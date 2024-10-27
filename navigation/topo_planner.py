@@ -154,6 +154,4 @@ class TopoPlanner(object):
         # =============================================================
         return start_point, end_point, stitching_map
 
-    # def go_to_sub_goal(self):
-    #     start_point, end_point, stitching_map = self.get_start_end_point()
 

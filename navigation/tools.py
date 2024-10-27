@@ -137,7 +137,7 @@ def is_in_free_grid(temp_node, current_node, rela_cx, rela_cy):
         return False
 
 
-def plot_map(obstacles, path, suc, obstable_distance):
+def plot_map(obstacles, path, suc):
     """
         Utility: Show the rrt path and its map.
     """
@@ -158,18 +158,10 @@ def plot_map(obstacles, path, suc, obstable_distance):
             cv2.line(rgb_img, (path_x[i], path_y[i]), (path_x[i+1], path_y[i+1]), color, thickness)
             cv2.circle(rgb_img, (path_x[i], path_y[i]), point_size, (255, 0, 0), thickness) # 起点：蓝点
             cv2.circle(rgb_img, (path_x[i+1], path_y[i+1]), point_size, (0, 255, 255), thickness) # 终点：黄色
-
-            # rgb_img = cv2.drawMarker(rgb_img, (path_x[i], path_y[i]), (255, 0, 0), cv2., thickness=1) # 起点：叉
-            # rgb_img = cv2.drawMarker(rgb_img, (path_x[i+1], path_y[i+1]), (0, 255, 0), cv2.MARKER_SQUARE, thickness=1) # 终点：方块
-
-    # if(suc==False):
-    #     cv2.imwrite("train_rrt_21_one_modal_gibson_70_test_show/{}_{}_{}_{}_{}.jpg".format(len(os.listdir("train_rrt_21_one_modal_gibson_70_test_show/")), path[0][0], path[0][1], path[-1][0], path[-1][1]), rgb_img_for_show)
-    # if(suc==False):
-    #     np.save("train_rrt_21_one_modal_gibson_43_test_show/{}_{}_{}_{}_{}.npy".format(len(os.listdir("train_rrt_21_one_modal_gibson_43_test_show/")), path[0][0], path[0][1], path[-1][0], path[-1][1]), obstacles)
     
     if(env_args.is_auto==False):
         rgb_img_for_show = cv2.resize(rgb_img, None, fx=1.5, fy=1.5)    
-        cv2.imshow("RRT PATH", rgb_img_for_show) # show00000000
+        cv2.imshow("RRT PATH", rgb_img_for_show) 
     
 
 def is_temp_node_see(temp_node, current_node, rela_cx, rela_cy, rela_turn):
@@ -196,4 +188,10 @@ def is_temp_node_see(temp_node, current_node, rela_cx, rela_cy, rela_turn):
         return True
     else:
         return False
+
+def get_absolute_pos_world(rela_cx, rela_cy, world_cx, world_cy, world_turn):
+    real_r_matrix = np.array([[np.cos(world_turn), np.sin(world_turn)], [np.sin(-world_turn), np.cos(world_turn)]])  
+    res_loc_in_real_world = np.dot(real_r_matrix, np.array([rela_cx, rela_cy])) + np.array([-world_cx, world_cy])
+    res_loc_in_real_world[0] = -res_loc_in_real_world[0]
+    return res_loc_in_real_world
 

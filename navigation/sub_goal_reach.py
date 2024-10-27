@@ -18,17 +18,15 @@ class SubgoalReach:
         Attributes
         ----------
         next_action: Selected next action.
-        rotate_cnt: The number of times the robot shakes left and right.
-        temp_action_buffer: Next action buffer.
         last_sim_location: last loc in the habitat.
         path_block_ls: List of robot walking path mater.
 
     """
     next_action = "new"
-    rotate_cnt = 0
-    temp_action_buffer = []
     last_sim_location = None
     path_block_ls = []
+
+    init_count_steps = 0
 
     @staticmethod
     def reset():
@@ -36,10 +34,9 @@ class SubgoalReach:
             Reset the static attributes.
         """
         SubgoalReach.next_action = "new"
-        SubgoalReach.rotate_cnt = 0
-        SubgoalReach.temp_action_buffer = []
         SubgoalReach.last_sim_location = None
         SubgoalReach.path_block_ls = []
+        SubgoalReach.init_count_steps = HabitatAction.count_steps
 
     @staticmethod
     def is_block(habitat_env):
@@ -74,10 +71,29 @@ class SubgoalReach:
                 action_parent_node.sub_frontiers.remove(action_node)
                 topo_graph.frontier_nodes.remove(action_node)
                 topo_graph.all_nodes.remove(action_node)
+
+                # rl_step中实际行走步数为0的frontier
+                if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
+                    action_node.parent_node.deleted_frontiers.append(action_node)
+
+
             else:
                 action_parent_node.sub_intentions.remove(action_node)
                 topo_graph.intention_nodes.remove(action_node)
                 topo_graph.all_nodes.remove(action_node)
+
+
+    def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result):
+        if(action_node.node_type=="intention_node"):
+            if not habitat_env.episode_over:
+                habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                observations = habitat_env.step(habitat_action)
+                return candidate_achieved_result
+            else:
+                return "exceed"
+        else:
+            SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+            return candidate_achieved_result 
 
 
 
@@ -93,18 +109,20 @@ class SubgoalReach:
         topo_planner = TopoPlanner(topo_graph, action_node)
         SubgoalReach.reset()
         while True:
-            if(HabitatAction.count_steps>env_args.max_steps): 
-                return "exceed" # 判断是否在1m以内
+            # 执行动作前的位置检测
             SubgoalReach.last_sim_location = get_sim_location(habitat_env)
             
             # 底层仿真器动作执行
             habitat_action = HabitatAction.set_habitat_action(SubgoalReach.next_action, topo_graph)
-            if(habitat_action is None):
+            if(habitat_action is None): # 手动调试时INVALID KEY
                 continue
 
-            if SubgoalReach.next_action=="f" or SubgoalReach.next_action=="l" or SubgoalReach.next_action=="r":
-                observations = habitat_env.step(habitat_action)
-                
+            if (SubgoalReach.next_action=="f" or SubgoalReach.next_action=="l" or SubgoalReach.next_action=="r"):
+                if not habitat_env.episode_over:
+                    observations = habitat_env.step(habitat_action)
+                else:
+                    return "exceed"
+
                 # 用于手动调试
                 if(env_args.is_auto==False):
                     rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
@@ -113,9 +131,10 @@ class SubgoalReach:
                 
                 if(SubgoalReach.next_action=="f"):
                     if(SubgoalReach.is_block(habitat_env)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
-                        # "block"
-                        SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                        return "block" # new_patch1
+                        # "block" # new_patch1
+                        achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block")
+                        return achieved_result
+                    
                     else:
                         # get sensor data: rgb, depth, 2d_laser
                         rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
@@ -128,16 +147,19 @@ class SubgoalReach:
                             cv2.imshow("occu_for_show", occu_for_show)
 
             elif (SubgoalReach.next_action == "suc" and topo_planner.state_flag=="finish"):
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                return "achieved" # frontier: 继续选下一个action, intention: 判断是否在1m以内
+                # "achieved"
+                achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved")
+                return achieved_result
 
             if(topo_planner.state_flag=="init" or (topo_planner.state_flag=="node_path" and SubgoalReach.next_action=="suc")):
                 # topo_planner.get_topo_path()
                 start_point, end_point, stitching_map = topo_planner.get_start_end_point()
-                local_planner = LocalPlanner(stitching_map, start_point, end_point, topo_planner.state_flag, action_node, topo_graph, topo_planner.sub_map_node)
+                local_planner = LocalPlanner(stitching_map, start_point, end_point, topo_planner.state_flag, action_node, topo_graph, topo_planner.sub_map_node, habitat_env)
                 local_path = local_planner.get_local_path()
                 if(local_path is None):
                     # "Failed_Plan"
-                    SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                    return "Failed_Plan" # new_patch2
-            SubgoalReach.next_action, local_path, SubgoalReach.rotate_cnt, SubgoalReach.temp_action_buffer = local_planner.update_local_path(topo_planner, SubgoalReach.next_action, local_path, SubgoalReach.rotate_cnt, SubgoalReach.temp_action_buffer)
+                    achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="Failed_Plan")
+                    return achieved_result
+
+            SubgoalReach.next_action, local_path = local_planner.update_local_path(topo_planner, SubgoalReach.next_action, local_path)
+            print("local_path:", local_path)

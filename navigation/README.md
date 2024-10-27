@@ -156,7 +156,7 @@
             * Determine if the robot is block.
             * param habitat_env
             * return flag: True or False
-        * def achieved_remove_action_node(topo_graph, action_node):
+        * def achieved__action_node(topo_graph, action_node):
             * When the robot achieves the sub-goal, delete the action node in the topo-graph.
             * param topo_graph
             * param action_node
@@ -194,7 +194,7 @@
         * param rela_cx, rela_cy
         * return flag: True or False.
 
-    * def plot_map(obstacles, path, suc, obstable_distance):
+    * def plot_map(obstacles, path, suc):
         * Utility: Show the rrt path and its map.
 
     * def is_temp_node_see(temp_node, current_node, rela_cx, rela_cy, rela_turn):

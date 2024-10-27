@@ -7,6 +7,7 @@ import copy
 from scipy.ndimage import distance_transform_edt
 
 from navigation.arguments import args
+from navigation.tools import plot_map
 from graph.arguments import args as graph_args
 
 
@@ -223,6 +224,7 @@ def astar(workMap):
             if ((end_time-init_time)>args.time_thre):
                 print("Noneeeee")
                 print((end_time-init_time))
+                plot_map(workMap.data, [(startx, starty), (endx, endy)], False)
                 return None
             for temp_work_node in workList:
                 if ((temp_work_node.x, temp_work_node.y) not in lockList): # 找到当前node附近（8格中）：没有“研究过的”&空闲区域node
@@ -238,8 +240,11 @@ def astar(workMap):
             result.append((currNode.x,currNode.y))
             currNode = currNode.father
         result.append((currNode.x,currNode.y))
+        result.reverse()
+        plot_map(workMap.data, result, True)
         end_time = time.time()
         print("time_delta:", end_time-init_time)
         return result
     except:
+        plot_map(workMap.data, [(startx, starty), (endx, endy)], False)
         return None

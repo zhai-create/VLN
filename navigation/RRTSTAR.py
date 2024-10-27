@@ -138,13 +138,13 @@ class RRTStar:
                     print("plan success")
                     print("RRT STEP: ", i, len(self.nodes), count)
                     print("RRT PATH LENGTH: ", len(path))
-                    plot_map(self.obstacles, path, True, self.obstable_distance)
+                    plot_map(self.obstacles, path, True)
                     return path
        
 
         print("fail")        
         print("RRT STEP: ", i, len(self.nodes), count)
-        plot_map(self.obstacles, [(self.start.x, self.start.y), (self.goal.x, self.goal.y)], False, self.obstable_distance)
+        plot_map(self.obstacles, [(self.start.x, self.start.y), (self.goal.x, self.goal.y)], False)
         return None
 
     def inflation(self, map):

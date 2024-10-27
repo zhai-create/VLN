@@ -65,11 +65,16 @@ class HabitatAction:
                 HabitatAction.count_steps += 1  # 每次初始化时增加步数
                 topo_graph.set_current_pos(topo_graph.rela_cx, topo_graph.rela_cy, rela_turn)
                 print("habitat_action: RIGHT")
-            else:
+            elif action_name == "s": # 找到intention node后执行的动作(手动赋值)
+                habitat_action = HabitatSimActions.stop
+                HabitatAction.count_steps += 1  # 每次初始化时增加步数
+                print("habitat_action: STOP")
+            else: # "new" or "suc"
                 habitat_action = -1
                 print("Else_action:", action_name)
-        elif keystroke == ord(args.FINISH):
+        elif keystroke == ord(args.FINISH): # 手动调试时才需要
             habitat_action = HabitatSimActions.stop
+            HabitatAction.count_steps += 1  # 每次初始化时增加步数
             print("action: FINISH")
         else:
             habitat_action = None

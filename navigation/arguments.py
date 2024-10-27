@@ -50,9 +50,10 @@ def get_args():
     parser.add_argument("--OTHER", type=str, default="o")
     parser.add_argument("--GO_ON", type=str, default="a")
 
-    parser.add_argument("--is_choose_action", type=bool, default=False)
-
-    
+    # action_pub revelent
+    parser.add_argument("--path_length_thre", type=int, default=10)
+    parser.add_argument("--short_path_length_thre", type=int, default=6)
+    parser.add_argument("--to_target_distance_thre", type=float, default=0.6)
     
     
 
@@ -61,3 +62,5 @@ def get_args():
     return args
 
 args = get_args()
+
+act_num_str_map = ["suc", "f", "l", "r"]
