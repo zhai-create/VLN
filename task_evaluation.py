@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 1'
 import cv2
 import habitat
 import datetime
@@ -35,9 +35,9 @@ if __name__=="__main__":
     args.model_file_name = "Models"
     args.graph_pre_model = 1
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    args.graph_episode_num = 500
+    args.graph_episode_num = 332
     args.success_distance = 0.25
-    args.max_steps = 495
+    args.max_steps = 500
 
     rl_args.score_top_k = 50
     rl_args.graph_node_feature_dim = 2
@@ -61,23 +61,22 @@ if __name__=="__main__":
         # rl_graph_init
         rl_graph = RL_Graph()
         # haitat_episode_init
+        
         observations = habitat_env.reset()
+        if(index_in_episodes<331):
+            continue
 
         HabitatAction.reset(habitat_env) 
         habitat_metric = habitat_env.get_metrics()
         object_goal = args.object_ls[observations["objectgoal"][0]]
 
         print("=====> object_goal <=====", object_goal)
-        if(index_in_episodes<10000):
-            continue
-
         # get sensor data: rgb, depth, 2d_laser
         rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
         depth = fix_depth(observations["depth"])
-
         
         # topo_graph_init
-        topo_graph = GraphMap()
+        topo_graph = GraphMap(habitat_env=habitat_env)
         topo_graph.set_current_pos(rela_cx=0.0, rela_cy=0.0, rela_turn=0.0)
         topo_graph.update(rgb_image_ls, depth, object_goal)
 
@@ -91,34 +90,35 @@ if __name__=="__main__":
         while True:
             # rl_graph_update
             rl_graph.update(topo_graph)
-            
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
+                print("=====> real_action_selection <=====")
             else:
                 topo_graph.ghost_patch()
                 if(len(topo_graph.frontier_nodes)>0):
                     rl_graph.update(topo_graph)
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
+                    print("=====> ghost_patch <=====")
                 else:
                     # action_space为空，结束当前episode
-                    Evaluate.evaluate(writer, achieved_result="empty", habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes)
-                    habitat_env.step(HabitatSimActions.stop)
+                    if not habitat_env.episode_over:
+                        habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                        observations = habitat_env.step(habitat_action)
+                        achieved_result = "empty"
+                    else:
+                        achieved_result = "exceed"
+                    Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes)
                     break
+
             action_node = rl_graph.all_nodes[polict_action]
             achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
+            print("======> achieved_result <=====", achieved_result)
+            print("=====> action_node_type <=====", action_node.node_type)
             
-
+            
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes)
-            if(evaluate_res=="stop"):
-                # 结束当前episode
-                habitat_env.step(HabitatSimActions.stop)
+            if(evaluate_res=="episode_stop"):
                 break
-        
-        
-        
-        # print("habitat_metric: ", habitat_metric.keys())
-        # print("observations:", observations.keys())
-        # print("objectgoal:", args.object_ls[observations["objectgoal"][0]])
 
 
 

@@ -36,7 +36,6 @@ def depth_estimation(large_mask, depth):
     :param depth: fixed depth
     :return res_depth_2d_cx, res_depth_2d_cy: relative pos of the object corresponding to the current robot
     """
-    min_threshold = 0.1
     depth_2d = depth * np.cos(pre_depth.data[:, :, 2:3]) * args.depth_scale # 单位：meter
 
     lower_depth_height = int(args.depth_height/4)
@@ -52,14 +51,56 @@ def depth_estimation(large_mask, depth):
     average_depth = sum_non_zero / count_non_zero
 
     non_zero_indices = np.nonzero(target_depth)
-    x_indices, y_indices = non_zero_indices[0], non_zero_indices[1]
-    average_y = np.mean(y_indices)
 
-    ta_angle = ta_ls_array[int(average_y)]
-    res_depth_2d_cx = average_depth * np.cos(ta_angle)
-    res_depth_2d_cy = average_depth * np.sin(ta_angle)
+    print("non_zero_indices:", non_zero_indices)
 
-    return res_depth_2d_cx, res_depth_2d_cy
+    if(len(non_zero_indices[1])==0):
+        return None, None
+    else:
+        x_indices, y_indices = non_zero_indices[0], non_zero_indices[1]
+        average_y = np.mean(y_indices)
+        
+        ta_angle = ta_ls_array[int(average_y)]
+        res_depth_2d_cx = average_depth * np.cos(ta_angle)
+        res_depth_2d_cy = average_depth * np.sin(ta_angle)
+        return res_depth_2d_cx, res_depth_2d_cy
+
+def depth_estimation_laser(large_mask, depth):
+    depth_2d = depth * np.cos(pre_depth.data[:, :, 2:3]) * args.depth_scale # 单位：meter
+
+    lower_depth_height = int(args.depth_height/4)
+    upper_depth_height = int(3*args.depth_height/4)
+    partial_depth_2d = depth_2d[lower_depth_height:upper_depth_height, :, 0]
+
+    num_large_mask = np.where(large_mask, 1, 0)
+    num_large_mask_after_resize = resize_matrix(num_large_mask, new_shape=(partial_depth_2d.shape[0], partial_depth_2d.shape[1]))
+    
+
+    res_depth_2d = np.multiply(num_large_mask_after_resize, partial_depth_2d)
+    res_depth_2d[res_depth_2d < args.depth_min_thre] = 10000
+
+    res_depth_2d_min = np.min(res_depth_2d, axis=0)
+    col_indices = np.where(res_depth_2d_min < args.depth_scale)[0] # 物体点云在depth中对应的列下标
+
+    res_depth_2d_cx = np.multiply(res_depth_2d_min, np.cos(ta_ls_array))
+    res_depth_2d_cy = np.multiply(res_depth_2d_min, np.sin(ta_ls_array))
+    res_center_ls = np.column_stack((res_depth_2d_cx, res_depth_2d_cy))
+
+    res_center_ls = res_center_ls[col_indices]
+
+    if(len(res_center_ls)==0):
+        return None, None
+    else:
+        dis_center_ls = [(res_center_ls[index][0]**2+res_center_ls[index][1]**2, (res_center_ls[index][0], res_center_ls[index][1]))  for index in range(len(res_center_ls))]
+        dis_center_ls = sorted(dis_center_ls)
+        dis_center_ls = dis_center_ls[len(dis_center_ls)//2:]
+        
+        res_depth_2d_cx = dis_center_ls[0][1][0]
+        res_depth_2d_cy = dis_center_ls[0][1][1]
+        return res_depth_2d_cx, res_depth_2d_cy
+        
+
+
 
 def sam_show_mask(mask, image0):
     """

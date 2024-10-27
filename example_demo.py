@@ -7,6 +7,7 @@ import numpy as np
 
 import habitat
 from env_tools.data_utils import hm3d_config
+from env_tools.arguments import args as env_args
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
@@ -26,7 +27,6 @@ def get_args():
 from perception.frontier_utils import predict_frontier
 from perception.laser_utils import get_laser_point
 from perception.tools import fix_depth, get_rgb_image
-from graph.node_utils import Node
 
 if __name__ == "__main__":
     args = get_args()
@@ -35,7 +35,10 @@ if __name__ == "__main__":
 
 
     for i in tqdm(range(args.eval_episodes)):
+        episode_steps = 0
         observations = habitat_env.reset()
+
+        object_goal = env_args.object_ls[observations["objectgoal"][0]]
         # rgb_show
         # obs_rgb = observations["rgb"]
         # cv2.imshow("obs_rgb", obs_rgb)
@@ -60,19 +63,10 @@ if __name__ == "__main__":
         point_for_close_loop_detection, laser_2d_filtered, laser_2d_filtered_angle = \
         get_laser_point(obs_depth)
 
-        print("point_for_close_loop_detection:{}\n".format(point_for_close_loop_detection))
-        print("laser_2d_filtered:{}\n".format(laser_2d_filtered))
-        print("laser_2d_filtered_angle:{}\n".format(laser_2d_filtered_angle))
         
-        node1 = Node(node_type="explored_node", name="0", pc=point_for_close_loop_detection)
-        node1.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, np.array([0,0]), 0.0)
-
-        occu_for_show = cv2.resize(node1.occupancy_map.astype(np.float64), None, fx=1, fy=1)
-        cv2.imshow("occupancy_map", occu_for_show)
 
         candidate_frontier_arr = predict_frontier(0.1, laser_2d_filtered, laser_2d_filtered_angle)
 
-        print("candidate_frontier_arr:", candidate_frontier_arr)
 
         # metric
         habitat_metric = habitat_env.get_metrics()
@@ -87,12 +81,22 @@ if __name__ == "__main__":
                 habitat_action = HabitatSimActions.turn_right
             elif(keystroke == ord(FINISH)):
                 habitat_action = HabitatSimActions.stop
-                habitat_env.step(habitat_action)
-                break
             else:
                 print("invalid_key")
                 continue
             observations = habitat_env.step(habitat_action)
+            episode_steps += 1
+
+            print("episode_steps:", episode_steps)
+            print("habitat_action:", habitat_action)
+            print("habitat_env.episode_over:", habitat_env.episode_over)
+            print("object_goal:", object_goal)
+
+            # metric
+            habitat_metric = habitat_env.get_metrics()
+            print("habitat_metric:", habitat_metric)
+
+            print("dis_to_goal:{}\n".format(habitat_metric['distance_to_goal']))
 
             # rgb_show
             # obs_rgb = observations["rgb"]
@@ -120,27 +124,18 @@ if __name__ == "__main__":
             point_for_close_loop_detection, laser_2d_filtered, laser_2d_filtered_angle = \
             get_laser_point(obs_depth)
 
-            print("point_for_close_loop_detection:{}\n".format(point_for_close_loop_detection))
-            print("laser_2d_filtered:{}\n".format(laser_2d_filtered))
-            print("laser_2d_filtered_angle:{}\n".format(laser_2d_filtered_angle))
 
-            node1.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, np.array([0,0]), 0.0)
 
-            occu_for_show = cv2.resize(node1.occupancy_map.astype(np.float64), None, fx=1, fy=1)
-            cv2.imshow("occupancy_map", occu_for_show)
 
             candidate_frontier_arr = predict_frontier(0.1, laser_2d_filtered, laser_2d_filtered_angle)
 
-            print("candidate_frontier_arr:", candidate_frontier_arr)
             
-            # metric
-            habitat_metric = habitat_env.get_metrics()
+            
 
             # agent_pos
             c_x, c_y = observations["agent_position"][2], observations["agent_position"][0]
             c_z = observations["agent_position"][1]
             
-            print("cx{}, cy:{}, cz:{}\n".format(c_x, c_y, c_z))
-            print("dis_to_goal:{}\n".format(habitat_metric['distance_to_goal']))
-            print("----habitat_metric----", habitat_metric.keys())
-            print("----observation_keys----", observations.keys())
+            # print("cx{}, cy:{}, cz:{}\n".format(c_x, c_y, c_z))
+            # print("----habitat_metric----", habitat_metric.keys())
+            # print("----observation_keys----", observations.keys())

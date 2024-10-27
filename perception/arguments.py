@@ -31,6 +31,9 @@ def get_args():
     parser.add_argument("--factor_0", type=float, default=1.5625)
     parser.add_argument("--factor_1", type=float, default=0.005859375)
 
+    parser.add_argument("--depth_min_thre", type=float, default=0.1)
+    parser.add_argument("--is_depth_estimation_laser", type=bool, default=True)
+
     # parse arguments
     args = parser.parse_args()
     return args

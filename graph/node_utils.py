@@ -11,7 +11,7 @@ class Node(object):
 
     name_val = 0
 
-    def __init__(self, node_type, rela_cx=0, rela_cy=0, parent_node=None, score=0.0, pc=None):
+    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None):
         self.node_type = node_type # 直接赋值, str
         self.name = str(Node.name_val) # 在graph update时赋值, str
         Node.name_val += 1
@@ -19,11 +19,19 @@ class Node(object):
         self.rela_cx = rela_cx # explored用默认值，其他结点需要赋值, float
         self.rela_cy = rela_cy # frontiet的cx和cy分别为ghost.middle[0]和middle[1], float
 
+        self.world_cx = world_cx
+        self.world_cy = world_cy
+        self.world_cz = world_cz
+        self.world_turn = world_turn
+
+
         self.dis = (rela_cx**2+rela_cy**2)**0.5 # float
 
         self.is_see = False # bool
 
         self.rl_node_index = -1 # int
+        
+        self.deleted_frontiers = [] # rl_step中实际行走步数为0的frontier
 
         if(node_type=="explored_node"):
             self.rela_angle_parent_center = 0
@@ -43,6 +51,15 @@ class Node(object):
         self.sub_intentions = []
 
         self.pc = pc
+
+    def __eq__(self, other):
+        if isinstance(other, Node):
+            return self.name == other.name
+        return False
+
+    def __hash__(self):
+        # 返回self.value的哈希值
+        return hash(self.name)
     
     
     def add_neighbor(self, neighbor, relative_loc, relative_turn): # 添加当前结点的邻居结点，及其相对于当前结点的位置和角度

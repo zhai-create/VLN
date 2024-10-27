@@ -9,7 +9,7 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 
 from perception.arguments import args, coco_categories_mapping
-from perception.tools import sam_show_mask, depth_estimation
+from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser
 
 
 def object_detect(rgb_image_ls, depth, object_text):
@@ -35,6 +35,7 @@ def object_detect(rgb_image_ls, depth, object_text):
         detections_ls = rcnn_model(img_info_inputs)
 
     for index in range(len(rgb_image_ls)): # 遍历每一张图片
+    # for index in range(1): # 遍历每一张图片
         temp_outputs = detections_ls[index]
         temp_masks = temp_outputs["instances"].pred_masks
         temp_boxes = temp_outputs["instances"].pred_boxes
@@ -63,11 +64,18 @@ def object_detect(rgb_image_ls, depth, object_text):
                 elif((index+1)==3):
                     large_mask = np.hstack((new_mask[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, false_matrix, new_mask[:, :int(false_matrix.shape[1]//2)]))
 
-                res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
-                if(temp_confidence_ls[temp_index] not in detect_res_pos_dict):
-                    detect_res_pos_dict[temp_confidence_ls[temp_index]] = [[res_depth_2d_cx, res_depth_2d_cy]]
+                if(args.is_depth_estimation_laser==True):
+                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
                 else:
-                    detect_res_pos_dict[temp_confidence_ls[temp_index]].append([res_depth_2d_cx, res_depth_2d_cy])
+                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
+                
+                if(res_depth_2d_cx is None):
+                    continue
+                
+                if(temp_pre_scores[temp_index].item() not in detect_res_pos_dict):
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy]]
+                else:
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy])
     return detect_res_pos_dict
 
 

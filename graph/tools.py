@@ -1,3 +1,4 @@
+import math
 from math import sqrt, atan2
 from numba import jit
 import numpy as np
@@ -145,5 +146,12 @@ def find_node_path(n1, n2, explored_nodes):
 
         visited.add(node.name)
     return None
+
+
+def get_current_world_pos(habitat_env):
+    world_cx, world_cy = habitat_env._sim.get_agent_state(0).position[2], habitat_env._sim.get_agent_state(0).position[0]
+    world_cz = habitat_env._sim.get_agent_state(0).position[1]
+    world_turn = 2 * math.atan(habitat_env._sim.get_agent_state(0).rotation.y/habitat_env._sim.get_agent_state(0).rotation.w)
+    return world_cx, world_cy, world_cz, world_turn
 
 

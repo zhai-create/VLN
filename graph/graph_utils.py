@@ -1,6 +1,6 @@
 import copy
 import numpy as np
-from graph.tools import find_current_node, get_absolute_pos, clear_fake_frontier
+from graph.tools import find_current_node, get_absolute_pos, clear_fake_frontier, get_current_world_pos
 from graph.check_utils import second_check, third_check, forth_check
 from graph.node_utils import Node
 from graph.arguments import args
@@ -8,6 +8,8 @@ from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
 from perception.intention_utils_rcnn import object_detect
 from perception.laser_utils import get_laser_point
+
+import copy
 
 
 
@@ -27,7 +29,7 @@ class NodeList(list):
         
 
 class GraphMap(object):
-    def __init__(self):
+    def __init__(self, habitat_env):
         self.explored_nodes = NodeList()
         self.frontier_nodes = []
         self.intention_nodes = []
@@ -41,6 +43,8 @@ class GraphMap(object):
         self.point_for_close_loop_detection=None
         self.laser_2d_filtered=None
         self.laser_2d_filtered_angle=None
+        
+        self.habitat_env = habitat_env
 
 
     def set_current_pos(self, rela_cx, rela_cy, rela_turn):
@@ -61,8 +65,25 @@ class GraphMap(object):
 
         current_map = self.current_node.occupancy_map
 
-        for temp_node in self.explored_nodes:
-            for temp_frontier in temp_node.sub_frontiers:
+        for temp_node in self.explored_nodes:            
+            sub_frontiers_for_index = copy.deepcopy(temp_node.sub_frontiers)
+            for temp_frontier in sub_frontiers_for_index:
+                
+
+                # 先删除使得rl_step中实际行走的step为0的frontier
+                # ===================================
+                need_delete_flag = False
+                for temp_delete_frontier in temp_node.deleted_frontiers:
+                    if ((temp_delete_frontier.rela_cx-temp_frontier.rela_cx)**2+(temp_delete_frontier.rela_cy-temp_frontier.rela_cy)**2)**0.5<0.2:
+                        need_delete_flag = True
+                        break
+                if(need_delete_flag == True):
+                    temp_node.sub_frontiers.remove(temp_frontier)
+                    self.frontier_nodes.remove(temp_frontier)
+                    self.all_nodes.remove(temp_frontier)
+                    continue
+                # ===================================
+                
                 if temp_node.name != self.current_node.name:
                     n_in_current_node = self.current_node.all_other_nodes_loc[temp_node.name] # 将node中的ghost坐标位置转换到当前node下
                     g_ref_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
@@ -70,19 +91,16 @@ class GraphMap(object):
                     g_ref_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
                 gx = (int)(half_len-g_ref_loc[0]/args.resolution)
                 gy = (int)(half_len+g_ref_loc[1]/args.resolution)
-
-                if gx >= 2*half_len:
-                    gx = 2*half_len
-                if gy >= 2*half_len:
-                    gy = 2*half_len
                 
-                temp_val = show_ghost_map[gx,gy,0]
-                show_ghost_map[gx,gy,0] = args.ghost_map_g_val
+
+                temp_dis = ((g_ref_loc[0]-self.rela_cx)**2 + (g_ref_loc[1]-self.rela_cy)**2)**0.5
+                print("=====> temp_dis <=====", temp_dis)
 
                 if gx>=1 and gx<=(2*half_len-1) and gy>=1 and gy<=(2*half_len-1):
+                    temp_val = show_ghost_map[gx,gy,0]
+                    show_ghost_map[gx,gy,0] = args.ghost_map_g_val
                     dis = ((g_ref_loc[0]-self.rela_cx)**2 + (g_ref_loc[1]-self.rela_cy)**2)**0.5
-                    
-                    
+                    print("=====> dis <=====", dis)
                     
                     around = np.array([current_map[gx-1, gy-1, 0], current_map[gx-1, gy-0, 0], current_map[gx-1, gy+1, 0], current_map[gx-0, gy-1, 0], \
                                     current_map[gx-0, gy+1, 0], current_map[gx+1, gy-1, 0], current_map[gx+1, gy-0, 0], current_map[gx+1, gy+1, 0], current_map[gx, gy, 0]])
@@ -93,14 +111,17 @@ class GraphMap(object):
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
                         show_ghost_map[gx,gy,0] = temp_val
-                        
                     elif dis <= args.thre_for_blacklist_delete:
                         temp_node.sub_frontiers.remove(temp_frontier)
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
                         clear_fake_frontier(self.current_node, gx, gy)
+                else: # 直接remove
+                    temp_node.sub_frontiers.remove(temp_frontier)
+                    self.frontier_nodes.remove(temp_frontier)
+                    self.all_nodes.remove(temp_frontier)
 
-    
+
     def multi_check_frontier(self, candidate_frontier_arr):
         res_frontier_pos_arr = []
         r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
@@ -228,16 +249,17 @@ class GraphMap(object):
         # update explored node
         if flag == True:
             last_node = self.current_node
+            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
             if(last_node is None):
                 self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", pc=point_for_close_loop_detection)
+                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
                 predict_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, np.array([0,0]), 0.0)
                 self.current_node = predict_node
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
             else:
                 self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", pc=point_for_close_loop_detection)
+                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
                 predict_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, np.array([0,0]), 0.0)
                 self.current_node = predict_node
                 
@@ -246,16 +268,6 @@ class GraphMap(object):
                 inverse_theta = -theta_to_current
                 inverse_t = np.dot(R, -t_to_current)
                 self.current_node.add_neighbor(last_node, inverse_t, inverse_theta)
-
-                print("=====> current_node.neighbor <=====", self.current_node.neighbor)
-                print("=====> last_node.neighbor <=====", last_node.neighbor)
-
-                print("=====> len(self.all_nodes) <=====", len(self.all_nodes))
-                print("=====> predict_node.name <=====", predict_node.name)
-                print("=====> current_node_name <=====", self.current_node.name)
-                print("=====> last_node.name <=====", last_node.name)
-
-                print("=====> self.explored_nodes <=====", self.explored_nodes)
                 
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
