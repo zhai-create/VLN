@@ -310,6 +310,9 @@ class GraphMap(object):
         detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_text)
         self.add_intention(detect_res_pos_dict)
 
+        # request the llm for question
+        
+
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
     def ghost_patch(self):
         predict_ghost_thre1 = args.init_predict_ghost_thre1

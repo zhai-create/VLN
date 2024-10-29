@@ -50,6 +50,11 @@ class Node(object):
         self.sub_frontiers = []
         self.sub_intentions = []
 
+        self.room_flag = -1
+        self.receptacle_flag = -1
+        self.guide_flag = -1
+        self.object_flag = -1
+
         self.pc = pc
 
     def __eq__(self, other):

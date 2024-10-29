@@ -59,7 +59,7 @@ def hm3d_config(path:str=HM3D_CONFIG_PATH,stage:str='val',episodes=200):
         # habitat_config.habitat.simulator.agents.main_agent.sim_sensors.depth_sensor.normalize_depth=False
         habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.max_depth=10.0
         habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.normalize_depth=True
-        habitat_config.habitat.task.measurements.success.success_distance = 0.25
+        habitat_config.habitat.task.measurements.success.success_distance = 1.0
     return habitat_config
     
 

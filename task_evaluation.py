@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '2, 3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '2, 3'
 import cv2
 import habitat
 import datetime
@@ -35,8 +35,8 @@ if __name__=="__main__":
     args.model_file_name = "Models"
     args.graph_pre_model = 1
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    args.graph_episode_num = 332
-    args.success_distance = 0.25
+    args.graph_episode_num = 1000
+    args.success_distance = 1.0
     args.max_steps = 500
 
     rl_args.score_top_k = 50
@@ -61,10 +61,9 @@ if __name__=="__main__":
         # rl_graph_init
         rl_graph = RL_Graph()
         # haitat_episode_init
-        
         observations = habitat_env.reset()
-        if(index_in_episodes<331):
-            continue
+        # if(index_in_episodes<800):
+        #     continue
 
         HabitatAction.reset(habitat_env) 
         habitat_metric = habitat_env.get_metrics()

@@ -18,7 +18,7 @@ RIGHT="d"
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--eval_episodes",type=int,default=100)
+    parser.add_argument("--eval_episodes",type=int,default=2000)
     parser.add_argument("--mapper_resolution",type=float,default=0.05)
     parser.add_argument("--path_resolution",type=float,default=0.2)
     parser.add_argument("--path_scale",type=int,default=5)
@@ -32,6 +32,9 @@ if __name__ == "__main__":
     args = get_args()
     habitat_config = hm3d_config(stage='val',episodes=args.eval_episodes)
     habitat_env = habitat.Env(config=habitat_config)
+
+
+    print("len(env.episodes):", len(habitat_env.episodes))
 
 
     for i in tqdm(range(args.eval_episodes)):
@@ -87,6 +90,7 @@ if __name__ == "__main__":
             observations = habitat_env.step(habitat_action)
             episode_steps += 1
 
+            print("len(env.episodes):", len(habitat_env.episodes))
             print("episode_steps:", episode_steps)
             print("habitat_action:", habitat_action)
             print("habitat_env.episode_over:", habitat_env.episode_over)

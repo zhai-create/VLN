@@ -22,7 +22,7 @@ def get_args():
 
     # episodes revelent
     # parser.add_argument("--eval_episodes", type=int, default=100)
-    parser.add_argument("--success_distance", type=float, default=0.25)
+    parser.add_argument("--success_distance", type=float, default=1.0)
     parser.add_argument("--max_steps", type=int, default=500)
     parser.add_argument("--object_ls", type=list, default=["chair", "bed", "plant", "toilet", "tv_monitor", "sofa"])
 
