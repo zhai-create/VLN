@@ -183,5 +183,6 @@ class SAC(RL_Policy):
         self.critic_target = copy.deepcopy(self.critic)
 
         self.actor.load_state_dict(torch.load(dir_path + "_actor"))
+        print("=====> torch.load <=====", dir_path + "_actor_optimizer")
         self.actor_optimizer.load_state_dict(torch.load(dir_path + "_actor_optimizer"))
         self.actor_target = copy.deepcopy(self.actor)

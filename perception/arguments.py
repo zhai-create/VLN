@@ -15,12 +15,7 @@ def get_args():
     parser.add_argument("--index_ratio", type=int, default=1, help="get the 1/index_ratio of the original laser_2d_filtered")
     parser.add_argument("--angle_depth", type=float, default=35.264389682754654, help="angle for pre_depth")
 
-    parser.add_argument("--sam_path", type=str, default='/home/zhaishichao/Data/Grounded_Segment_Anything/sam_hq_vit_h.pth')
-    parser.add_argument("--sam_type", type=str, default='vit_h')
     parser.add_argument("--model_device", type=str, default='cuda:1')
-    parser.add_argument("--text_to_text_path", type=str, default='/home/zhaishichao/Data/Grounded_Segment_Anything/all-MiniLM-L6-v2')
-    parser.add_argument("--GROUNDING_DINO_CONFIG_PATH", type=str, default="/home/zhaishichao/Data/Grounded_Segment_Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py")
-    parser.add_argument("--GROUNDING_DINO_CHECKPOINT_PATH", type=str, default="/home/zhaishichao/Data/Grounded_Segment_Anything/groundingdino_swint_ogc.pth")
     parser.add_argument("--rcnn_weight_path", type=str, default="/home/zhaishichao/Data/VLN/dependencies/mask_rcnn/maskrcnn_gibson.pth")
     parser.add_argument("--rcnn_yaml_path", type=str, default="/home/zhaishichao/Data/VLN/dependencies/mask_rcnn/mask_rcnn_R_50_FPN_3x.yaml")
 

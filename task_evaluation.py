@@ -31,7 +31,7 @@ from habitat.sims.habitat_simulator.actions import HabitatSimActions
 if __name__=="__main__":
     args.task_stage = "val"
     args.graph_train = False
-    args.root = "/home/zhaishichao/Data/VLN"
+    args.root = "/home/zhaishichao/Data/VLN_master"
     args.model_file_name = "Models"
     args.graph_pre_model = 1
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
@@ -52,7 +52,7 @@ if __name__=="__main__":
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num)
     habitat_env = habitat.Env(config=habitat_config)
 
-    experiment_details = args.task_stage+'_graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
+    experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         '_'+ rl_args.graph_encoder
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
