@@ -50,7 +50,7 @@
 
 ## Datasets
 Please use the datasets of HM3D-v0.2-val_split. You should download both Scenes datasets and the task datasets.
-[Common task and episode datasets used with Habitat-Lab](DATASETS.md).
+[Common task and episode datasets used with Habitat-Lab](https://github.com/facebookresearch/habitat-lab/blob/main/DATASETS.md).
 
 
 
