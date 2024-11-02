@@ -14,7 +14,7 @@ def get_args():
     parser.add_argument("--alpha_init", type=float, default=1.0)
 
     # feature_dim
-    parser.add_argument('--graph_node_feature_dim', type=int, default=2,
+    parser.add_argument('--graph_node_feature_dim', type=int, default=6,
         help="the dimension of graph node")
     parser.add_argument('--graph_edge_feature_dim', type=int, default=3,
         help="the dimension of graph edge")
@@ -52,6 +52,12 @@ def get_args():
     parser.add_argument('--graph_lr_critic', type=float, default=1e-4,
         help="the learning rate of critic network")
     parser.add_argument("--random_exploration_length", type=int, default=-1)
+    parser.add_argument("--load_buffer_data_cnt", type=int, default=-1)
+
+    # buffer_data_path
+    parser.add_argument("--save_buffer_data_path", type=str, default="")
+    parser.add_argument("--load_buffer_data_path", type=str, default="")
+    parser.add_argument("--is_save_buffer_data", type=bool, default=False)
 
     # parse arguments
     args = parser.parse_args()

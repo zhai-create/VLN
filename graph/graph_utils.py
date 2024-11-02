@@ -7,9 +7,11 @@ from graph.arguments import args
 from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
 from perception.intention_utils_rcnn import object_detect
+from perception.intention_utils_blip import request_llm
 from perception.laser_utils import get_laser_point
 
 import copy
+import time
 
 
 
@@ -94,13 +96,11 @@ class GraphMap(object):
                 
 
                 temp_dis = ((g_ref_loc[0]-self.rela_cx)**2 + (g_ref_loc[1]-self.rela_cy)**2)**0.5
-                print("=====> temp_dis <=====", temp_dis)
 
                 if gx>=1 and gx<=(2*half_len-1) and gy>=1 and gy<=(2*half_len-1):
                     temp_val = show_ghost_map[gx,gy,0]
                     show_ghost_map[gx,gy,0] = args.ghost_map_g_val
                     dis = ((g_ref_loc[0]-self.rela_cx)**2 + (g_ref_loc[1]-self.rela_cy)**2)**0.5
-                    print("=====> dis <=====", dis)
                     
                     around = np.array([current_map[gx-1, gy-1, 0], current_map[gx-1, gy-0, 0], current_map[gx-1, gy+1, 0], current_map[gx-0, gy-1, 0], \
                                     current_map[gx-0, gy+1, 0], current_map[gx+1, gy-1, 0], current_map[gx+1, gy-0, 0], current_map[gx+1, gy+1, 0], current_map[gx, gy, 0]])
@@ -233,6 +233,15 @@ class GraphMap(object):
                 self.current_node.sub_intentions.append(new_intention)
                 self.intention_nodes.append(new_intention)
                 self.all_nodes.append(new_intention)
+
+    def add_request_feature(self, rgb_image_ls, object_text):
+        answer_ls = request_llm(rgb_image_ls, object_text)
+        room_flag, receptacle_flag, guide_flag, object_flag = answer_ls[0], answer_ls[1], answer_ls[2], answer_ls[3]
+        self.current_node.room_flag = room_flag
+        self.current_node.receptacle_flag = receptacle_flag
+        self.current_node.guide_flag = guide_flag
+        self.current_node.object_flag = object_flag
+        
     
     
     def update(self, rgb_image_ls, depth, object_text):
@@ -245,7 +254,8 @@ class GraphMap(object):
         
         flag, predict_node, [final_theta, final_t], [theta_to_current, t_to_current], ratio = \
         find_current_node(self.explored_nodes, self.current_node, point_for_close_loop_detection, self.rela_turn, np.array([self.rela_cx, self.rela_cy]))
-        
+
+
         # update explored node
         if flag == True:
             last_node = self.current_node
@@ -295,9 +305,11 @@ class GraphMap(object):
             self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)            
             self.current_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, final_t, final_theta)
 
+
         else:
             self.set_current_pos(final_t[0], final_t[1], final_theta)
             self.current_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, final_t, final_theta)
+
 
         # update frontier node
         candidate_frontier_arr = predict_frontier(args.init_predict_ghost_thre1, laser_2d_filtered, laser_2d_filtered_angle)
@@ -308,11 +320,16 @@ class GraphMap(object):
 
         # update intention node
         detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_text)
+        
         self.add_intention(detect_res_pos_dict)
 
         # request the llm for question
-        
-
+        if(flag==True):
+            s_llm_time = time.time()
+            self.add_request_feature(rgb_image_ls, object_text)
+            e_llm_time = time.time()
+            print("=====> delta_llm_time <=====", e_llm_time-s_llm_time)
+    
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
     def ghost_patch(self):
         predict_ghost_thre1 = args.init_predict_ghost_thre1

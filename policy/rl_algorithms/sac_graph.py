@@ -17,11 +17,11 @@ from policy.modules.graph_pointer import GraphPointerPolicy, GraphQNet
 from torch_geometric.data.batch import Batch
 
 from graph.tools import get_absolute_pos
-from policy.rl_algorithms.arguments import args
+# from policy.rl_algorithms.arguments import args
 
 
 class SAC(RL_Policy):
-    def __init__(self, target_entropy=None):
+    def __init__(self, args):
         super(SAC, self).__init__(args)
 
         self.actor = GraphPointerPolicy(node_dim=args.graph_node_feature_dim, 
@@ -50,9 +50,7 @@ class SAC(RL_Policy):
         # entropy tuning
         self.lr_tune = args.lr_tune
         self.alpha_init = args.alpha_init
-        self.target_entropy = target_entropy
-        if self.target_entropy == None:
-            self.target_entropy = 0.05 * (-np.log(1 / args.graph_num_action_padding))
+        self.target_entropy = 0.05 * (-np.log(1 / args.graph_num_action_padding))
         
         self.log_alpha = torch.full((), np.log(self.alpha_init), requires_grad=True, dtype=torch.float32, device=torch.device('cuda'))
         self.alpha = self.log_alpha.exp().detach()
@@ -183,6 +181,18 @@ class SAC(RL_Policy):
         self.critic_target = copy.deepcopy(self.critic)
 
         self.actor.load_state_dict(torch.load(dir_path + "_actor"))
-        print("=====> torch.load <=====", dir_path + "_actor_optimizer")
         self.actor_optimizer.load_state_dict(torch.load(dir_path + "_actor_optimizer"))
         self.actor_target = copy.deepcopy(self.actor)
+
+    def load_buffer_data(self, writer, load_buffer_data_cnt):
+        while self.train_step<=load_buffer_data_cnt:
+            load_dict = np.load(args.load_buffer_data_path+"{}.npy".format(self.train_step), allow_pickle=True).item()
+            load_state = load_dict['state']
+            load_action_indexes = load_dict['action_indexes']
+            load_next_state = load_dict['next_state']
+            load_reward = load_dict['reward']
+            load_done = load_dict['done']
+
+            policy.update_buffer(load_state, load_action_indexes, load_next_state, load_reward, load_done, 0) # 一个样本
+            self.train_step += 1
+            writer.add_scalar('Reward/reward_per_train_step', load_reward, self.train_step) # 记录每一个train_step的reward

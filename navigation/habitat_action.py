@@ -21,6 +21,9 @@ class HabitatAction:
     walk_path_meter = 1e-5
     this_episode_short_dis = -1
 
+    # train
+    reward_per_episode = 0
+
     @staticmethod
     def reset(habitat_env):
         """
@@ -32,6 +35,8 @@ class HabitatAction:
         HabitatAction.walk_path_meter = 1e-5
         HabitatAction.this_episode_short_dis = habitat_env.get_metrics()['distance_to_goal']
         
+        HabitatAction.reward_per_episode = 0
+
     @staticmethod
     def set_habitat_action(action_name, topo_graph):
         """

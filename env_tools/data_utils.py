@@ -23,7 +23,7 @@ class AgentPositionSensorConfig(LabSensorConfig):
     type: str = "my_supercool_sensor"
     answer_to_life: int = MISSING
 
-def hm3d_config(path:str=HM3D_CONFIG_PATH,stage:str='val',episodes=200):
+def hm3d_config(path:str=HM3D_CONFIG_PATH,stage:str='val',episodes=200, max_steps=500):
     habitat_config = habitat.get_config(path)
     with read_write(habitat_config):
         habitat_config.habitat.task.lab_sensors[
@@ -60,6 +60,7 @@ def hm3d_config(path:str=HM3D_CONFIG_PATH,stage:str='val',episodes=200):
         habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.max_depth=10.0
         habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.normalize_depth=True
         habitat_config.habitat.task.measurements.success.success_distance = 1.0
+        habitat_config.habitat.environment.max_episode_steps = max_steps
     return habitat_config
     
 

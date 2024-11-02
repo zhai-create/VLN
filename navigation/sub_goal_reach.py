@@ -12,6 +12,8 @@ from habitat.sims.habitat_simulator.actions import HabitatSimActions
 
 from perception.tools import get_rgb_image_ls, fix_depth
 
+import time
+
 class SubgoalReach:
     """
         Static class: Guide the robot to the sub-goal.
@@ -27,6 +29,7 @@ class SubgoalReach:
     path_block_ls = []
 
     init_count_steps = 0
+    init_front_steps = 0
 
     @staticmethod
     def reset():
@@ -36,7 +39,9 @@ class SubgoalReach:
         SubgoalReach.next_action = "new"
         SubgoalReach.last_sim_location = None
         SubgoalReach.path_block_ls = []
+
         SubgoalReach.init_count_steps = HabitatAction.count_steps
+        SubgoalReach.init_front_steps = HabitatAction.front_steps
 
     @staticmethod
     def is_block(habitat_env):
@@ -74,7 +79,7 @@ class SubgoalReach:
 
                 # rl_step中实际行走步数为0的frontier
                 if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
-                    action_node.parent_node.deleted_frontiers.append(action_node)
+                    action_parent_node.deleted_frontiers.append(action_node)
 
 
             else:
@@ -83,22 +88,35 @@ class SubgoalReach:
                 topo_graph.all_nodes.remove(action_node)
 
 
-    def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result):
-        if(action_node.node_type=="intention_node"):
-            if not habitat_env.episode_over:
-                habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                observations = habitat_env.step(habitat_action)
-                return candidate_achieved_result
+    def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
+        if(graph_train==True): # 处于训练阶段，卡住直接退出
+            if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
+                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+                return candidate_achieved_result 
             else:
-                return "exceed"
-        else:
-            SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-            return candidate_achieved_result 
+                if not habitat_env.episode_over:
+                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                    observations = habitat_env.step(habitat_action)
+                    return candidate_achieved_result
+                else:
+                    return "exceed"
+
+        else: # 处于测试阶段
+            if(action_node.node_type=="intention_node"):
+                if not habitat_env.episode_over:
+                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                    observations = habitat_env.step(habitat_action)
+                    return candidate_achieved_result
+                else:
+                    return "exceed"
+            else:
+                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+                return candidate_achieved_result 
 
 
 
     @staticmethod
-    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal):
+    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False):
         """
             Go to the selected action node pos.
             :param topo_graph
@@ -119,7 +137,10 @@ class SubgoalReach:
 
             if (SubgoalReach.next_action=="f" or SubgoalReach.next_action=="l" or SubgoalReach.next_action=="r"):
                 if not habitat_env.episode_over:
+                    s_env_step_time = time.time()
                     observations = habitat_env.step(habitat_action)
+                    e_env_step_time = time.time()
+                    print("=====> delta_env_time <=====", e_env_step_time-s_env_step_time)
                 else:
                     return "exceed"
 
@@ -132,7 +153,7 @@ class SubgoalReach:
                 if(SubgoalReach.next_action=="f"):
                     if(SubgoalReach.is_block(habitat_env)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
                         # "block" # new_patch1
-                        achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block")
+                        achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block", graph_train=graph_train)
                         return achieved_result
                     
                     else:
@@ -145,11 +166,13 @@ class SubgoalReach:
                         if(env_args.is_auto==False):
                             occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
                             cv2.imshow("occu_for_show", occu_for_show)
+            
 
             elif (SubgoalReach.next_action == "suc" and topo_planner.state_flag=="finish"):
                 # "achieved"
-                achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved")
+                achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
                 return achieved_result
+
 
             if(topo_planner.state_flag=="init" or (topo_planner.state_flag=="node_path" and SubgoalReach.next_action=="suc")):
                 # topo_planner.get_topo_path()
@@ -158,7 +181,7 @@ class SubgoalReach:
                 local_path = local_planner.get_local_path()
                 if(local_path is None):
                     # "Failed_Plan"
-                    achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="Failed_Plan")
+                    achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="Failed_Plan", graph_train=graph_train)
                     return achieved_result
 
             SubgoalReach.next_action, local_path = local_planner.update_local_path(topo_planner, SubgoalReach.next_action, local_path)

@@ -108,13 +108,13 @@ class RL_Graph(object):
         # =======update node feature=======
         for temp_node in topo_graph.all_nodes:
             if(temp_node.node_type=="explored_node"):
-                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0]])], dim=0)
+                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, temp_node.room_flag, temp_node.receptacle_flag, temp_node.guide_flag, temp_node.object_flag]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
             elif(temp_node.node_type=="frontier_node"):
                 if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                     continue
-                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5]])], dim=0)
+                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, temp_node.room_flag, temp_node.receptacle_flag, temp_node.guide_flag, temp_node.object_flag]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
 
@@ -125,7 +125,7 @@ class RL_Graph(object):
             elif(temp_node.node_type=="intention_node" and ((temp_node in selected_intention_node_ls))):
                 if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                     continue
-                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1]])], dim=0)
+                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.room_flag, temp_node.receptacle_flag, temp_node.guide_flag, temp_node.object_flag]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
                 

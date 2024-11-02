@@ -8,7 +8,7 @@ def get_args():
 
     # test revelent
     parser.add_argument("--graph_train", type=bool, default=False)
-    parser.add_argument("--root", type=str, default="/home/zhaishichao/Data/VLN_master")
+    parser.add_argument("--root", type=str, default="/home/zhaishichao/Data/VLN")
     parser.add_argument("--model_file_name", type=str, default="")
     parser.add_argument("--graph_pre_model", type=int, default=-1)
     parser.add_argument("--logger_file_name", type=str, default="")

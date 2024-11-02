@@ -243,7 +243,7 @@ def astar(workMap):
         result.reverse()
         plot_map(workMap.data, result, True)
         end_time = time.time()
-        print("time_delta:", end_time-init_time)
+        print("=====> astar_time_delta <=====", end_time-init_time)
         return result
     except:
         plot_map(workMap.data, [(startx, starty), (endx, endy)], False)
