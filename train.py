@@ -52,7 +52,7 @@ if __name__=="__main__":
     rl_args.graph_sac_greedy = False
 
     # only_train
-    rl_args.random_exploration_length = 200
+    rl_args.random_exploration_length = 400
     rl_args.load_buffer_data_cnt = -1
     rl_args.save_buffer_data_path = "buffer_data/{}/".format(date_time)
     rl_args.load_buffer_data_path = ""
@@ -151,16 +151,3 @@ if __name__=="__main__":
                 system_info(init_process_memory, init_free_memory)
                 break
     
-             
-            
-            
-            
-            
-            
-            
-            
-            
-
-
-
-            

@@ -18,7 +18,7 @@ RIGHT="d"
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--eval_episodes",type=int,default=2000)
+    parser.add_argument("--eval_episodes",type=int,default=500)
     parser.add_argument("--mapper_resolution",type=float,default=0.05)
     parser.add_argument("--path_resolution",type=float,default=0.2)
     parser.add_argument("--path_scale",type=int,default=5)
@@ -41,6 +41,9 @@ if __name__ == "__main__":
         episode_steps = 0
         observations = habitat_env.reset()
 
+        if(i<1):
+            continue
+
         object_goal = env_args.object_ls[observations["objectgoal"][0]]
         # rgb_show
         # obs_rgb = observations["rgb"]
@@ -51,12 +54,11 @@ if __name__ == "__main__":
         rgb_3 = get_rgb_image(habitat_env, 3)
         rgb_4 = get_rgb_image(habitat_env, 4)
 
-
-        cv2.imshow("rgb_1", rgb_1)
-        cv2.imshow("rgb_2", rgb_2)
-        cv2.imshow("rgb_3", rgb_3)
-        cv2.imshow("rgb_4", rgb_4)
-
+        rgb_image_ls = [rgb_1, rgb_2, rgb_3, rgb_4]
+        large_rgb = np.hstack((rgb_image_ls[2][:, int(rgb_image_ls[2].shape[1]//2):], rgb_image_ls[1], rgb_image_ls[0], rgb_image_ls[3], rgb_image_ls[2][:, :int(rgb_image_ls[2].shape[1]//2)]))
+        large_rgb_for_show = cv2.resize(large_rgb, None, fx=0.5, fy=0.5)
+        cv2.imshow("large_rgb_for_show", large_rgb_for_show)
+        
         # depth_show
         obs_depth = observations["depth"]
         d_for_show = cv2.resize(obs_depth, None, fx=1.5, fy=1.5)
@@ -112,11 +114,11 @@ if __name__ == "__main__":
             rgb_3 = get_rgb_image(habitat_env, 3)
             rgb_4 = get_rgb_image(habitat_env, 4)
 
+            rgb_image_ls = [rgb_1, rgb_2, rgb_3, rgb_4]
+            large_rgb = np.hstack((rgb_image_ls[2][:, int(rgb_image_ls[2].shape[1]//2):], rgb_image_ls[1], rgb_image_ls[0], rgb_image_ls[3], rgb_image_ls[2][:, :int(rgb_image_ls[2].shape[1]//2)]))
+            large_rgb_for_show = cv2.resize(large_rgb, None, fx=0.5, fy=0.5)
+            cv2.imshow("large_rgb_for_show", large_rgb_for_show)
 
-            cv2.imshow("rgb_1", rgb_1)
-            cv2.imshow("rgb_2", rgb_2)
-            cv2.imshow("rgb_3", rgb_3)
-            cv2.imshow("rgb_4", rgb_4)
 
             # depth_show
             obs_depth = observations["depth"]
