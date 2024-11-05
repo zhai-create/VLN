@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0, 3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1, 3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 3'
 import cv2
 import habitat
 import datetime
@@ -32,18 +32,15 @@ if __name__=="__main__":
     args.graph_train = False
     args.root = "/home/zhaishichao/Data/VLN"
     args.model_file_name = "Models_train"
-    # args.graph_pre_model = 328
-    # args.graph_pre_model = 341 (暂停)
-    # args.graph_pre_model = 345
-    # args.graph_pre_model = 607 (暂停)
-    args.graph_pre_model = 323
+    # args.graph_pre_model = 358
+    args.graph_pre_model = 532 # 预备
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     args.graph_episode_num = 1000
     args.success_distance = 1.0
     args.max_steps = 500
 
     rl_args.score_top_k = 50
-    rl_args.graph_node_feature_dim = 6
+    rl_args.graph_node_feature_dim = 4
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -57,7 +54,7 @@ if __name__=="__main__":
 
     # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
     #     '_'+ rl_args.graph_encoder
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_11_02_14_07_20"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_11_03_22_49_24"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 

@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '2, 3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '2, 3'
 import cv2
 import copy
 import habitat
@@ -44,7 +44,7 @@ if __name__=="__main__":
     args.graph_iter_per_step = 2
 
     rl_args.score_top_k = 50
-    rl_args.graph_node_feature_dim = 6
+    rl_args.graph_node_feature_dim = 4 
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500

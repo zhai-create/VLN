@@ -236,10 +236,8 @@ class GraphMap(object):
 
     def add_request_feature(self, rgb_image_ls, object_text):
         answer_ls = request_llm(rgb_image_ls, object_text)
-        room_flag, receptacle_flag, guide_flag, object_flag = answer_ls[0], answer_ls[1], answer_ls[2], answer_ls[3]
+        room_flag, object_flag = answer_ls[0], answer_ls[1]
         self.current_node.room_flag = room_flag
-        self.current_node.receptacle_flag = receptacle_flag
-        self.current_node.guide_flag = guide_flag
         self.current_node.object_flag = object_flag
         
     
