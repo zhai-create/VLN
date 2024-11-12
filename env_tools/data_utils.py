@@ -25,6 +25,11 @@ class AgentPositionSensorConfig(LabSensorConfig):
 
 def hm3d_config(path:str=HM3D_CONFIG_PATH,stage:str='val',episodes=200, max_steps=500):
     habitat_config = habitat.get_config(path)
+
+    # print("\n\n\n\n\n")
+    # print(habitat_config.habitat.simulator.agents.main_agent.sim_sensors)
+    # print("\n\n\n\n\n")
+
     with read_write(habitat_config):
         habitat_config.habitat.task.lab_sensors[
             "agent_position_sensor"

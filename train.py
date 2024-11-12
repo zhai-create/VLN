@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '2, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1, 2'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '2, 3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1, 2'
 import cv2
 import copy
 import habitat
@@ -31,8 +31,10 @@ if __name__=="__main__":
     args.root = "/home/zhaishichao/Data/VLN"
     args.model_file_name = "Models_train"
     args.graph_pre_model = 0
+
+    train_note = "_two_dim_train" # 注释当前训练处于什么阶段
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    args.logger_file_name = "./log_files_train/log_"+date_time
+    args.logger_file_name = "./log_files_train/log_"+date_time+train_note
     args.graph_episode_num = 10000
     args.success_distance = 1.0
     args.max_steps = 10000
@@ -41,18 +43,24 @@ if __name__=="__main__":
     args.graph_model_save_frequency = 1
     args.graph_batch_size = 64
     args.graph_episode_length = 40 # max train rl_steps for per episode
-    args.graph_iter_per_step = 2
+    
 
     rl_args.score_top_k = 50
-    rl_args.graph_node_feature_dim = 4 
+    rl_args.graph_node_feature_dim = 2
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
     rl_args.graph_num_graph_padding = -1
     rl_args.graph_sac_greedy = False
 
+    # new_revise
+    args.graph_iter_per_step = 1
+    rl_args.lr_tune = 0.5e-3
+    rl_args.graph_lr_actor = 0.5e-4
+    rl_args.graph_lr_critic = 0.5e-4
+    rl_args.random_exploration_length = 500
+
     # only_train
-    rl_args.random_exploration_length = 400
     rl_args.load_buffer_data_cnt = -1
     rl_args.save_buffer_data_path = "buffer_data/{}/".format(date_time)
     rl_args.load_buffer_data_path = ""
@@ -62,8 +70,10 @@ if __name__=="__main__":
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
     habitat_env = habitat.Env(config=habitat_config)
 
+    
+
     experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
-        '_'+ rl_args.graph_encoder+"_"+date_time
+        '_'+ rl_args.graph_encoder+"_"+date_time+train_note
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details, writer=writer)
 
@@ -106,6 +116,7 @@ if __name__=="__main__":
                 topo_graph.ghost_patch()
                 if(len(topo_graph.frontier_nodes)>0):
                     rl_graph.update(topo_graph)
+                    current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
                     print("=====> ghost_patch <=====")
                 else:

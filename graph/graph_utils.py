@@ -7,7 +7,7 @@ from graph.arguments import args
 from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
 from perception.intention_utils_rcnn import object_detect
-from perception.intention_utils_blip import request_llm
+# from perception.intention_utils_blip import request_llm
 from perception.laser_utils import get_laser_point
 
 import copy
@@ -321,12 +321,12 @@ class GraphMap(object):
         
         self.add_intention(detect_res_pos_dict)
 
-        # request the llm for question
-        if(flag==True):
-            s_llm_time = time.time()
-            self.add_request_feature(rgb_image_ls, object_text)
-            e_llm_time = time.time()
-            print("=====> delta_llm_time <=====", e_llm_time-s_llm_time)
+        # # request the llm for question
+        # if(flag==True):
+        #     s_llm_time = time.time()
+        #     self.add_request_feature(rgb_image_ls, object_text)
+        #     e_llm_time = time.time()
+        #     print("=====> delta_llm_time <=====", e_llm_time-s_llm_time)
     
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
     def ghost_patch(self):

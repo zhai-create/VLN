@@ -16,6 +16,9 @@ class Evaluate:
 
     state_dict = {"achieved": 1, "exceed": -1, "Failed_Plan": -2, "empty": -3, "block": -4, "EXCEED_RL": -5}
 
+    # val
+    all_front_steps = 0
+
     # train
     real_episode_num_in_train = 1
     empty_num = 0
@@ -34,6 +37,18 @@ class Evaluate:
 
     spl_buffer_general_20 = []
     spl_buffer_limit_20 = []
+
+    @staticmethod
+    def reset():
+        Evaluate.success_num = 0 # sr
+        Evaluate.spl_per_episode = 0
+        Evaluate.spl_ls = []
+        Evaluate.spl_mean = 0
+        Evaluate.ne_per_episode = 0
+        Evaluate.ne_ls = []
+        Evaluate.ne_mean = 0
+
+        Evaluate.all_front_steps = 0
 
 
     @staticmethod
@@ -180,6 +195,7 @@ class Evaluate:
 
 
         else: # 处于测试阶段
+            Evaluate.all_front_steps += HabitatAction.front_steps
             if(achieved_result=="exceed" or achieved_result=="empty"):
                 if(habitat_metric['success']>0):
                     Evaluate.success_num += 1

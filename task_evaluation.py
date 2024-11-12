@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import datetime
@@ -32,15 +32,14 @@ if __name__=="__main__":
     args.graph_train = False
     args.root = "/home/zhaishichao/Data/VLN"
     args.model_file_name = "Models_train"
-    # args.graph_pre_model = 358
-    args.graph_pre_model = 532 # 预备
+    args.graph_pre_model = 445
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     args.graph_episode_num = 1000
     args.success_distance = 1.0
     args.max_steps = 500
 
     rl_args.score_top_k = 50
-    rl_args.graph_node_feature_dim = 4
+    rl_args.graph_node_feature_dim = 2
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -54,7 +53,7 @@ if __name__=="__main__":
 
     # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
     #     '_'+ rl_args.graph_encoder
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_11_03_22_49_24"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_11_06_15_54_28"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
@@ -63,7 +62,7 @@ if __name__=="__main__":
         rl_graph = RL_Graph()
         # haitat_episode_init
         observations = habitat_env.reset()
-        # if(index_in_episodes<800):
+        # if(index_in_episodes<923):
         #     continue
 
         HabitatAction.reset(habitat_env) 
