@@ -65,7 +65,7 @@ def depth_estimation(large_mask, depth):
         res_depth_2d_cy = average_depth * np.sin(ta_angle)
         return res_depth_2d_cx, res_depth_2d_cy
 
-def depth_estimation_laser(large_mask, depth):
+def depth_estimation_laser(large_mask, depth, rgb_image_ls=None):
     depth_2d = depth * np.cos(pre_depth.data[:, :, 2:3]) * args.depth_scale # 单位：meter
 
     lower_depth_height = int(args.depth_height/4)
@@ -75,6 +75,17 @@ def depth_estimation_laser(large_mask, depth):
     num_large_mask = np.where(large_mask, 1, 0)
     num_large_mask_after_resize = resize_matrix(num_large_mask, new_shape=(partial_depth_2d.shape[0], partial_depth_2d.shape[1]))
     
+
+    # =====> save mask result <=====
+    # import time
+    # import cv2
+    # now_time = time.time()
+    # large_rgb = np.hstack((rgb_image_ls[2][:, int(rgb_image_ls[2].shape[1]//2):], rgb_image_ls[1], rgb_image_ls[0], rgb_image_ls[3], rgb_image_ls[2][:, :int(rgb_image_ls[2].shape[1]//2)]))
+    # cv2.imwrite("temp_res/{}_rgb.jpg".format(now_time), (large_rgb).astype(np.uint8))
+    # cv2.imwrite("temp_res/{}_mask.jpg".format(now_time), (num_large_mask * 255).astype(np.uint8))
+    # cv2.imwrite("temp_res/{}_part_depth.jpg".format(now_time), ((depth* pre_depth.data[:, :, 4:])[lower_depth_height:upper_depth_height, :, 0] * 255).astype(np.uint8))
+    # cv2.imwrite("temp_res/{}_depth.jpg".format(now_time), (depth* pre_depth.data[:, :, 4:] * 255).astype(np.uint8))
+
 
     res_depth_2d = np.multiply(num_large_mask_after_resize, partial_depth_2d)
     res_depth_2d[res_depth_2d < args.depth_min_thre] = 10000

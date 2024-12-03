@@ -27,6 +27,7 @@ def get_args():
     parser.add_argument("--object_ls", type=list, default=["chair", "bed", "plant", "toilet", "tv_monitor", "sofa"])
 
     parser.add_argument("--is_auto", type=bool, default=True)
+    parser.add_argument("--is_vis", type=bool, default=False)
     
 
     # parse arguments

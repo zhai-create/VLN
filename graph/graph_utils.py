@@ -258,6 +258,7 @@ class GraphMap(object):
         if flag == True:
             last_node = self.current_node
             world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+            
             if(last_node is None):
                 self.set_current_pos(0.0, 0.0, 0.0)
                 predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)

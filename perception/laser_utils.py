@@ -47,17 +47,17 @@ def get_laser_point(depth):
     split_w = (int)(args.depth_width/2+1)
 
     depth_half = depth[split_h:, :, :]
-    laser_height = -depth_half * np.sin(pre_depth.data[split_h:, :, 2:3]) * args.depth_scale
-    laser_dis = depth_half * np.cos(pre_depth.data[split_h:, :, 2:3]) * args.depth_scale
+    laser_height = -depth_half * np.sin(pre_depth.data[split_h:, :, 2:3]) * args.depth_scale # meter
+    laser_dis = depth_half * np.cos(pre_depth.data[split_h:, :, 2:3]) * args.depth_scale # meters
     laser_angle = -pre_depth.data[split_h:, :, 3:4] + 0.5 * np.pi
-    laser_x = laser_dis * np.sin(laser_angle)
+    laser_x = laser_dis * np.sin(laser_angle) # meter
     laser_z = laser_dis * np.cos(laser_angle)
     laser_points = np.concatenate((laser_x, laser_height, laser_z), axis = 2)
 
     laser_points_for_noise_filter = np.concatenate((laser_dis, -laser_height), axis = 2)
     laser_points_for_noise_filter[laser_points_for_noise_filter[:,:,1]>=args.camera_height+0.13-args.height_thre, 0] = 20.0
     laser_row = np.argmin(laser_points_for_noise_filter[:,:,0], axis=0)
-    laser_2d = laser_dis[laser_row, np.arange(args.depth_width), 0] / args.depth_scale
+    laser_2d = laser_dis[laser_row, np.arange(args.depth_width), 0] / args.depth_scale # 0--1
 
     laser_points = laser_points.reshape(-1,3)
     laser_points[:,[0,1,2]] = laser_points[:,[2,0,1]]

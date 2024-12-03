@@ -4,6 +4,7 @@ import argparse
 import csv
 from tqdm import tqdm
 import numpy as np
+import random
 
 import habitat
 from env_tools.data_utils import hm3d_config
@@ -18,7 +19,7 @@ RIGHT="d"
 
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--eval_episodes",type=int,default=500)
+    parser.add_argument("--eval_episodes",type=int,default=1)
     parser.add_argument("--mapper_resolution",type=float,default=0.05)
     parser.add_argument("--path_resolution",type=float,default=0.2)
     parser.add_argument("--path_scale",type=int,default=5)
@@ -30,19 +31,60 @@ from perception.tools import fix_depth, get_rgb_image
 
 if __name__ == "__main__":
     args = get_args()
-    habitat_config = hm3d_config(stage='val',episodes=args.eval_episodes)
+    args.eval_episodes = 80000
+    habitat_config = hm3d_config(stage='train',episodes=1, max_steps=1000000)
     habitat_env = habitat.Env(config=habitat_config)
 
-
     print("len(env.episodes):", len(habitat_env.episodes))
+    # # =====> select episodes <=====
+    # random.seed(456)
+    # id_dict = {
+    #     # "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00324-DoSbsoo4EAg/DoSbsoo4EAg.basis.glb":["bed", "tv_monitor"]
+    #     "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00327-xgLmjqzoAzF/xgLmjqzoAzF.basis.glb":["bed", "tv_monitor", "toilet", "sofa", "chair", "plant"][4]
+    #     # "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00017-oEPjPNSPmzL/oEPjPNSPmzL.basis.glb":["plant"]
+    # }
+    # selected_episodes = []
+    # for index, temp_episode in enumerate(habitat_env.episodes):
+    #     if(temp_episode.scene_id in id_dict.keys()):
+    #         if(temp_episode.object_category in id_dict[temp_episode.scene_id]):
+    #             selected_episodes.append(temp_episode)
+    # random.shuffle(selected_episodes)
+    # # =====> select episodes <=====
+
+    # =====> select episodes <=====
+    random.seed(456)
+    id_dict = {
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00669-DNWbUAJYsPy/DNWbUAJYsPy.basis.glb":["tv_monitor", "bed", "sofa", "chair", "toilet"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00166-RaYrxWt5pR1/RaYrxWt5pR1.basis.glb":["tv_monitor", "toilet", "chair", "plant", "sofa"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00404-QN2dRqwd84J/QN2dRqwd84J.basis.glb":["sofa", "bed", "plant", "tv_monitor", "toilet"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00706-YHmAkqgwe2p/YHmAkqgwe2p.basis.glb":["bed", "toilet", "chair", "sofa"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00324-DoSbsoo4EAg/DoSbsoo4EAg.basis.glb":["bed", "tv_monitor"],
+
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00017-oEPjPNSPmzL/oEPjPNSPmzL.basis.glb":["bed", "tv_monitor", "toilet", "sofa", "plant"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00031-Wo6kuutE9i7/Wo6kuutE9i7.basis.glb":["bed", "tv_monitor", "toilet"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00099-226REUyJh2K/226REUyJh2K.basis.glb":["bed", "tv_monitor"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00105-xWvSkKiWQpC/xWvSkKiWQpC.basis.glb":["tv_monitor", "toilet", "sofa"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00250-U3oQjwTuMX8/U3oQjwTuMX8.basis.glb":["bed", "toilet", "sofa", "plant"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00251-wsAYBFtQaL7/wsAYBFtQaL7.basis.glb":["bed", "toilet", "sofa"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00254-YMNvYDhK8mB/YMNvYDhK8mB.basis.glb":["chair", "plant"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00255-NGyoyh91xXJ/NGyoyh91xXJ.basis.glb":["bed", "tv_monitor", "toilet"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00323-yHLr6bvWsVm/yHLr6bvWsVm.basis.glb":["bed", "tv_monitor", "toilet"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00327-xgLmjqzoAzF/xgLmjqzoAzF.basis.glb":["bed", "toilet", "chair"],
+
+    }
+    selected_episodes = []
+    for index, temp_episode in enumerate(habitat_env.episodes):
+        if(temp_episode.scene_id in id_dict.keys()):
+            if(temp_episode.object_category in id_dict[temp_episode.scene_id]):
+                selected_episodes.append(temp_episode)
+    random.shuffle(selected_episodes)
+    # =====> select episodes <=====
 
 
     for i in tqdm(range(args.eval_episodes)):
         episode_steps = 0
+        habitat_env.episodes = [selected_episodes[i]]
         observations = habitat_env.reset()
-
-        if(i<1):
-            continue
 
         object_goal = env_args.object_ls[observations["objectgoal"][0]]
         # rgb_show
@@ -57,7 +99,8 @@ if __name__ == "__main__":
         rgb_image_ls = [rgb_1, rgb_2, rgb_3, rgb_4]
         large_rgb = np.hstack((rgb_image_ls[2][:, int(rgb_image_ls[2].shape[1]//2):], rgb_image_ls[1], rgb_image_ls[0], rgb_image_ls[3], rgb_image_ls[2][:, :int(rgb_image_ls[2].shape[1]//2)]))
         large_rgb_for_show = cv2.resize(large_rgb, None, fx=0.5, fy=0.5)
-        cv2.imshow("large_rgb_for_show", large_rgb_for_show)
+        # cv2.imshow("large_rgb_for_show", large_rgb_for_show)
+        cv2.imshow("rgb_1", rgb_1)
         
         # depth_show
         obs_depth = observations["depth"]
@@ -76,7 +119,7 @@ if __name__ == "__main__":
         # metric
         habitat_metric = habitat_env.get_metrics()
 
-        while True:
+        while not habitat_env.episode_over:
             keystroke = cv2.waitKey(0)
             if(keystroke == ord(FORWARD)):
                 habitat_action = HabitatSimActions.move_forward
@@ -92,7 +135,7 @@ if __name__ == "__main__":
             observations = habitat_env.step(habitat_action)
             episode_steps += 1
 
-            print("len(env.episodes):", len(habitat_env.episodes))
+            print("---------------------")
             print("episode_steps:", episode_steps)
             print("habitat_action:", habitat_action)
             print("habitat_env.episode_over:", habitat_env.episode_over)
@@ -103,6 +146,7 @@ if __name__ == "__main__":
             print("habitat_metric:", habitat_metric)
 
             print("dis_to_goal:{}\n".format(habitat_metric['distance_to_goal']))
+            print("====================")
 
             # rgb_show
             # obs_rgb = observations["rgb"]
@@ -117,7 +161,8 @@ if __name__ == "__main__":
             rgb_image_ls = [rgb_1, rgb_2, rgb_3, rgb_4]
             large_rgb = np.hstack((rgb_image_ls[2][:, int(rgb_image_ls[2].shape[1]//2):], rgb_image_ls[1], rgb_image_ls[0], rgb_image_ls[3], rgb_image_ls[2][:, :int(rgb_image_ls[2].shape[1]//2)]))
             large_rgb_for_show = cv2.resize(large_rgb, None, fx=0.5, fy=0.5)
-            cv2.imshow("large_rgb_for_show", large_rgb_for_show)
+            # cv2.imshow("large_rgb_for_show", large_rgb_for_show)
+            cv2.imshow("rgb_1", rgb_1)
 
 
             # depth_show

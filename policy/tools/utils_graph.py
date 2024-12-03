@@ -345,12 +345,12 @@ class SingleHeadAttention(nn.Module):
         
         
         if mask is not None:
-            mask = mask.unsqueeze(1) # Batch, Num_Query=1, Num_Key
+            mask = mask.unsqueeze(1) # Batch, Num_Query=1, Num_Key(Num_Action)
             U = U.masked_fill(mask == 0, -1e8) # 0 means will not be selected as actions
         
         # cprint("Pointer Net : \n", color='green', attrs=['reverse', 'bold'])
         # print("U : ", U.detach().cpu().numpy())
-        attention = torch.log_softmax(U, dim=-1) 
+        attention = torch.log_softmax(U, dim=-1) # Batch, 1, Num_Action
         # print("attention : ", attention.detach().cpu().numpy())
                 
         return attention # Batch, Num_Query, Num_Key
@@ -621,7 +621,7 @@ class PointerNet(nn.Module):
         self.network = SingleHeadAttention(embedding_dim=embedding_dim)
         
     def forward(self, q, k, mask=None):
-        return self.network(q, k, mask).squeeze(1)
+        return self.network(q, k, mask).squeeze(1) # Batch, Num_Action
     
 
 

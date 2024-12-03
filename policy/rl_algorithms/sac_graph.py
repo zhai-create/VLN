@@ -106,6 +106,7 @@ class SAC(RL_Policy):
                 action_index = torch.multinomial(action.exp(), 1).long().squeeze(1)
             action = state['action_idxes'][0, action_index.item()].cpu().numpy() # action在rl_topo中的index
             action_index = action_index.cpu().numpy() # action在action_space中的index
+        
         return action, action_index # idx in padding
 
 
@@ -123,28 +124,28 @@ class SAC(RL_Policy):
         state = self.state_handler(state)
         next_state = self.state_handler(next_state)
         
-        action = self.action_handler(action)
+        action = self.action_handler(action) # B,1 (选择到的action在action_space中的index)
         reward = reward.unsqueeze(1).float().cuda() # B,1,1
         not_done = not_done.unsqueeze(1).float().cuda() # B,1,1
         
         '''critic'''
         with torch.no_grad():
-            next_logprob = self.actor(next_state, self.args)
-            target_q1, target_q2 = self.critic_target(next_state, self.args)
-            next_q_values = torch.min(target_q1, target_q2)
+            next_logprob = self.actor(next_state, self.args) # Batch, Num_Action
+            target_q1, target_q2 = self.critic_target(next_state, self.args) # Batch, Num_Action, 1
+            next_q_values = torch.min(target_q1, target_q2) # Batch, Num_Action, 1
             target_q = torch.sum(next_logprob.unsqueeze(2).exp() * (next_q_values - self.alpha * next_logprob.unsqueeze(2)), dim=1).unsqueeze(1)
-            target_q = reward + self.discount * not_done * target_q
+            target_q = reward + self.discount * not_done * target_q # B, 1, 1
             
-        all_q1, all_q2 = self.critic(state, self.args)
-        current_q1 = torch.gather(all_q1, 1, action.unsqueeze(-1))
-        current_q2 = torch.gather(all_q2, 1, action.unsqueeze(-1))
+        all_q1, all_q2 = self.critic(state, self.args) # Batch, Num_Action, 1
+        current_q1 = torch.gather(all_q1, 1, action.unsqueeze(-1)) # B,1,1(选择action对应的q值)
+        current_q2 = torch.gather(all_q2, 1, action.unsqueeze(-1)) # B,1,1
         critic_loss = self.critic_loss(current_q1, target_q) + self.critic_loss(current_q2, target_q)
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
         self.critic_optimizer.step()   
         
         '''actor'''
-        logprob = self.actor(state, self.args)
+        logprob = self.actor(state, self.args) # Batch, Num_Action
         actor_loss = torch.sum((logprob.exp().unsqueeze(2) * (self.alpha * logprob.unsqueeze(2) - self.critic.Q1(state, self.args).detach())), dim=1).mean()
         self.actor_optimizer.zero_grad()
         actor_loss.backward()

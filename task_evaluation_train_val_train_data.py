@@ -1,12 +1,13 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 1'
 import cv2
 import habitat
 import time
 import datetime
 import numpy as np
+import random
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
@@ -26,9 +27,9 @@ from graph.graph_utils import GraphMap
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
 
+from vis_tools.vis_utils import init_mp4, get_top_down_map
+
 from perception.arguments import args as perception_args
-
-
 
 
 if __name__=="__main__":
@@ -37,11 +38,13 @@ if __name__=="__main__":
     args.root = "/home/zhaishichao/Data/VLN"
     args.model_file_name = "Models_train"
 
-    val_note = "_two_dim_val_train_new_load_data_all_label_low_cost_15_scene_large_thre" # 注释当前测试处于什么阶段
+    val_note = "_two_dim_val_train_new_load_data_all_label_low_cost_15_scene_large_thre_train_data" # 注释当前测试处于什么阶段
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
-    args.graph_episode_num = 1000
+    args.graph_episode_num = 30
     args.success_distance = 1.0
     args.max_steps = 500
+
+    args.is_vis = False # 录制视频
 
     rl_args.score_top_k = 50
     rl_args.graph_node_feature_dim = 2
@@ -53,11 +56,11 @@ if __name__=="__main__":
 
 
     writer = SummaryWriter(args.logger_file_name)
-    # writer = SummaryWriter("./log_files/log_2024_12_02_11_07_16_two_dim_val_train_new_load_data_all_label_18_cost_15_scene")
+    # writer = SummaryWriter("./log_files/log_2024_12_02_11_10_35_two_dim_val_train_new_load_data_all_label_18_cost_15_scene_train_data")
 
     init_free_memory, init_process_memory = process_info()
-    habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
-
+    habitat_config = hm3d_config(stage="train", episodes=1, max_steps=args.max_steps)
+    
     for temp_pre_model in range(10, 80000, 25):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
@@ -77,14 +80,51 @@ if __name__=="__main__":
         # # different_difficult_num = {1: 8, 2: 13, 3: 16, 4: 14, 5: 12, 6: 7, 7: 7, 8: 5, 9: 3, 10: 3, 11: 2, 12: 2, 13: 1, 14:1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1, 22: 1}
         # different_difficult_num = {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14:1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1, 22: 1}
         # different_difficult_index = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0, 11:0, 12:0, 13:0, 14:0, 15:0, 16:0, 17:0, 18:0, 20:0, 22:0}
-        
+
+        # =====> select episodes <=====
+        id_dict = {
+            "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00669-DNWbUAJYsPy/DNWbUAJYsPy.basis.glb":["tv_monitor", "bed", "sofa", "chair", "toilet"]
+        }
+        object_num_ls = [0 for i in range(5)]
+        selected_episodes = []
+        for index, temp_episode in enumerate(habitat_env.episodes):
+            if(temp_episode.scene_id in id_dict.keys()):
+                if(temp_episode.object_category in id_dict[temp_episode.scene_id]) and object_num_ls[id_dict[temp_episode.scene_id].index(temp_episode.object_category)]<6:
+                    selected_episodes.append(temp_episode)
+                    object_num_ls[id_dict[temp_episode.scene_id].index(temp_episode.object_category)] += 1
+                    if(len(selected_episodes)>=args.graph_episode_num):
+                        break
+        # =====> select episodes <=====
+
+        # # =====> select episodes <=====
+        # random.seed(456)
+        # id_dict = {
+        #     "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00669-DNWbUAJYsPy/DNWbUAJYsPy.basis.glb":["tv_monitor", "bed", "sofa", "chair", "toilet"],
+        #     "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00166-RaYrxWt5pR1/RaYrxWt5pR1.basis.glb":["tv_monitor", "toilet", "chair", "plant", "sofa"],
+        #     "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00404-QN2dRqwd84J/QN2dRqwd84J.basis.glb":["sofa", "bed", "plant", "tv_monitor", "toilet"],
+        #     "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00706-YHmAkqgwe2p/YHmAkqgwe2p.basis.glb":["bed", "toilet", "chair", "sofa"],
+        #     "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00324-DoSbsoo4EAg/DoSbsoo4EAg.basis.glb":["bed", "tv_monitor"]
+        # }
+        # selected_episodes = []
+        # for index, temp_episode in enumerate(habitat_env.episodes):
+        #     if(temp_episode.scene_id in id_dict.keys()):
+        #         if(temp_episode.object_category in id_dict[temp_episode.scene_id]):
+        #             selected_episodes.append(temp_episode)
+        # random.shuffle(selected_episodes)
+        # selected_episodes = selected_episodes[:args.graph_episode_num]
+        # # =====> select episodes <=====
+
         while index_in_episodes<(30-1):
             # rl_graph_init
             rl_graph = RL_Graph()
             # haitat_episode_init
             index_in_episodes += 1
+            print("=====> selected_episodes <=====", len(selected_episodes))
+            habitat_env.episodes = [selected_episodes[index_in_episodes]]
+            writer.add_scalar('Scene/scene_id', list(id_dict.keys()).index(habitat_env.episodes[0].scene_id), index_in_episodes+1)
             observations = habitat_env.reset()
             HabitatAction.reset(habitat_env) 
+            writer.add_scalar('Scene/shortest_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
 
             # if(int(HabitatAction.this_episode_short_dis) not in different_difficult_index):
             #     continue
@@ -94,6 +134,8 @@ if __name__=="__main__":
             
             habitat_metric = habitat_env.get_metrics()
             object_goal = args.object_ls[observations["objectgoal"][0]]
+            writer.add_scalar('Scene/object_goal', observations["objectgoal"][0], index_in_episodes+1)
+
             print("=====> object_goal <=====", object_goal)
             # get sensor data: rgb, depth, 2d_laser
             rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
@@ -110,19 +152,22 @@ if __name__=="__main__":
                 cv2.imshow("depth", observations["depth"])
                 occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
                 cv2.imshow("occu_for_show", occu_for_show)
+            
+            # 用于录制视频
+            if(args.is_vis==True):
+                video_writer, map_writer = init_mp4(pre_model=args.graph_pre_model, episode_index=index_in_episodes+1)
+                get_top_down_map(habitat_env)
 
             while True:
                 # rl_graph_update
                 rl_graph.update(topo_graph)
                 if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
-                    print("=====> real_action_selection <=====")
                 else:
                     topo_graph.ghost_patch()
                     if(len(topo_graph.frontier_nodes)>0):
                         rl_graph.update(topo_graph)
                         polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
-                        print("=====> ghost_patch <=====")
                     else:
                         # action_space为空，结束当前episode
                         if not habitat_env.episode_over:
@@ -135,10 +180,14 @@ if __name__=="__main__":
                         break
 
                 action_node = rl_graph.all_nodes[polict_action]
-                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
+                
+                if(args.is_vis==True):
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, video_writer=video_writer, map_writer=map_writer)
+                else:
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
                 print("======> achieved_result <=====", achieved_result)
                 print("=====> action_node_type <=====", action_node.node_type)
-                
+
                 
                 evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes)
                 if(evaluate_res=="episode_stop"):

@@ -11,6 +11,7 @@ from navigation.tools import get_pose_change, get_sim_location, get_l2_distance
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 
 from perception.tools import get_rgb_image_ls, fix_depth
+from vis_tools.vis_utils import save_mp4
 
 import time
 
@@ -31,8 +32,10 @@ class SubgoalReach:
     init_count_steps = 0
     init_front_steps = 0
 
+    init_dis_to_goal = 0
+
     @staticmethod
-    def reset():
+    def reset(habitat_env):
         """
             Reset the static attributes.
         """
@@ -42,6 +45,8 @@ class SubgoalReach:
 
         SubgoalReach.init_count_steps = HabitatAction.count_steps
         SubgoalReach.init_front_steps = HabitatAction.front_steps
+
+        SubgoalReach.init_dis_to_goal = habitat_env.get_metrics()['distance_to_goal']
 
     @staticmethod
     def is_block(habitat_env):
@@ -116,7 +121,7 @@ class SubgoalReach:
 
 
     @staticmethod
-    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False):
+    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=None, video_writer=None, map_writer=None):
         """
             Go to the selected action node pos.
             :param topo_graph
@@ -125,7 +130,7 @@ class SubgoalReach:
             :param object_goal
         """
         topo_planner = TopoPlanner(topo_graph, action_node)
-        SubgoalReach.reset()
+        SubgoalReach.reset(habitat_env)
         while True:
             # 执行动作前的位置检测
             SubgoalReach.last_sim_location = get_sim_location(habitat_env)
@@ -149,6 +154,10 @@ class SubgoalReach:
                     rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
                     cv2.imshow("rgb", rgb_image_ls[0])
                     cv2.imshow("depth", observations["depth"])
+                
+                # 用于录制视频
+                if(env_args.is_vis==True):
+                    save_mp4(video_writer, map_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
                 
                 if(SubgoalReach.next_action=="f"):
                     if(SubgoalReach.is_block(habitat_env)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
@@ -185,4 +194,6 @@ class SubgoalReach:
                     return achieved_result
 
             SubgoalReach.next_action, local_path = local_planner.update_local_path(topo_planner, SubgoalReach.next_action, local_path)
+            print("next_action:", SubgoalReach.next_action)
+            print("topo_planner.state_flag:", topo_planner.state_flag)
             print("local_path:", local_path)

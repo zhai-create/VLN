@@ -84,14 +84,15 @@ Perpection Model Init, detect & mask
 """
 
 # loading config
+args.mask_rcnn_thre = 0.8
+
 rcnn_cfg = get_cfg()
 rcnn_cfg.merge_from_file(args.rcnn_yaml_path)
 rcnn_cfg.merge_from_list(["MODEL.WEIGHTS", args.rcnn_weight_path])
-mask_rcnn_thre = 0.6
-rcnn_cfg.MODEL.RETINANET.SCORE_THRESH_TEST = mask_rcnn_thre
-rcnn_cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = mask_rcnn_thre
+rcnn_cfg.MODEL.RETINANET.SCORE_THRESH_TEST = args.mask_rcnn_thre
+rcnn_cfg.MODEL.ROI_HEADS.SCORE_THRESH_TEST = args.mask_rcnn_thre
 rcnn_cfg.MODEL.PANOPTIC_FPN.COMBINE.INSTANCES_CONFIDENCE_THRESH = (
-    mask_rcnn_thre
+    args.mask_rcnn_thre
 )
 rcnn_cfg.MODEL.DEVICE = args.model_device  
 rcnn_cfg.freeze()
@@ -103,5 +104,8 @@ rcnn_model.eval()
 checkpointer = DetectionCheckpointer(rcnn_model)
 checkpointer.load(rcnn_cfg.MODEL.WEIGHTS)
 print('Mask-rcnn initialize success!')
+
+print("\n\n\n\n\n")
+print("args.mask_rcnn_thre:", args.mask_rcnn_thre)
 
 

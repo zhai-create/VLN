@@ -95,11 +95,11 @@ class GraphPointerPolicy(nn.Module):
         
         # Current Node Feature Enhancement with Residual
         # enhanced_current_node, _ = self.decoder(current_node, action_node, action_mask) # enhance with action nodes
-        enhanced_current_node, _ = self.decoder(current_node, node_enhanced_padded, node_padding_mask) # enhance with all nodes
-        enhanced_current_node = self.combine_residual(torch.cat((enhanced_current_node, current_node), dim=-1))
+        enhanced_current_node, _ = self.decoder(current_node, node_enhanced_padded, node_padding_mask) # enhance with all nodes (Batch, 1, Embedding_dim)
+        enhanced_current_node = self.combine_residual(torch.cat((enhanced_current_node, current_node), dim=-1)) # double the dim of embedding_dim (Batch, 1, 2*Embedding_dim)-->(Batch, 1, Embedding_dim)
         # PointerNet
-        pointer_out = self.pointer(enhanced_current_node, action_node, action_mask)
-        return pointer_out # Batch, Num_Key
+        pointer_out = self.pointer(enhanced_current_node, action_node, action_mask) # Batch, Num_Action
+        return pointer_out # Batch, Num_Action
 
 
 class GraphQNet(nn.Module):
@@ -184,8 +184,8 @@ class GraphQNet(nn.Module):
         # enhanced_current_node_1, attention_1 = self.decoder_1(current_node, action_node, action_mask) # enhance with action nodes
         enhanced_current_node_1, attention_1 = self.decoder_1(current_node, node_enhanced_padded, node_padding_mask) # enhance with all nodes
         enhanced_action_node_1 = torch.cat((enhanced_current_node_1.repeat(1, action_node.shape[1], 1), current_node.repeat(1, action_node.shape[1], 1), action_node), dim=-1)
-        enhanced_action_node_1 = self.action_enhancing_1(enhanced_action_node_1)
-        q_values_1 = self.q_value_embedding_1(enhanced_action_node_1)
+        enhanced_action_node_1 = self.action_enhancing_1(enhanced_action_node_1) # (Batch, 3*Num_Action, Feature_Dim) --> (Batch, Num_Action, Feature_Dim)
+        q_values_1 = self.q_value_embedding_1(enhanced_action_node_1) # Batch, Num_Action, 1
         zero_1 = torch.zeros_like(q_values_1).cuda()
         q_values_masked_1 = torch.where(action_mask.unsqueeze(-1) == 0, zero_1, q_values_1) # Batch, Num_Action, 1
 

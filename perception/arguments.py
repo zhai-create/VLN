@@ -27,6 +27,7 @@ def get_args():
 
     parser.add_argument("--BOX_THRESHOLD", type=float, default=0.6)
     parser.add_argument("--CONFIDENCE_TRESHOLE", type=float, default=0.6)
+    parser.add_argument("--mask_rcnn_thre", type=float, default=0.6)
 
     parser.add_argument("--factor_0", type=float, default=1.5625)
     parser.add_argument("--factor_1", type=float, default=0.005859375)
