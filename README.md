@@ -63,6 +63,98 @@ Download the image segmentation model [[URL](https://utexas.box.com/s/sf4prmup4f
 python task_evaluation.py
 ```
 
+For dataset switching(HM3D V1/V2), it can be achieved by setting `habitat_config.habitat.dataset.data_path` in the `$VLN_ROOT/env_tools/data_utils.py`
+
+
+
+## Train the RL Policy
+```
+python train.py
+```
+
+For the train scenes setting, add the following code in the `$VLN_ROOT/train.py`(It should be noted that some episodes may have ambiguity, so the interference of ambiguous episodes can be eliminated by specifying categories as follows.):
+```
+id_dict = {
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00669-DNWbUAJYsPy/DNWbUAJYsPy.basis.glb":["tv_monitor", "bed", "sofa", "chair", "toilet"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00166-RaYrxWt5pR1/RaYrxWt5pR1.basis.glb":["tv_monitor", "toilet", "chair", "plant", "sofa"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00404-QN2dRqwd84J/QN2dRqwd84J.basis.glb":["sofa", "bed", "plant", "tv_monitor", "toilet"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00706-YHmAkqgwe2p/YHmAkqgwe2p.basis.glb":["bed", "toilet", "chair", "sofa"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00324-DoSbsoo4EAg/DoSbsoo4EAg.basis.glb":["bed", "tv_monitor"],
+
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00017-oEPjPNSPmzL/oEPjPNSPmzL.basis.glb":["bed", "tv_monitor", "toilet", "sofa", "plant"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00031-Wo6kuutE9i7/Wo6kuutE9i7.basis.glb":["bed", "tv_monitor", "toilet"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00099-226REUyJh2K/226REUyJh2K.basis.glb":["bed", "tv_monitor"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00105-xWvSkKiWQpC/xWvSkKiWQpC.basis.glb":["tv_monitor", "toilet", "sofa"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00250-U3oQjwTuMX8/U3oQjwTuMX8.basis.glb":["bed", "toilet", "sofa", "plant"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00251-wsAYBFtQaL7/wsAYBFtQaL7.basis.glb":["bed", "toilet", "sofa"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00254-YMNvYDhK8mB/YMNvYDhK8mB.basis.glb":["chair", "plant"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00255-NGyoyh91xXJ/NGyoyh91xXJ.basis.glb":["bed", "tv_monitor", "toilet"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00323-yHLr6bvWsVm/yHLr6bvWsVm.basis.glb":["bed", "tv_monitor", "toilet"],
+    "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00327-xgLmjqzoAzF/xgLmjqzoAzF.basis.glb":["bed", "toilet", "chair"],
+
+}
+selected_episodes = []
+for index, temp_episode in enumerate(habitat_env.episodes):
+    if(temp_episode.scene_id in id_dict.keys()):
+        if(temp_episode.object_category in id_dict[temp_episode.scene_id]):
+            selected_episodes.append(temp_episode)
+random.shuffle(selected_episodes)
+```
+
+## Visualization of Training Process
+When `train.by` is executed, the trend of SR and SPL changes in the last 20 episodes in the training set can be directly obtained.
+
+You can execute the following instructions on the terminal to visualize the training curve:
+```
+ tensorboard --host 127.0.0.1 --logdir log_files_train/your_train_log_file --samples_per_plugin scalars=999999999
+```
+
+When `task_evaluation_train_val.py` is executed, you can obtain the performance change curve of the policy on the validation set during the training process.
+```
+ tensorboard --host 127.0.0.1 --logdir log_files/your_train_val_log_file --samples_per_plugin scalars=999999999
+```
+
+When `task_evaluation_train_val_train_data.py` is executed, you can obtain the performance change curve of the policy on the train set during the training process.
+```
+ tensorboard --host 127.0.0.1 --logdir log_files/your_train_val_train_data_log_file --samples_per_plugin scalars=999999999
+```
+
+## Visualization of Episode
+The related tools for episode visualization are located in `$VLN_ROOT/vis_tools/`, you can save the execution status of the episode in `*.mp4` format locally, as follows:
+
+0. Set the path to save the video in the `--pre_path` parameter of `$VLN_ROOT/vis_tools/arguments.py`
+
+1. Set the `args.is_vis = False`
+
+2. Add the following code at the beginning of each episode:
+```
+if(args.is_vis==True):
+    video_writer, map_writer = init_mp4(pre_model=args.graph_pre_model,    episode_index=index_in_episodes+1)
+    get_top_down_map(habitat_env)
+```
+It is used to initialize the objects for recording videos and initialize the top-down map.
+
+3. Add the following code after selecting the sub-goal:
+```
+if(args.is_vis==True):
+    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, video_writer=video_writer, map_writer=map_writer)
+else:
+    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
+```
+
+4. Add the following code after executing the work steps in the simulator in `$VLN_ROOT/navigation/sub_goal_reach.py`:
+```
+if(env_args.is_vis==True):
+    save_mp4(video_writer, map_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
+```
+
+5. After completing the above steps, you will obtain the RGB video and topology change video for each episode in the designated folder for saving videos, which will facilitate debugging of the later code.
+
+## Manual debugging
+Just set the `args.is_auto=False`, then you can manually debug the navigation process of the robots in each episode.
+
+
+
 ## Habitat Tips
 0. **Please git clone the habitat-lab commit of "c9e5366".**
 
