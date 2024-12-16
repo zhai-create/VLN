@@ -1,0 +1,5 @@
+# ninja log v5
+1	1052	1728998410429535513	/mnt/zhaishichao/VLN/dependencies/GroundingDINO/build/temp.linux-x86_64-3.9/mnt/zhaishichao/VLN/dependencies/GroundingDINO/groundingdino/models/GroundingDINO/csrc/cuda_version.o	eede2e32a3af617d
+1	9912	1728998419273503195	/mnt/zhaishichao/VLN/dependencies/GroundingDINO/build/temp.linux-x86_64-3.9/mnt/zhaishichao/VLN/dependencies/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cpu.o	98e255fd747b2285
+1	32359	1728998441717423652	/mnt/zhaishichao/VLN/dependencies/GroundingDINO/build/temp.linux-x86_64-3.9/mnt/zhaishichao/VLN/dependencies/GroundingDINO/groundingdino/models/GroundingDINO/csrc/vision.o	7085ccad833762e4
+1	34687	1728998444053415572	/mnt/zhaishichao/VLN/dependencies/GroundingDINO/build/temp.linux-x86_64-3.9/mnt/zhaishichao/VLN/dependencies/GroundingDINO/groundingdino/models/GroundingDINO/csrc/MsDeformAttn/ms_deform_attn_cuda.o	5978af52424781f7
