@@ -13,7 +13,7 @@ def get_args():
     parser.add_argument("--new_top_left", type=tuple, default=(0, 0))
     parser.add_argument("--new_right_bottom", type=tuple, default=(240, 60))
 
-    parser.add_argument("--pre_path", type=str, default="vis_result_hm3d")
+    parser.add_argument("--pre_path", type=str, default="vis_result_1110")
 
     # parse arguments
     args = parser.parse_args()

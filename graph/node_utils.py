@@ -50,10 +50,10 @@ class Node(object):
         self.sub_frontiers = []
         self.sub_intentions = []
 
-        self.room_flag = -1
-        self.receptacle_flag = -1
-        self.guide_flag = -1
-        self.object_flag = -1
+        self.room_flag = 0
+        self.receptacle_flag = 0
+        self.guide_flag = 1
+        self.object_flag = 0
 
         self.pc = pc
 

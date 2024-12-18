@@ -1,6 +1,10 @@
+
 import torch
 from torch_geometric.data import Data
 import numpy as np
+
+
+
 
 from graph.arguments import args as graph_args
 from perception.arguments import args as perception_args
@@ -108,6 +112,9 @@ class RL_Graph(object):
         # =======update node feature=======
         for temp_node in topo_graph.all_nodes:
             if(temp_node.node_type=="explored_node"):
+                # assert temp_node.room_flag != -1
+                # assert temp_node.object_flag != -1
+                
                 # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, temp_node.room_flag, temp_node.object_flag]])], dim=0)
                 self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)

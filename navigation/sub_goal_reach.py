@@ -2,11 +2,13 @@ import cv2
 import numpy as np
 from env_tools.arguments import args as env_args
 
+
 from navigation.arguments import args
 from navigation.topo_planner import TopoPlanner
 from navigation.local_planner import LocalPlanner
 from navigation.habitat_action import HabitatAction
 from navigation.tools import get_pose_change, get_sim_location, get_l2_distance
+
 
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 
@@ -49,7 +51,7 @@ class SubgoalReach:
         SubgoalReach.init_dis_to_goal = habitat_env.get_metrics()['distance_to_goal']
 
     @staticmethod
-    def is_block(habitat_env):
+    def is_block(habitat_env, graph_train):
         """
             Determine if the robot is block.
             :param habitat_env
@@ -66,6 +68,8 @@ class SubgoalReach:
             first_last_delta = abs(SubgoalReach.path_block_ls[-1]-SubgoalReach.path_block_ls[0])
             if(first_last_delta<=args.path_block_meter_thre):
                 return True
+        if(graph_train==True and (HabitatAction.front_steps-SubgoalReach.init_front_steps)>200):
+            return True
         return False
 
     @staticmethod
@@ -160,7 +164,7 @@ class SubgoalReach:
                     save_mp4(video_writer, map_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
                 
                 if(SubgoalReach.next_action=="f"):
-                    if(SubgoalReach.is_block(habitat_env)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
+                    if(SubgoalReach.is_block(habitat_env, graph_train)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
                         # "block" # new_patch1
                         achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block", graph_train=graph_train)
                         return achieved_result
@@ -194,6 +198,8 @@ class SubgoalReach:
                     return achieved_result
 
             SubgoalReach.next_action, local_path = local_planner.update_local_path(topo_planner, SubgoalReach.next_action, local_path)
+            
+            
             print("next_action:", SubgoalReach.next_action)
             print("topo_planner.state_flag:", topo_planner.state_flag)
             print("local_path:", local_path)

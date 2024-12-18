@@ -11,6 +11,8 @@ from detectron2.checkpoint import DetectionCheckpointer
 from perception.arguments import args, coco_categories_mapping
 from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser
 
+from env_tools.arguments import args as env_args
+
 
 def object_detect(rgb_image_ls, depth, object_text):
     """
@@ -53,8 +55,13 @@ def object_detect(rgb_image_ls, depth, object_text):
                 # sam_show_res = sam_show_mask(new_mask, image0)
                 # cv2.imwrite("sam_show_res_{}_{}.jpg".format(index, temp_index), sam_show_res)
                 
-                false_matrix = np.zeros(new_mask.shape, dtype=bool)
+                if(env_args.is_one_rgb==True): # 是使用一张rgb
+                    new_add_half_width = int(((new_mask.shape[1]*90/79)-new_mask.shape[1])/2)
+                    new_add_false_matrix = np.zeros((new_mask.shape[0], new_add_half_width), dtype=bool)
+                    new_mask = np.hstack((new_add_false_matrix, new_mask, new_add_false_matrix))
                 
+                
+                false_matrix = np.zeros(new_mask.shape, dtype=bool)
                 if((index+1)==1):
                     large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], false_matrix, new_mask, false_matrix, false_matrix[:, :int(false_matrix.shape[1]//2)]))
                 elif((index+1)==2):
@@ -63,6 +70,8 @@ def object_detect(rgb_image_ls, depth, object_text):
                     large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, new_mask, false_matrix[:, :int(false_matrix.shape[1]//2)]))
                 elif((index+1)==3):
                     large_mask = np.hstack((new_mask[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, false_matrix, new_mask[:, :int(false_matrix.shape[1]//2)]))
+
+
 
                 if(args.is_depth_estimation_laser==True):
                     res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
@@ -84,7 +93,7 @@ Perpection Model Init, detect & mask
 """
 
 # loading config
-args.mask_rcnn_thre = 0.8
+# args.mask_rcnn_thre = 0.6
 
 rcnn_cfg = get_cfg()
 rcnn_cfg.merge_from_file(args.rcnn_yaml_path)

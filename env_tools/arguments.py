@@ -28,6 +28,8 @@ def get_args():
 
     parser.add_argument("--is_auto", type=bool, default=True)
     parser.add_argument("--is_vis", type=bool, default=False)
+    parser.add_argument("--is_gt", type=bool, default=False)
+    parser.add_argument("--is_one_rgb", type=bool, default=True)
     
 
     # parse arguments

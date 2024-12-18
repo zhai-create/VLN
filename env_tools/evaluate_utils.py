@@ -3,6 +3,9 @@ from navigation.habitat_action import HabitatAction
 from env_tools.arguments import args
 
 from navigation.sub_goal_reach import SubgoalReach
+from graph.tools import get_absolute_pos
+
+from perception.arguments import args as perception_args
 
 class Evaluate:
     success_num = 0 # sr
@@ -51,7 +54,7 @@ class Evaluate:
 
 
     @staticmethod
-    def evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=False, rl_graph=None, policy=None):
+    def evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=False, rl_graph=None, policy=None, topo_graph=None):
         # 1. 成功到达
         # 0. 到达错误的label goal
         # -1. 超过最大步长
@@ -93,7 +96,7 @@ class Evaluate:
                         reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+40
                         # reward_per_rl_step = (SubgoalReach.init_dis_to_goal-distance_to_goal)/5+(HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+40
                     else:
-                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step-20
+                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step
                         # reward_per_rl_step = (SubgoalReach.init_dis_to_goal-distance_to_goal)/5+(HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step-40
                     rl_graph.data['arrive'] = True
                     HabitatAction.reward_per_episode += reward_per_rl_step
@@ -202,6 +205,13 @@ class Evaluate:
             if(achieved_result=="exceed" or achieved_result=="empty"):
                 if(habitat_metric['success']>0):
                     Evaluate.success_num += 1
+                    writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)
+                elif(achieved_result=="exceed"):
+                    writer.add_scalar('Simulator/ratio_state', -1, index_in_episodes+1)
+                elif(achieved_result=="empty"):
+                    writer.add_scalar('Simulator/ratio_state', -3, index_in_episodes+1)
+
+
                 Evaluate.spl_per_episode = habitat_metric['spl']
                 Evaluate.spl_ls.append(Evaluate.spl_per_episode)
                 Evaluate.spl_mean = np.mean(Evaluate.spl_ls)
@@ -227,6 +237,24 @@ class Evaluate:
                 elif(action_node.node_type=="intention_node"):
                     if(habitat_metric['success']>0):
                         Evaluate.success_num += 1
+                        writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)
+                    elif(achieved_result=="block"):
+                        writer.add_scalar('Simulator/ratio_state', -4, index_in_episodes+1)
+                    elif(achieved_result=="Failed_Plan"):
+                        writer.add_scalar('Simulator/ratio_state', -2, index_in_episodes+1)
+                    else:
+                        if action_node.parent_node.name == topo_graph.current_node.name:
+                            robot_rela_loc = np.array([topo_graph.rela_cx, topo_graph.rela_cy])
+                        else:
+                            # current_node_in_temp_node = temp_node.all_other_nodes_loc[current_node.name] # 当前node在temp_node坐标系下的位置和角度
+                            current_node_in_action_parent_node = action_node.parent_node.all_other_nodes_loc[topo_graph.current_node.name] # 当前node在temp_node坐标系下的位置和角度
+                            robot_rela_loc = get_absolute_pos(np.array([topo_graph.rela_cx, topo_graph.rela_cy]), current_node_in_action_parent_node[:2], current_node_in_action_parent_node[2])
+                        
+                        if(((robot_rela_loc[0]-action_node.rela_cx)**2+(robot_rela_loc[1]-action_node.rela_cy)**2)**0.5)>1:
+                            writer.add_scalar('Simulator/ratio_state', -5, index_in_episodes+1) # 底层控制器失败
+                        else:
+                            writer.add_scalar('Simulator/ratio_state', 0, index_in_episodes+1) # 到达错误的intention_node
+                    
                     Evaluate.spl_per_episode = habitat_metric['spl']
                     Evaluate.spl_ls.append(Evaluate.spl_per_episode)
                     Evaluate.spl_mean = np.mean(Evaluate.spl_ls)

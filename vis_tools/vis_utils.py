@@ -27,6 +27,8 @@ def get_top_down_map(habitat_env):
     top_down_map = recolor_map[top_down_map]
     cv2.imwrite("{}/top_down_map.png".format(args.pre_path), top_down_map)
 
+
+
 def fig2data(fig):
     """
     fig = plt.figure()

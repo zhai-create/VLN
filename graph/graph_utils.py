@@ -7,7 +7,7 @@ from graph.arguments import args
 from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
 from perception.intention_utils_rcnn import object_detect
-# from perception.intention_utils_blip import request_llm
+# from perception.intention_utils_llava_easy import request_llm
 from perception.laser_utils import get_laser_point
 
 import copy

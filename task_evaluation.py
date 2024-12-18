@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '2, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '2, 3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import datetime
@@ -25,20 +25,28 @@ from graph.graph_utils import GraphMap
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
 
+from vis_tools.vis_utils import init_mp4, get_top_down_map
+
 from perception.arguments import args as perception_args
 
 if __name__=="__main__":
     args.task_stage = "val"
     args.graph_train = False
     args.root = "/home/zhaishichao/Data/VLN"
+    # args.model_file_name = "Models_train_llm"
     args.model_file_name = "Models_train"
-    args.graph_pre_model = 110
+    args.graph_pre_model = 1735
 
-    val_note = "_two_dim_val_train_new_load_data_all_label_low_cost_15_scene_large_thre_pre_model_"+str(args.graph_pre_model) # 注释当前测试处于什么阶段
+    # val_note = "_four_dim_"+str(args.graph_pre_model) # 注释当前测试处于什么阶段
+    val_note = "_two_dim_small_thre_one_rgb_"+str(args.graph_pre_model) # 注释当前测试处于什么阶段
+    # val_note = "_four_dim_baseline_llm_large_bs_val_"+str(args.graph_pre_model) # 注释当前测试处于什么阶段
+    # args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
     args.graph_episode_num = 1000
     args.success_distance = 1.0 
     args.max_steps = 500
+
+    args.is_vis = False # 录制视频
 
     rl_args.score_top_k = 50
     rl_args.graph_node_feature_dim = 2
@@ -55,11 +63,13 @@ if __name__=="__main__":
 
     # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
     #     '_'+ rl_args.graph_encoder
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_12_02_16_32_56_two_dim_train_new_load_data_all_label_low_cost_15_scene_large_thre"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_12_16_20_27_24_two_dim_small_thre_one_rgb"
+    # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_12_17_18_25_15_four_dim_baseline_llm_large_bs"
+
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
-    for index_in_episodes in tqdm(range(args.graph_episode_num)):        
+    for index_in_episodes in tqdm(range(args.graph_episode_num)):   
         # rl_graph_init
         rl_graph = RL_Graph()
         # haitat_episode_init
@@ -88,6 +98,11 @@ if __name__=="__main__":
             occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
             cv2.imshow("occu_for_show", occu_for_show)
 
+        # 用于录制视频
+        if(args.is_vis==True):
+            video_writer, map_writer = init_mp4(pre_model=args.graph_pre_model, episode_index=index_in_episodes+1)
+            get_top_down_map(habitat_env)
+
         while True:
             # rl_graph_update
             rl_graph.update(topo_graph)
@@ -112,7 +127,12 @@ if __name__=="__main__":
                     break
 
             action_node = rl_graph.all_nodes[polict_action]
-            achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
+            # achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, index_in_episodes=index_in_episodes, writer=writer)
+            
+            if(args.is_vis==True):
+                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, video_writer=video_writer, map_writer=map_writer)
+            else:
+                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
             print("======> achieved_result <=====", achieved_result)
             print("=====> action_node_type <=====", action_node.node_type)
             
@@ -120,8 +140,18 @@ if __name__=="__main__":
             print("=====> rl_graph_action_node_name_ls <=====", rl_graph_action_node_name_ls)
             print("============> intention_score <=============", action_node.score)
             
-            evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes)
+            evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
             if(evaluate_res=="episode_stop"):
+                # =====> new_add_evaluate <=====
+                writer.add_scalar('Policy/selected_intention_score', action_node.score, index_in_episodes+1)
+                all_intention_score_ls = [temp_node.score for temp_node in rl_graph.all_nodes if(temp_node.node_type=="intention_node")]
+                all_frontier_score_ls = [temp_node.score for temp_node in rl_graph.all_nodes if(temp_node.node_type=="frontier_node")]
+                writer.add_scalar('Policy/len_intention_nodes', len(all_intention_score_ls), index_in_episodes+1)
+                writer.add_scalar('Policy/len_frontier_nodes', len(all_frontier_score_ls), index_in_episodes+1)
+                if(len(all_intention_score_ls)>0):
+                    writer.add_scalar('Policy/max_intention_score', max(all_intention_score_ls), index_in_episodes+1)
+                    writer.add_scalar('Policy/min_intention_score', min(all_intention_score_ls), index_in_episodes+1)
+                # =====> new_add_evaluate <=====
                 break
 
 

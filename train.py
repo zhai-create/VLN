@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '2, 3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '2, 3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
 import random
 import cv2
 import copy
@@ -32,24 +32,29 @@ if __name__=="__main__":
     env_args.task_stage = "train"
     env_args.graph_train = True
     env_args.root = "/home/zhaishichao/Data/VLN"
-    env_args.model_file_name = "Models_train"
+    env_args.model_file_name = "Models_train_llm"
+    # env_args.model_file_name = "Models_train"
     env_args.graph_pre_model = 0
 
-    train_note = "_two_dim_train_new_load_data_all_label_low_cost_15_scene_large_thre" # 注释当前训练处于什么阶段
+    # train_note = "_four_dim_new_question" # 注释当前训练处于什么阶段
+    # train_note = "_two_dim_small_thre_one_rgb" # 注释当前训练处于什么阶段
+    train_note = "_four_dim_baseline_llm_large_bs" # 注释当前训练处于什么阶段
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    env_args.logger_file_name = "./log_files_train/log_"+date_time+train_note
+    env_args.logger_file_name = "./log_files_train_llm/log_"+date_time+train_note
+    # env_args.logger_file_name = "./log_files_train/log_"+date_time+train_note
     env_args.graph_episode_num = 80000
     env_args.success_distance = 1.0
     env_args.max_steps = 10000
 
     # only_train
     env_args.graph_model_save_frequency = 1
-    env_args.graph_batch_size = 64
+    env_args.graph_batch_size = 128
+    # env_args.graph_batch_size = 64
     env_args.graph_episode_length = 40 # max train rl_steps for per episode
     
 
     rl_args.score_top_k = 50
-    rl_args.graph_node_feature_dim = 2
+    rl_args.graph_node_feature_dim = 4
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -97,7 +102,6 @@ if __name__=="__main__":
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00255-NGyoyh91xXJ/NGyoyh91xXJ.basis.glb":["bed", "tv_monitor", "toilet"],
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00323-yHLr6bvWsVm/yHLr6bvWsVm.basis.glb":["bed", "tv_monitor", "toilet"],
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00327-xgLmjqzoAzF/xgLmjqzoAzF.basis.glb":["bed", "toilet", "chair"],
-
     }
     selected_episodes = []
     for index, temp_episode in enumerate(habitat_env.episodes):

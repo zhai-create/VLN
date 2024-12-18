@@ -17,7 +17,7 @@ def get_args():
 
     parser.add_argument("--sam_path", type=str, default='/home/zhaishichao/Data/Grounded_Segment_Anything/sam_hq_vit_h.pth')
     parser.add_argument("--sam_type", type=str, default='vit_h')
-    parser.add_argument("--model_device", type=str, default='cuda:1')
+    parser.add_argument("--model_device", type=str, default='cuda:0')
     parser.add_argument("--text_to_text_path", type=str, default='/home/zhaishichao/Data/Grounded_Segment_Anything/all-MiniLM-L6-v2')
     parser.add_argument("--GROUNDING_DINO_CONFIG_PATH", type=str, default="/home/zhaishichao/Data/Grounded_Segment_Anything/GroundingDINO/groundingdino/config/GroundingDINO_SwinT_OGC.py")
     parser.add_argument("--GROUNDING_DINO_CHECKPOINT_PATH", type=str, default="/home/zhaishichao/Data/Grounded_Segment_Anything/groundingdino_swint_ogc.pth")

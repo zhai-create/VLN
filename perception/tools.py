@@ -1,9 +1,14 @@
+import cv2
 import numpy as np
 import quaternion
 from scipy.ndimage import zoom
 
 from perception.arguments import args, pre_depth, ta_ls_array
 from graph.tools import get_absolute_pos
+
+from env_tools.arguments import args as env_args
+
+from PIL import Image
 
 def fix_depth(depth):
     """
@@ -134,6 +139,16 @@ def transform_rgb_bgr(image):
     """
     return image[:, :, [2, 1, 0]]
 
+def transform_semantic(obs_sem):
+    obs_sem = (obs_sem).astype(np.uint8)[:, :, 0]
+    rgb = Image.fromarray(obs_sem, 'P')
+    bin_colormap = [0,0,0] + [255,255,255]*254    # 二值调色板
+    rgb.putpalette(bin_colormap)
+    rgb = cv2.cvtColor(np.asarray(rgb),cv2.COLOR_RGB2BGR) 
+    rgb[:, :, 1] = obs_sem[:, :]
+    rgb[:, :, 2] = obs_sem[:, :]
+    return rgb
+
 def get_rgb_image(env, turn_id):
     #     1
     # 2        4
@@ -157,7 +172,22 @@ def get_rgb_image(env, turn_id):
         p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
         goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
         obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-        rgb = transform_rgb_bgr(obs["rgb"])
+        
+        
+        print('obs["semantic"]:', obs["semantic"])
+        print('obs["semantic"].shape:', obs["semantic"].shape)
+        obs_sem_set = []
+        for i in range(obs["semantic"].shape[0]):
+            for j in range(obs["semantic"].shape[1]):
+                if(obs["semantic"][i][j][0] not in obs_sem_set):
+                    obs_sem_set.append(obs["semantic"][i][j][0])
+        print("obs_sem_set:", obs_sem_set)        
+        
+        
+        if(env_args.is_gt==True):
+            rgb = transform_semantic(obs["semantic"])
+        else:
+            rgb = transform_rgb_bgr(obs["rgb"])
         # print(state.position, type(state.position))
         # print(rotation, type(rotation))
         # print("euler1:", euler)
@@ -179,7 +209,10 @@ def get_rgb_image(env, turn_id):
         p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
         goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
         obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-        rgb = transform_rgb_bgr(obs["rgb"])
+        if(env_args.is_gt==True):
+            rgb = transform_semantic(obs["semantic"])
+        else:
+            rgb = transform_rgb_bgr(obs["rgb"])
         # print(state.position, type(state.position))
         # print(rotation, type(rotation))
         # print("euler2:", euler)
@@ -201,7 +234,10 @@ def get_rgb_image(env, turn_id):
         p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
         goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
         obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-        rgb = transform_rgb_bgr(obs["rgb"])
+        if(env_args.is_gt==True):
+            rgb = transform_semantic(obs["semantic"])
+        else:
+            rgb = transform_rgb_bgr(obs["rgb"])
         # print(state.position, type(state.position))
         # print(rotation, type(rotation))
         # print("euler3:", euler)
@@ -223,7 +259,10 @@ def get_rgb_image(env, turn_id):
         p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
         goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
         obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-        rgb = transform_rgb_bgr(obs["rgb"])
+        if(env_args.is_gt==True):
+            rgb = transform_semantic(obs["semantic"])
+        else:
+            rgb = transform_rgb_bgr(obs["rgb"])
         # print(state.position, type(state.position))
         # print(rotation, type(rotation))
         # print("euler4:", euler)
@@ -240,7 +279,13 @@ def get_rgb_image_ls(env):
     # 2        4
     #     3
     rgb_ls = []
-    for turn_id in range(1, 5):
+
+    if(env_args.is_one_rgb==True):
+        turn_id_ls = [1]
+    else:
+        turn_id_ls = range(1, 5)
+
+    for turn_id in turn_id_ls:
         if(turn_id==1):
             dis, angle = 0, 0
             p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
@@ -259,7 +304,10 @@ def get_rgb_image_ls(env):
             p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
             goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
             obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-            rgb = transform_rgb_bgr(obs["rgb"])
+            if(env_args.is_gt==True):
+                rgb = transform_semantic(obs["semantic"])
+            else:
+                rgb = transform_rgb_bgr(obs["rgb"])
         elif(turn_id==2):
             dis, angle = 0, 0.5*np.pi
             p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
@@ -278,7 +326,10 @@ def get_rgb_image_ls(env):
             p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
             goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
             obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-            rgb = transform_rgb_bgr(obs["rgb"])
+            if(env_args.is_gt==True):
+                rgb = transform_semantic(obs["semantic"])
+            else:
+                rgb = transform_rgb_bgr(obs["rgb"])
         elif(turn_id==3):
             dis, angle = 0, np.pi
             p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
@@ -297,7 +348,10 @@ def get_rgb_image_ls(env):
             p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
             goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
             obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-            rgb = transform_rgb_bgr(obs["rgb"])
+            if(env_args.is_gt==True):
+                rgb = transform_semantic(obs["semantic"])
+            else:
+                rgb = transform_rgb_bgr(obs["rgb"])
         elif(turn_id==4):
             dis, angle = 0, -0.5*np.pi
             p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
@@ -316,6 +370,9 @@ def get_rgb_image_ls(env):
             p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
             goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
             obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
-            rgb = transform_rgb_bgr(obs["rgb"])
+            if(env_args.is_gt==True):
+                rgb = transform_semantic(obs["semantic"])
+            else:
+                rgb = transform_rgb_bgr(obs["rgb"])
         rgb_ls.append(rgb)
     return rgb_ls

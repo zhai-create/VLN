@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0, 1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0, 3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0, 3'
 import cv2
 import habitat
 import time
@@ -38,7 +38,7 @@ if __name__=="__main__":
     args.root = "/home/zhaishichao/Data/VLN"
     args.model_file_name = "Models_train"
 
-    val_note = "_two_dim_val_train_new_load_data_all_label_low_cost_15_scene_large_thre_train_data" # 注释当前测试处于什么阶段
+    val_note = "_two_dim_small_thre_train_val_train_data" # 注释当前测试处于什么阶段
     args.logger_file_name = "./log_files/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
     args.graph_episode_num = 30
     args.success_distance = 1.0
@@ -56,7 +56,6 @@ if __name__=="__main__":
 
 
     writer = SummaryWriter(args.logger_file_name)
-    # writer = SummaryWriter("./log_files/log_2024_12_02_11_10_35_two_dim_val_train_new_load_data_all_label_18_cost_15_scene_train_data")
 
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage="train", episodes=1, max_steps=args.max_steps)
@@ -65,8 +64,8 @@ if __name__=="__main__":
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_12_02_16_32_56_two_dim_train_new_load_data_all_label_low_cost_15_scene_large_thre"
-        while not os.path.exists("/home/zhaishichao/Data/VLN/Models_train/policy/{}/{}_critic".format(experiment_details, args.graph_pre_model)):
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_12_12_15_57_13_two_dim_small_thre"
+        while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
             time.sleep(1)
         
@@ -76,10 +75,6 @@ if __name__=="__main__":
         policy = init_RL(args, rl_args, experiment_details)
         
         index_in_episodes = -1 # 用于计数episode数量
-
-        # # different_difficult_num = {1: 8, 2: 13, 3: 16, 4: 14, 5: 12, 6: 7, 7: 7, 8: 5, 9: 3, 10: 3, 11: 2, 12: 2, 13: 1, 14:1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1, 22: 1}
-        # different_difficult_num = {1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14:1, 15: 1, 16: 1, 17: 1, 18: 1, 20: 1, 22: 1}
-        # different_difficult_index = {1:0, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:0, 10:0, 11:0, 12:0, 13:0, 14:0, 15:0, 16:0, 17:0, 18:0, 20:0, 22:0}
 
         # =====> select episodes <=====
         id_dict = {
@@ -189,13 +184,14 @@ if __name__=="__main__":
                 print("=====> action_node_type <=====", action_node.node_type)
 
                 
-                evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes)
+                evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
                 if(evaluate_res=="episode_stop"):
                     break
 
         writer.add_scalar('Val_Result/success_num', Evaluate.success_num, temp_pre_model)
         writer.add_scalar('Val_Result/spl_mean', Evaluate.spl_mean, temp_pre_model)
-        writer.add_scalar('Val_Result/reward', (Evaluate.success_num*40+(30-Evaluate.success_num)*(-40)+(-1)*Evaluate.all_front_steps/Evaluate.max_front_steps_per_rl_step)/30, temp_pre_model)
+        # writer.add_scalar('Val_Result/reward', (Evaluate.success_num*40+(30-Evaluate.success_num)*(-40)+(-1)*Evaluate.all_front_steps/Evaluate.max_front_steps_per_rl_step)/30, temp_pre_model)
+        writer.add_scalar('Val_Result/reward', (Evaluate.success_num*40+(-1)*Evaluate.all_front_steps/Evaluate.max_front_steps_per_rl_step)/30, temp_pre_model)
         
 
 
