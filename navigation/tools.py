@@ -195,3 +195,8 @@ def get_absolute_pos_world(rela_cx, rela_cy, world_cx, world_cy, world_turn):
     res_loc_in_real_world[0] = -res_loc_in_real_world[0]
     return res_loc_in_real_world
 
+
+def get_relative_pos_world(real_world_cx, real_world_cy, world_cx, world_cy, world_turn):
+    real_r_matrix = np.array([[np.cos(world_turn), -np.sin(world_turn)], [np.sin(world_turn), np.cos(world_turn)]])  
+    rela_pos = np.dot(real_r_matrix, np.array([world_cx-real_world_cx, real_world_cy-world_cy]))
+    return rela_pos

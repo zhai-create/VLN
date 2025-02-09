@@ -24,6 +24,25 @@ class Node(object):
         self.world_cz = world_cz
         self.world_turn = world_turn
 
+        # cluster_revise
+        # self.intention_cluster = [] # 包含自己节点
+        # cluster_revise
+
+        # # 0109_add
+        # self.intention_flag = 0
+        # self.closer_intention_ls = []
+        # # 0109_add
+
+        # # new_recheck
+        # self.intention_flag = 0
+        # # new_recheck
+
+        # new_recheck_train
+        self.intention_cnt = 0
+        # new_recheck_train
+
+
+
 
         self.dis = (rela_cx**2+rela_cy**2)**0.5 # float
 
@@ -32,6 +51,7 @@ class Node(object):
         self.rl_node_index = -1 # int
         
         self.deleted_frontiers = [] # rl_step中实际行走步数为0的frontier
+        self.deleted_intentions = [] # rl_step中实际行走步数为0的intention
 
         if(node_type=="explored_node"):
             self.rela_angle_parent_center = 0
@@ -43,6 +63,17 @@ class Node(object):
             self.occupancy_map = None
 
         self.score = score # float, 只有intention需要，其他两种node均为0
+        # correct_recheck
+        self.score_ls = [score, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        # closer_revise
+        self.dis_ls = [-2, -2, -2, -2, -2, -2, -2, -2, -2, -2]
+        # closer_revise
+        # # no_closer_revise
+        # self.dis_ls = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        # # no_closer_revise
+        self.robot_intention_dis = -1
+        self.intention_type = 1
+        # correct_recheck
         self.parent_node = parent_node
 
         self.all_other_nodes_loc = {} # dict

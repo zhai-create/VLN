@@ -59,34 +59,43 @@ def request_llm(rgb_image_ls, object_text):
         .cuda()
     )
 
-    # --------------------> 2.2 object_1 <--------------------
-    qs_object_1 = "Infer the probability of the {} around these objects in image and output it as a decimal in the range [0,1].".format(object_text)
-    qs_object_1 = DEFAULT_IMAGE_TOKEN + "\n" + qs_object_1
+    # # ===========> temp_close <===========
+    # # --------------------> 2.2 object_1 <--------------------
+    # qs_object_1 = "Infer the probability of the {} around these objects in image and output it as a decimal in the range [0,1].".format(object_text)
+    # qs_object_1 = DEFAULT_IMAGE_TOKEN + "\n" + qs_object_1
 
-    conv_object_1 = conv_templates[conv_mode].copy()
-    conv_object_1.append_message(conv_object_1.roles[0], qs_object_1)
-    conv_object_1.append_message(conv_object_1.roles[1], None)
-    prompt_object_1 = conv_object_1.get_prompt()
+    # conv_object_1 = conv_templates[conv_mode].copy()
+    # conv_object_1.append_message(conv_object_1.roles[0], qs_object_1)
+    # conv_object_1.append_message(conv_object_1.roles[1], None)
+    # prompt_object_1 = conv_object_1.get_prompt()
 
-    input_id_object_1 = (
-        tokenizer_image_token(prompt_object_1, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
-        .unsqueeze(0)
-        .cuda()
-    )
+    # input_id_object_1 = (
+    #     tokenizer_image_token(prompt_object_1, tokenizer, IMAGE_TOKEN_INDEX, return_tensors="pt")
+    #     .unsqueeze(0)
+    #     .cuda()
+    # )
+    # # ===========> temp_close <===========
     # ============================================================
 
     # tensor_concat
-    input_ids = torch.cat((input_id_room_1, input_id_room_1, input_id_room_1, input_id_room_1, 
-                           input_id_object_1, input_id_object_1, input_id_object_1, input_id_object_1), dim=0)
+    # # ===========> temp_close <===========
+    # input_ids = torch.cat((input_id_room_1, input_id_room_1, input_id_room_1, input_id_room_1, 
+    #                        input_id_object_1, input_id_object_1, input_id_object_1, input_id_object_1), dim=0)
 
-    large_images_tensor = torch.cat((images_tensor, images_tensor), dim=0)
+    # large_images_tensor = torch.cat((images_tensor, images_tensor), dim=0)
+    # # ===========> temp_close <===========
+
+    input_ids = torch.cat((input_id_room_1, input_id_room_1, input_id_room_1, input_id_room_1), dim=0)
+    large_images_tensor = images_tensor
+
     # large_images_tensor = large_images_tensor.to(torch.float32)
     # ====================> reasoning_stage_1 <====================
     with torch.inference_mode():    
         output_ids= model.generate(
             input_ids,
             images=large_images_tensor,
-            image_sizes=image_sizes+image_sizes,
+            # image_sizes=image_sizes+image_sizes, # ===========> temp_close <===========
+            image_sizes=image_sizes,
             do_sample=False,
             temperature=0,
             top_p=None,
@@ -115,35 +124,41 @@ def request_llm(rgb_image_ls, object_text):
                     continue
         output_room_score_ls.append(output_room_score)
 
-    output_object_str_ls = outputs_all_str_ls[4:8]
-    output_object_score_ls = []
-    for index in range(len(output_object_str_ls)):
-        temp_str = (output_object_str_ls[index].strip()).strip(".")
-        try:
-            output_object_score = eval(temp_str)
-        except:
-            output_object_score = 0
-            temp_str_ls = temp_str.split(" ")[::-1]
-            for temp_index in range(len(temp_str_ls)):
-                try:
-                    output_object_score = eval(temp_str_ls[temp_index].strip(','))
-                    break
-                except:
-                    continue
-        output_object_score_ls.append(output_object_score)
+    # # ===========> temp_close <===========
+    # output_object_str_ls = outputs_all_str_ls[4:8]
+    # output_object_score_ls = []
+    # for index in range(len(output_object_str_ls)):
+    #     temp_str = (output_object_str_ls[index].strip()).strip(".")
+    #     try:
+    #         output_object_score = eval(temp_str)
+    #     except:
+    #         output_object_score = 0
+    #         temp_str_ls = temp_str.split(" ")[::-1]
+    #         for temp_index in range(len(temp_str_ls)):
+    #             try:
+    #                 output_object_score = eval(temp_str_ls[temp_index].strip(','))
+    #                 break
+    #             except:
+    #                 continue
+    #     output_object_score_ls.append(output_object_score)
+    # # ===========> temp_close <===========
 
     print("output_room_score_ls:", output_room_score_ls)
-    print("output_object_score_ls:", output_object_score_ls)
+    # print("output_object_score_ls:", output_object_score_ls) # ===========> temp_close <===========
 
     try:
         room_type_score = np.mean(output_room_score_ls)
     except:
         room_type_score = 0
 
-    try:
-        object_details_score = np.mean(output_object_score_ls)
-    except:
-        object_details_score = 0
+    # # ===========> temp_close <===========
+    # try:
+    #     object_details_score = np.mean(output_object_score_ls)
+    # except:
+    #     object_details_score = 0
+    # # ===========> temp_close <===========
+    
+    object_details_score = 0.0
     answer_ls = [room_type_score, object_details_score]
     return answer_ls
 

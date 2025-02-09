@@ -36,6 +36,8 @@ class TopoPlanner(object):
         # selected sub-goal pose
         self.rela_object_cx = action_node.rela_cx
         self.rela_object_cy = action_node.rela_cy
+        self.world_object_cx = action_node.world_cx
+        self.world_object_cy = action_node.world_cy
         self.object_parent_node = action_node.parent_node
         self.sub_map_node = None
         self.state_flag = "init"

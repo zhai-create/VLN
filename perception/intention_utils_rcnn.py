@@ -9,7 +9,7 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 
 from perception.arguments import args, coco_categories_mapping
-from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser
+from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser, depth_estimation_laser_pinhole_to_panorama
 
 from env_tools.arguments import args as env_args
 
@@ -71,10 +71,14 @@ def object_detect(rgb_image_ls, depth, object_text):
                 elif((index+1)==3):
                     large_mask = np.hstack((new_mask[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, false_matrix, new_mask[:, :int(false_matrix.shape[1]//2)]))
 
+                true_count = np.sum(large_mask)
+                if true_count < args.mask_true_cnt_thre:
+                    continue
 
 
                 if(args.is_depth_estimation_laser==True):
-                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
+                    # res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
+                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser_pinhole_to_panorama(large_mask, depth)
                 else:
                     res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
                 
@@ -82,9 +86,9 @@ def object_detect(rgb_image_ls, depth, object_text):
                     continue
                 
                 if(temp_pre_scores[temp_index].item() not in detect_res_pos_dict):
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy]]
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy, index]]
                 else:
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy])
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy, index])
     return detect_res_pos_dict
 
 

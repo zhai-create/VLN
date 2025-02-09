@@ -10,6 +10,8 @@ from graph.arguments import args as graph_args
 from perception.arguments import args as perception_args
 from policy.rl_algorithms.arguments import args
 
+from env_tools.arguments import args as env_args
+
 
 half_len = (int)(perception_args.depth_scale/graph_args.resolution)
 
@@ -88,6 +90,18 @@ class RL_Graph(object):
     def select_intention(self, topo_graph):
         object_score_ls = []
         for temp_intention_node in topo_graph.intention_nodes:
+            # 先删除使得rl_step中实际行走的step为0的intention
+            # ===================================
+            temp_intention_parent_node = temp_intention_node.parent_node
+            need_delete_flag = False
+            for temp_delete_intention in temp_intention_parent_node.deleted_intentions:
+                if ((temp_delete_intention.rela_cx-temp_intention_node.rela_cx)**2+(temp_delete_intention.rela_cy-temp_intention_node.rela_cy)**2)**0.5<0.2:
+                    need_delete_flag = True
+                    break
+            if(need_delete_flag == True):
+                continue
+            # ===================================
+
             if(temp_intention_node.is_see==True):
                 object_score_ls.append(temp_intention_node)
             else:
@@ -114,16 +128,55 @@ class RL_Graph(object):
             if(temp_node.node_type=="explored_node"):
                 # assert temp_node.room_flag != -1
                 # assert temp_node.object_flag != -1
-                
                 # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, temp_node.room_flag, temp_node.object_flag]])], dim=0)
-                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0]])], dim=0)
+                if(env_args.is_llm==2):
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0, 0]])], dim=0)
+                elif(env_args.is_llm==1):    
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0]])], dim=0)
+                else:
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0]])], dim=0)
+                    # new_recheck_train
+                    # 暂时关闭
+                    # no_cluster_revise
+                    # cluster_revise
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0, 0]])], dim=0)
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0]])], dim=0)
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0]])], dim=0)
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, 0]])], dim=0)
+                    # no_closer_revise
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0]])], dim=0)
+                    # no_closer_revise
+                    # cluster_revise
+                    # no_cluster_revise
+                    # 暂时关闭
+                    # new_recheck_train
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
             elif(temp_node.node_type=="frontier_node"):
                 if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                     continue
-                # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, temp_node.room_flag, temp_node.object_flag]])], dim=0)
-                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5]])], dim=0)
+                # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0.0, 0.0]])], dim=0)
+                if(env_args.is_llm==2):
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0.0, 0.0]])], dim=0)
+                elif(env_args.is_llm==1):
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0.0]])], dim=0)
+                else:
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5]])], dim=0)
+                    # new_recheck_train
+                    # 暂时关闭
+                    # no_cluster_revise
+                    # cluster_revise
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0.5, 0]])], dim=0)
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0.5]])], dim=0)
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0]])], dim=0)
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, 0.5]])], dim=0)
+                    # no_closer_revise
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0.5]])], dim=0)
+                    # no_closer_revise
+                    # cluster_revise
+                    # no_cluster_revise
+                    # 暂时关闭
+                    # new_recheck_train
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
 
@@ -134,8 +187,25 @@ class RL_Graph(object):
             elif(temp_node.node_type=="intention_node" and ((temp_node in selected_intention_node_ls))):
                 if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                     continue
-                # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.room_flag, temp_node.object_flag]])], dim=0)
-                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1]])], dim=0)
+                # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, 0.0, 0.0]])], dim=0)
+                if(env_args.is_llm==2):
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.room_flag, temp_node.object_flag]])], dim=0)
+                elif(env_args.is_llm==1):
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.room_flag]])], dim=0)
+                else:
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1]])], dim=0)
+                    # new_recheck_train
+                    # 暂时关闭
+                    # no_cluster_revise
+                    # cluster_revise
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[np.mean(temp_node.intention_cluster), len(temp_node.intention_cluster), 1]])], dim=0)
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[np.mean(temp_node.intention_cluster), len(temp_node.intention_cluster), 1, temp_node.intention_cnt]])], dim=0)
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.intention_cnt]])], dim=0)
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score_ls[0], temp_node.score_ls[1], temp_node.score_ls[2], temp_node.score_ls[3], temp_node.score_ls[4], temp_node.score_ls[5], temp_node.score_ls[6], temp_node.score_ls[7], temp_node.score_ls[8], temp_node.score_ls[9], temp_node.dis_ls[0], temp_node.dis_ls[1], temp_node.dis_ls[2], temp_node.dis_ls[3], temp_node.dis_ls[4], temp_node.dis_ls[5], temp_node.dis_ls[6], temp_node.dis_ls[7], temp_node.dis_ls[8], temp_node.dis_ls[9], temp_node.intention_type]])], dim=0)
+                    # cluster_revise
+                    # no_cluster_revise
+                    # 暂时关闭
+                    # new_recheck_train
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
                 

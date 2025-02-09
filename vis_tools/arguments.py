@@ -13,7 +13,13 @@ def get_args():
     parser.add_argument("--new_top_left", type=tuple, default=(0, 0))
     parser.add_argument("--new_right_bottom", type=tuple, default=(240, 60))
 
-    parser.add_argument("--pre_path", type=str, default="vis_result_1110")
+    # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_plan")
+    # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt")
+    # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_fakeintention_no_filter")
+    # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_ctr")
+    # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_ctr_plan_fakeintention")
+
+    parser.add_argument("--pre_path", type=str, default="vis_result_node_type_revise_closer_revise")
 
     # parse arguments
     args = parser.parse_args()

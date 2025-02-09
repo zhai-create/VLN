@@ -12,8 +12,10 @@ half_len = (int)(perception_args.depth_scale/graph_args.resolution)
 def choose_action(local_path, sub_map_node, habitat_env, habitat_planner):
     if len(local_path) < args.path_length_thre: # 路径较短
         waypoint_grid = local_path[-1]
+        selected_index = len(local_path)-1
     else: # 路径较长
         waypoint_grid = local_path[args.path_length_thre-1] # 我们是9
+        selected_index = args.path_length_thre-1
 
     waypoint_x = -(waypoint_grid[0] - half_len) * graph_args.resolution
     waypoint_y = (waypoint_grid[1] - half_len) * graph_args.resolution
@@ -33,8 +35,10 @@ def choose_action(local_path, sub_map_node, habitat_env, habitat_planner):
         local_path = local_path[min(args.path_length_thre, len(local_path)-1):] # 更新local_path
         if len(local_path) < args.short_path_length_thre: 
             waypoint_grid = local_path[-1]
+            selected_index = len(local_path)-1
         else:
             waypoint_grid = local_path[args.short_path_length_thre-1]
+            selected_index = args.short_path_length_thre-1
 
         waypoint_x = -(waypoint_grid[0] - half_len) * graph_args.resolution
         waypoint_y = (waypoint_grid[1] - half_len) * graph_args.resolution
@@ -48,6 +52,25 @@ def choose_action(local_path, sub_map_node, habitat_env, habitat_planner):
     habitat_act_num = habitat_planner.get_next_action(pid_waypoint)
     next_action = act_num_str_map[habitat_act_num]
 
+
+    while True:
+        if(len(local_path)>args.path_length_thre and next_action=="suc"): # 发现底层执行器失败的现象
+            if(selected_index<=len(local_path)-2):
+                local_path.pop(selected_index)
+                waypoint_grid = local_path[selected_index]
+                waypoint_x = -(waypoint_grid[0] - half_len) * graph_args.resolution
+                waypoint_y = (waypoint_grid[1] - half_len) * graph_args.resolution
+                waypoint = np.array([waypoint_x, waypoint_y])
+
+                pid_waypoint = get_absolute_pos_world(waypoint[0], waypoint[1], sub_map_node.world_cx, sub_map_node.world_cy, sub_map_node.world_turn)
+                pid_waypoint = np.array([pid_waypoint[1], habitat_env._sim.get_agent_state(0).position[1], pid_waypoint[0]]) # pid_waypoint: 下一个路径点在世界坐标系下的坐标
+                
+                habitat_act_num = habitat_planner.get_next_action(pid_waypoint)
+                next_action = act_num_str_map[habitat_act_num]
+            else:
+                break
+        else:
+            break
     return local_path, next_action
     
         

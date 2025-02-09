@@ -1,6 +1,7 @@
 import cv2
 import os
 import numpy as np
+# np.set_printoptions(threshold=np.inf)
 import matplotlib.pyplot as plt
 import networkx as nx
 import matplotlib.image as mpimg
@@ -13,9 +14,13 @@ from typing import TYPE_CHECKING, Union, cast
 from navigation.tools import get_absolute_pos_world
 from graph.tools import get_current_world_pos
 
-from perception.tools import get_rgb_image_ls, fix_depth
+from perception.tools import get_rgb_image_ls, get_gt_image_ls, fix_depth
 
 from vis_tools.arguments import args
+from PIL import Image
+
+from env_tools.arguments import args as env_args
+
 
 def get_top_down_map(habitat_env):
     top_down_map = maps.get_topdown_map_from_sim(
@@ -54,6 +59,11 @@ def fig2data(fig):
     return image
 
 def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
+    # if(action_node.node_type=="intention_node"):
+    #     print("node_name:", action_node.name)
+    #     print("action_node_pos:", (action_node.rela_cx, action_node.rela_cy))
+    #     breakpoint()
+    
     label_figure = plt.figure(2, figsize=(3, 5))
     plt.clf()
     ax = plt.gca()
@@ -131,6 +141,17 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
                 circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
             else:
                 circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            
+            # 添加 score 文字标注
+            if(-1 in temp_node.score_ls):
+                score_index = temp_node.score_ls.index(-1)
+                temp_node_score = temp_node.score_ls[score_index-1]
+            else:
+                temp_node_score = temp_node.score_ls[-1]
+            plt.text(ty, tx - 35, f"{temp_node_score:.2f}", fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+            # 添加 score 文字标注
+
+
             ax.add_patch(circle)
             G.add_node(temp_node.name, pos=(ty, tx))
             label_action_ls_index += 1
@@ -204,10 +225,22 @@ def init_mp4(pre_model, episode_index):
         bitrate=0,
         output_params=["-crf", "31"],
     )
-    return video_writer, map_writer
+
+    gt_path = "{}/gt_{:04d}_{:04d}.mp4".format(args.pre_path, pre_model, episode_index)
+    gt_writer = imageio.get_writer(
+        gt_path,
+        codec="h264",
+        fps=10,
+        quality=None,
+        pixelformat="yuv420p",
+        bitrate=0,
+        output_params=["-crf", "31"],
+    )
+
+    return video_writer, map_writer, gt_writer
 
 
-def save_mp4(video_writer, map_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal):
+def save_mp4(video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal, vln_sim=None):
     plt_topo_map = plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node)
 
     rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
@@ -217,6 +250,22 @@ def save_mp4(video_writer, map_writer, habitat_env, topo_graph, rl_graph, action
     cv2.rectangle(video_image, args.new_top_left, args.new_right_bottom, color=(0,0,0), thickness=-1)
     cv2.putText(video_image, 'Object Goal: '+object_goal, args.font_pos1, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
 
+    if(env_args.is_gt==True):
+        gt_image_ls = get_gt_image_ls(vln_sim)
+        # ===========> old <============
+        gt_image = gt_image_ls[0][:, :, :3]
+        gt_image = np.array(gt_image, dtype=np.uint8)
+        gt_image = cv2.resize(gt_image, None, fx=1.0, fy=1.0)
+        # ===========> old <============
+
+    # # ===========> new <============
+    # gt_image = Image.fromarray(gt_image_ls[0], mode="RGB")
+    # gt_image = np.array(gt_image)
+    # # ===========> new <============
+
+
+
+
     if(action_node.node_type=="frontier_node"):
         cv2.putText(video_image, "Go to frontier node", args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
     else:
@@ -224,5 +273,20 @@ def save_mp4(video_writer, map_writer, habitat_env, topo_graph, rl_graph, action
 
     video_writer.append_data(video_image)
     map_writer.append_data(plt_topo_map)
+
+    if(env_args.is_gt==True):
+        gt_writer.append_data(gt_image)
+
+    # cv2.imwrite("video_rgb.jpg", video_image[:, :, ::-1])
+    # cv2.imwrite("video_gt.jpg", gt_image[:, :, ::-1])
+    # print(gt_image[-1][-1])
+
+    # for i in range(gt_image.shape[0]):
+    #     for j in range(gt_image.shape[1]):
+    #         if(gt_image[i][j][0]==108 and gt_image[i][j][1]==0 and gt_image[i][j][2]==212):
+    #             print((i, j))
+    #             print("!!!!!!!!!!!!!!!!!")
+
+    # breakpoint()
 
 

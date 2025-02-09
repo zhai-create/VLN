@@ -31,4 +31,18 @@ def predict_frontier(thre1, laser_2d_filtered, laser_2d_filtered_angle):
 
             candidate_frontier_ls.append([candidate_frontier_d1, candidate_frontier_d2])
 
+
+        # if(laser_dis>0 and laser_angle>0 and laser_angle<np.pi/2):
+        #     center_point_d1 = (int)(half_len-ty/0.1)
+        #     center_point_d2 = (int)(half_len+tx/0.1)
+
+        #     print("laser_dis:", laser_dis)
+        #     print("laser_angle:", laser_angle*180/np.pi)
+
+        #     print("center_point_d1:", center_point_d1)
+        #     print("center_point_d2:", center_point_d2)
+
+        #     breakpoint()
+
+
     return np.array(candidate_frontier_ls)

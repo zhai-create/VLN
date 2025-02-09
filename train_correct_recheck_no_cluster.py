@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import random
 import cv2
 import copy
@@ -28,33 +28,57 @@ from graph.graph_utils import GraphMap
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
 
+from perception.intention_utils_rcnn import object_detect
+
 if __name__=="__main__":
     env_args.task_stage = "train"
     env_args.graph_train = True
     env_args.root = "/home/zhaishichao/Data/VLN"
-    env_args.model_file_name = "Models_train_llm"
-    # env_args.model_file_name = "Models_train"
+    if(env_args.is_llm==1 or env_args.is_llm==2):
+        env_args.model_file_name = "Models_train_llm"
+    else:
+        env_args.model_file_name = "Models_train"
     env_args.graph_pre_model = 0
 
-    # train_note = "_four_dim_new_question" # 注释当前训练处于什么阶段
-    # train_note = "_two_dim_small_thre_one_rgb" # 注释当前训练处于什么阶段
-    train_note = "_four_dim_baseline_llm_large_bs" # 注释当前训练处于什么阶段
+    if(env_args.is_llm==2):
+        train_note = "_four_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
+    elif(env_args.is_llm==1):
+        train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
+    else:
+        # train_note = "_two_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
+        # train_note = "_two_dim_small_thre_rgb_new_framework" # 注释当前训练处于什么阶段
+        # train_note = "_two_dim_small_thre_rgb_old_framework" # 注释当前训练处于什么阶段
+        # train_note = "_two_dim_small_thre_cluster_recheck" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_node_type_revise_no_if_revise" # 注释当前训练处于什么阶段
+
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-    env_args.logger_file_name = "./log_files_train_llm/log_"+date_time+train_note
-    # env_args.logger_file_name = "./log_files_train/log_"+date_time+train_note
+    if(env_args.is_llm==1 or env_args.is_llm==2):
+        env_args.logger_file_name = "./log_files_train_llm/log_"+date_time+train_note
+    else:
+        env_args.logger_file_name = "./log_files_train/log_"+date_time+train_note
     env_args.graph_episode_num = 80000
     env_args.success_distance = 1.0
     env_args.max_steps = 10000
 
     # only_train
     env_args.graph_model_save_frequency = 1
-    env_args.graph_batch_size = 128
-    # env_args.graph_batch_size = 64
+    # env_args.graph_batch_size = 128
+    env_args.graph_batch_size = 64
     env_args.graph_episode_length = 40 # max train rl_steps for per episode
     
 
     rl_args.score_top_k = 50
-    rl_args.graph_node_feature_dim = 4
+    if(env_args.is_llm==2):
+        rl_args.graph_node_feature_dim = 4
+    elif(env_args.is_llm==1):
+        rl_args.graph_node_feature_dim = 3
+    else:
+        # rl_args.graph_node_feature_dim = 2
+        # no_cluster_revise
+        # new_recheck_train
+        rl_args.graph_node_feature_dim = 21
+        # new_recheck_train
+        # no_cluster_revise
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -135,14 +159,13 @@ if __name__=="__main__":
         rl_graph = RL_Graph()
         # haitat_episode_init
         habitat_env.episodes = [selected_episodes[index_in_episodes]]
-        # writer.add_scalar('Scene/scene_id', list(id_dict.keys()).index(habitat_env.episodes[0].scene_id), index_in_episodes+1)
+        writer.add_scalar('Scene/scene_id', list(id_dict.keys()).index(habitat_env.episodes[0].scene_id), index_in_episodes+1)
         print("=====> scene_id <=====", habitat_env.episodes[0].scene_id)
         try:
             observations = habitat_env.reset()
         except:
             continue
         HabitatAction.reset(habitat_env) 
-
         habitat_metric = habitat_env.get_metrics()
         object_goal = env_args.object_ls[observations["objectgoal"][0]]
 
@@ -154,7 +177,9 @@ if __name__=="__main__":
         # topo_graph_init
         topo_graph = GraphMap(habitat_env=habitat_env)
         topo_graph.set_current_pos(rela_cx=0.0, rela_cy=0.0, rela_turn=0.0)
-        topo_graph.update(rgb_image_ls, depth, object_goal)
+        topo_graph.update(depth)
+        detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+        topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
         # rl_graph_update
         rl_graph.update(topo_graph)
@@ -167,6 +192,9 @@ if __name__=="__main__":
             occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
             cv2.imshow("occu_for_show", occu_for_show)
 
+        # new_recheck_train
+        action_node = None
+        # new_recheck_train
         while True:    
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
@@ -189,11 +217,61 @@ if __name__=="__main__":
                     Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
                     break
 
-            action_node = rl_graph.all_nodes[polict_action]
-            achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
-            if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node"):
-                achieved_result = "EXCEED_RL" # 超过RL最大次数 
+            # action_node = rl_graph.all_nodes[polict_action]
+
+            # new_recheck_train
+            new_action_node = rl_graph.all_nodes[polict_action]
+            if(action_node is None):
+                action_node = new_action_node
+            else:
+                if(new_action_node.node_type=="intention_node" and action_node.node_type=="intention_node"):
+                    if(((new_action_node.world_cx-action_node.world_cx)**2+(new_action_node.world_cy-action_node.world_cy)**2)**0.5)<1.0:
+                        new_action_node.intention_cnt = -1
+                action_node = new_action_node
+            # new_recheck_train
             
+
+            achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
+            
+            # # correct_recheck
+            # if(action_node.node_type=="intention_node"):
+            #     if(action_node.intention_cnt==-1):
+            #         for temp_intention_node in topo_graph.intention_nodes:
+            #             if(temp_intention_node.name==action_node.name):
+            #                 temp_intention_node.intention_type = 2 # 确定要去的intention
+            #             else:
+            #                 temp_intention_node.intention_type = 1 # 靠近的intention
+            #     else:
+            #         for temp_intention_node in topo_graph.intention_nodes:
+            #             temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
+            #             if(temp_dis<1.0):
+            #                 temp_intention_node.intention_type = 2
+            #             else:
+            #                 temp_intention_node.intention_type = 1
+            # # correct_recheck
+
+            # node_type_revise
+            if(action_node.node_type=="intention_node"):
+                for temp_intention_node in topo_graph.intention_nodes:
+                    if(temp_intention_node.intention_type==1):
+                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
+                        if(temp_dis<1.0):
+                            temp_intention_node.intention_type = 2
+            # node_type_revise
+                    
+            
+            # # 0109_add
+            # if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="false_intention"):
+            # # 0109_add
+
+            # if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node"):
+            #     achieved_result = "EXCEED_RL" # 超过RL最大次数 
+
+            # new_recheck_train
+            if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and action_node.intention_cnt!=-1 and achieved_result=="achieved"):
+                achieved_result = "EXCEED_RL" # 超过RL最大次数 
+            # new_recheck_train
+
             print("======> achieved_result <=====", achieved_result)
             print("=====> action_node_type <=====", action_node.node_type)
 

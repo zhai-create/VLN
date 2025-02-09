@@ -25,6 +25,12 @@ def laser_filter(laser_2d):
         if (np.absolute(laser_2d[i]-laser_2d[(i-1+laser_len)%laser_len]) * args.depth_scale < min(args.filter_thre, 2.5*left_ave_depth_dif) \
         or np.absolute(laser_2d[i]-laser_2d[(i+1+laser_len)%laser_len]) * args.depth_scale < min(args.filter_thre, 2.5*right_ave_depth_dif)) \
         or laser_2d[i]*args.depth_scale < 0.01: 
+
+            # # =====> laser_revise <=====    
+            # if(laser_2d[i]>0.5): # 超过5m的激光进行mask
+            #     laser_2d[i] = 0.01/args.depth_scale
+            # # =====> laser_revise <=====   
+
             laser_2d_filtered.append(laser_2d[i])
             temp_angle = 1.5 * np.pi - i / laser_len * 2 * np.pi
             if temp_angle >= np.pi:
@@ -62,13 +68,11 @@ def get_laser_point(depth):
     laser_points = laser_points.reshape(-1,3)
     laser_points[:,[0,1,2]] = laser_points[:,[2,0,1]]
     laser_points = laser_points.astype(np.float16)
-
     laser_2d_filtered, laser_2d_filtered_angle = laser_filter(laser_2d)
 
     depth_for_unprojection_for_close_loop = depth[split_h-1:split_h, :, :]
     laser_dis_for_close_loop = depth_for_unprojection_for_close_loop * np.cos(pre_depth.data[split_h:, :, 2:3]) * args.depth_scale # 单位: meter
     laser_for_close_loop = laser_dis_for_close_loop[0, np.arange(args.depth_width), 0] / args.depth_scale # 单位: 无量纲
-
     laser_2d_filtered_for_close_loop, laser_2d_filtered_angle_for_close_loop = laser_filter(laser_for_close_loop) # 深度相机中间高度的filter_scan和filter_scan_angle
 
     number_of_filtered = len(laser_2d_filtered_for_close_loop)

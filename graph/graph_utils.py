@@ -6,9 +6,17 @@ from graph.node_utils import Node
 from graph.arguments import args
 from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
-from perception.intention_utils_rcnn import object_detect
-# from perception.intention_utils_llava_easy import request_llm
+# from perception.intention_utils_rcnn import object_detect
+
+from env_tools.arguments import args as env_args
+from navigation.tools import get_absolute_pos_world, get_relative_pos_world
+
+if(env_args.is_llm==2):
+    from perception.intention_utils_llava_easy_four_intention_tag import request_llm
+elif(env_args.is_llm==1):
+    from perception.intention_utils_llava_easy_three_intention_tag import request_llm
 from perception.laser_utils import get_laser_point
+from policy.rl_algorithms.arguments import args as rl_args
 
 import copy
 import time
@@ -107,6 +115,9 @@ class GraphMap(object):
                     diff = np.absolute(around-args.ghost_map_g_val)
                     diff = np.sort(diff)
                     if diff[args.thre_for_delete] >= args.ghost_diff_thre or max(around) >= args.ghost_map_thre:
+                    # # laser_revise
+                    # if diff[args.thre_for_delete] >= args.ghost_diff_thre:
+                    # # laser_revise
                         temp_node.sub_frontiers.remove(temp_frontier)
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
@@ -220,29 +231,223 @@ class GraphMap(object):
             self.frontier_nodes.append(new_frontier)
             self.all_nodes.append(new_frontier)
 
-    def add_intention(self, detect_res_pos_dict):
+    # # 0109_add
+    # def is_object_see(self, temp_intention_node):
+    #     temp_parent_node = temp_intention_node.parent_node
+    #     temp_parent_node_obstacle_map = temp_parent_node.occupancy_map[:,:,0]
+    
+    #     object_rela_cx, object_rela_cy = temp_intention_node.rela_cx, temp_intention_node.rela_cy
+    #     object_rela_loc = np.array([object_rela_cx, object_rela_cy])
+    #     object_t2 = object_rela_loc/args.resolution
+    #     object_p2 = np.array([-object_t2[0], object_t2[1]])
+    #     end = object_p2+np.array([half_len, half_len])
+
+
+    #     if(int(end[0])>=0 and int(end[0])<temp_parent_node_obstacle_map.shape[0] and  int(end[1])>=0 and int(end[1])<temp_parent_node_obstacle_map.shape[1] and temp_parent_node_obstacle_map[int(end[0])][int(end[1])]<args.unknown_val):
+    #         return True
+
+    #     if(int(end[0])>=0 and int(end[0])<half_len and int(end[1])>=0 and int(end[1])<half_len):
+    #         lower_bound_x = max(0, int(end[0]))
+    #         lower_bound_y = max(0, int(end[1]))                                            
+    #         upper_bound_x = min(temp_parent_node_obstacle_map.shape[0]-1, int(end[0])+rl_args.is_see_grid_delta)
+    #         upper_bound_y = min(temp_parent_node_obstacle_map.shape[1]-1, int(end[1])+rl_args.is_see_grid_delta)
+    #     elif (int(end[0])>=0 and int(end[0])<half_len and int(end[1])>=half_len and int(end[1])<2*half_len):
+    #         lower_bound_x = max(0, int(end[0]))
+    #         lower_bound_y = max(0, int(end[1])-rl_args.is_see_grid_delta)
+    #         upper_bound_x = min(temp_parent_node_obstacle_map.shape[0]-1, int(end[0])+rl_args.is_see_grid_delta)
+    #         upper_bound_y = min(temp_parent_node_obstacle_map.shape[1]-1, int(end[1]))
+    #     elif (int(end[0])>=half_len and int(end[0])<2*half_len and int(end[1])>=0 and int(end[1])<half_len):
+    #         lower_bound_x = max(0, int(end[0])-rl_args.is_see_grid_delta)
+    #         lower_bound_y = max(0, int(end[1]))
+    #         upper_bound_x = min(temp_parent_node_obstacle_map.shape[0]-1, int(end[0]))
+    #         upper_bound_y = min(temp_parent_node_obstacle_map.shape[1]-1, int(end[1])+rl_args.is_see_grid_delta)
+    #     else:
+    #         lower_bound_x = max(0, int(end[0])-rl_args.is_see_grid_delta)
+    #         lower_bound_y = max(0, int(end[1])-rl_args.is_see_grid_delta)
+    #         upper_bound_x = min(temp_parent_node_obstacle_map.shape[0]-1, int(end[0]))
+    #         upper_bound_y = min(temp_parent_node_obstacle_map.shape[1]-1, int(end[1]))
+
+    #     for grid_x in range(lower_bound_x, upper_bound_x+1):
+    #         for grid_y in range(lower_bound_y, upper_bound_y+1):
+    #             if(temp_parent_node_obstacle_map[grid_x][grid_y]<args.unknown_val):                    
+    #                 return True
+    #     return False
+    # # 0109_add
+    
+    
+    def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text, action_node=None, state_flag=None):
         rela_loc = np.array([self.rela_cx, self.rela_cy])
         r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
         
+        # =====> request_llm <=====
+        if(env_args.is_llm==2):
+            room_score_ls, object_score_ls = self.add_request_feature_four(detect_res_pos_dict, rgb_image_ls, object_text)
+        elif(env_args.is_llm==1):
+            room_score_ls = self.add_request_feature_three(detect_res_pos_dict, rgb_image_ls, object_text)
+        # =====> request_llm <=====
+
+        new_intention_ls = []
+        new_intention_name_ls = []
+    
         for temp_score in detect_res_pos_dict:
             for temp_rela_pos in detect_res_pos_dict[temp_score]:
                 tx, ty = temp_rela_pos[0], temp_rela_pos[1]                
                 center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
 
-                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score)
+                # cluster_revise
+                res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
+                # correct_recheck
+                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+                new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
+                new_intention.dis_ls[0] = new_intention.robot_intention_dis
+                # correct_recheck
+                # new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score)
+                # cluster_revise
+
+                # if(new_intention.name=="62"):
+                #     print("temp_rela_pos", temp_rela_pos)
+                #     breakpoint()
+
+                # =====> request_llm <=====
+                if(env_args.is_llm==2):
+                    temp_image_index = temp_rela_pos[2]
+                    assert temp_image_index==0
+                    new_intention.room_flag = room_score_ls[temp_image_index]
+                    new_intention.object_flag = object_score_ls[temp_image_index]
+                elif(env_args.is_llm==1):
+                    temp_image_index = temp_rela_pos[2]
+                    assert temp_image_index==0
+                    new_intention.room_flag = room_score_ls[temp_image_index]
+                # =====> request_llm <=====
+                
+                
                 self.current_node.sub_intentions.append(new_intention)
                 self.intention_nodes.append(new_intention)
                 self.all_nodes.append(new_intention)
 
-    def add_request_feature(self, rgb_image_ls, object_text):
-        answer_ls = request_llm(rgb_image_ls, object_text)
-        room_flag, object_flag = answer_ls[0], answer_ls[1]
-        self.current_node.room_flag = room_flag
-        self.current_node.object_flag = object_flag
-        
+                new_intention_ls.append(new_intention)
+                new_intention_name_ls.append(new_intention.name)
+
+                # no_cluster_revise
+                # cluster_revise
+                # for temp_intention_node in self.intention_nodes:
+                #     if(temp_intention_node.name==new_intention.name):
+                #         new_intention.intention_cluster.append(temp_intention_node.score)
+                #     else:
+                #         if(((new_intention.world_cx-temp_intention_node.world_cx)**2+(new_intention.world_cy-temp_intention_node.world_cy)**2)**0.5)<1.0:
+                #             temp_intention_node.intention_cluster.append(new_intention.score)
+                #             new_intention.intention_cluster.append(temp_intention_node.score)
+                # cluster_revise
+                # no_cluster_revise
+
+                
+                # # 0109_add
+                # if(action_node is not None):
+                #     if(action_node.node_type=="intention_node" and self.is_object_see(new_intention)==True):
+                #         new_intention.is_see = True    
+                #         two_intention_dis = ((new_intention.world_cx-action_node.world_cx)**2+(new_intention.world_cy-action_node.world_cy)**2)**0.5
+                #         if(two_intention_dis<1.0 and (action_node.score-new_intention.score)<=0.1):
+                #             action_node.closer_intention_ls.append(new_intention)
+                # # 0109_add
+
+        # correct_recheck
+        for temp_intention_node in self.intention_nodes:
+            if(temp_intention_node.name in new_intention_name_ls):
+                continue
+            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+            now_temp_intention_dis = ((world_cx-temp_intention_node.world_cx)**2+(world_cy-temp_intention_node.world_cy)**2)**0.5
+            
+            # # no_closer_revise
+            # if(now_temp_intention_dis<3.0) or (action_node.name==temp_intention_node.name):
+            # # no_closer_revise
+            
+            # closer_revise
+            assert state_flag is not None
+            if(now_temp_intention_dis<2.0) or (action_node.name==temp_intention_node.name and state_flag=="finish"):
+            # closer_revise
+
+            # # only_action_revise
+            # assert state_flag is not None
+            # if(action_node.name==temp_intention_node.name and state_flag=="finish"):
+            # # only_action_revise
+
+            # no_if_revise
+            # no_if_revise
+                min_dis = 10000
+                min_node = None
+                for temp_new_intention_node in new_intention_ls:
+                    temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
+                    if(temp_dis<min_dis):
+                        min_dis = temp_dis
+                        min_node = temp_new_intention_node
+                if(min_dis>0.5): # 在0.5m范围内没有找到合适的intention_node
+                    if(-1 not in temp_intention_node.score_ls):
+                        temp_intention_node.score_ls.append(0)
+                        temp_intention_node.score_ls.pop(0)
+
+                        temp_intention_node.dis_ls.append(-2)
+                        temp_intention_node.dis_ls.pop(0)
+                    else:
+                        score_index = temp_intention_node.score_ls.index(-1)
+                        temp_intention_node.score_ls[score_index] = 0
+
+                        temp_intention_node.dis_ls[score_index] = -2
+                else:
+                    if(-1 not in temp_intention_node.score_ls):
+                        temp_intention_node.score_ls.append(min_node.score)
+                        temp_intention_node.score_ls.pop(0)
+
+                        temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
+                        temp_intention_node.dis_ls.pop(0)
+                    else:
+                        score_index = temp_intention_node.score_ls.index(-1)
+                        temp_intention_node.score_ls[score_index] = min_node.score
+
+                        temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
+        # correct_recheck
+
+
+
+
+                    
+
+    def add_request_feature_three(self, detect_res_pos_dict, rgb_image_ls, object_text):
+        image_index_ls = []
+        for temp_score in detect_res_pos_dict:
+            for temp_ls in detect_res_pos_dict[temp_score]:
+                image_index = temp_ls[2]
+                assert image_index==0
+                if(image_index not in image_index_ls):
+                    image_index_ls.append(image_index)
+        if(len(image_index_ls)==0):
+            room_score_ls = [0]
+        else:
+            answer_ls = request_llm(rgb_image_ls, object_text, image_index_ls)
+            room_score_ls = answer_ls[0]
+        return room_score_ls
+
+    def add_request_feature_four(self, detect_res_pos_dict, rgb_image_ls, object_text):
+        image_index_ls = []
+        for temp_score in detect_res_pos_dict:
+            for temp_ls in detect_res_pos_dict[temp_score]:
+                image_index = temp_ls[2]
+                assert image_index==0
+                if(image_index not in image_index_ls):
+                    image_index_ls.append(image_index)
+        if(len(image_index_ls)==0):
+            room_score_ls = [0]
+            object_score_ls = [0]
+        else:
+            answer_ls = request_llm(rgb_image_ls, object_text, image_index_ls)
+            room_score_ls = answer_ls[0]
+            object_score_ls = answer_ls[1]
+        return room_score_ls, object_score_ls
+
     
     
-    def update(self, rgb_image_ls, depth, object_text):
+    # def update(self, rgb_image_ls, depth, object_text):
+    def update(self, depth):
         point_for_close_loop_detection, laser_2d_filtered, laser_2d_filtered_angle = \
         get_laser_point(depth)
         # 表示最新的laser感知信息
@@ -317,17 +522,10 @@ class GraphMap(object):
         self.add_ghost(final_frontier_pos_arr)
         self.frontier_delete()
 
-        # update intention node
-        detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_text)
-        
-        self.add_intention(detect_res_pos_dict)
+        # # update intention node
+        # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_text)
+        # self.add_intention(detect_res_pos_dict, rgb_image_ls, object_text)
 
-        # # request the llm for question
-        # if(flag==True):
-        #     s_llm_time = time.time()
-        #     self.add_request_feature(rgb_image_ls, object_text)
-        #     e_llm_time = time.time()
-        #     print("=====> delta_llm_time <=====", e_llm_time-s_llm_time)
     
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
     def ghost_patch(self):
