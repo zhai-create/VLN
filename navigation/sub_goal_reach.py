@@ -137,15 +137,17 @@ class SubgoalReach:
 
         else: # 处于测试阶段
             if(action_node.node_type=="intention_node"):
-                # if not habitat_env.episode_over:
-                #     habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                #     observations = habitat_env.step(habitat_action)
-                #     return candidate_achieved_result
-                # else:
-                #     return "exceed"
+                if not habitat_env.episode_over:
+                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                    observations = habitat_env.step(habitat_action)
+                    return candidate_achieved_result
+                else:
+                    return "exceed"
 
-                # # new_recheck
-                # if(action_node.intention_flag==0 and candidate_achieved_result=="achieved"):
+
+                # # new_recheck_train
+                # if(action_node.intention_type!=2):
+                #     SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
                 #     return candidate_achieved_result
                 # else:
                 #     if not habitat_env.episode_over:
@@ -154,22 +156,7 @@ class SubgoalReach:
                 #         return candidate_achieved_result
                 #     else:
                 #         return "exceed"
-                # # new_recheck
-
-                # 暂时关闭
-                # new_recheck_train
-                if(action_node.intention_type!=2):
-                    SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                    return candidate_achieved_result
-                else:
-                    if not habitat_env.episode_over:
-                        habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                        observations = habitat_env.step(habitat_action)
-                        return candidate_achieved_result
-                    else:
-                        return "exceed"
-                # new_recheck_train
-                # 暂时关闭
+                # # new_recheck_train
 
 
             else:

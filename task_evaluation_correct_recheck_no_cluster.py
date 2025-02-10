@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '2'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '2'
 import cv2
 import habitat
 import habitat_sim
@@ -42,7 +42,7 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 85
+    args.graph_pre_model = 1110
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
@@ -51,7 +51,8 @@ if __name__=="__main__":
     else:
         # val_note = "_two_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
         # val_note = "_two_dim_small_thre_recheck_framework_val_47_server_"+str(args.graph_pre_model)
-        val_note = "_two_dim_time_series_val_"+str(args.graph_pre_model)+"_init_800"
+        # val_note = "_two_dim_time_series_val_"+str(args.graph_pre_model)
+        val_note = "_two_dim_origin_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -69,10 +70,10 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        # rl_args.graph_node_feature_dim = 2
+        rl_args.graph_node_feature_dim = 2
         # cluster_revise
         # new_recheck_train
-        rl_args.graph_node_feature_dim = 21
+        # rl_args.graph_node_feature_dim = 21
         # new_recheck_train
         # cluster_revise
     rl_args.graph_edge_feature_dim = 3
@@ -90,7 +91,8 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_02_04_06_17_45_two_dim_node_type_revise_closer_revise"
+    # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_02_04_06_17_45_two_dim_node_type_revise_closer_revise"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2024_12_12_15_57_13_two_dim_small_thre"
 
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
@@ -103,8 +105,8 @@ if __name__=="__main__":
         print("=====> scene_id <=====", habitat_env.episodes[0].scene_id)
         observations = habitat_env.reset()
 
-        if(index_in_episodes<800):
-            continue
+        # if(index_in_episodes<800):
+        #     continue
         HabitatAction.reset(habitat_env) 
         habitat_metric = habitat_env.get_metrics()
         object_goal = args.object_ls[observations["objectgoal"][0]]
@@ -165,7 +167,7 @@ if __name__=="__main__":
                     break
 
             action_node = rl_graph.all_nodes[polict_action]
-            if(action_node.intention_type==1):
+            if(action_node.intention_type==1 and action_node.node_type=="intention_node"):
                 HabitatAction.intention_one_cnt += 1
             
             
@@ -197,14 +199,14 @@ if __name__=="__main__":
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
             
             
-            # node_type_revise
-            if(action_node.node_type=="intention_node"):
-                for temp_intention_node in topo_graph.intention_nodes:
-                    if(temp_intention_node.intention_type==1):
-                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-                        if(temp_dis<1.0):
-                            temp_intention_node.intention_type = 2
-            # node_type_revise
+            # # node_type_revise
+            # if(action_node.node_type=="intention_node"):
+            #     for temp_intention_node in topo_graph.intention_nodes:
+            #         if(temp_intention_node.intention_type==1):
+            #             temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
+            #             if(temp_dis<1.0):
+            #                 temp_intention_node.intention_type = 2
+            # # node_type_revise
             
             
             if(evaluate_res=="episode_stop"):

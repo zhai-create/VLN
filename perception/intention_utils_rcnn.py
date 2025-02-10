@@ -71,16 +71,16 @@ def object_detect(rgb_image_ls, depth, object_text):
                 elif((index+1)==3):
                     large_mask = np.hstack((new_mask[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, false_matrix, new_mask[:, :int(false_matrix.shape[1]//2)]))
 
-                # small_revise
-                true_count = np.sum(large_mask)
-                if true_count < args.mask_true_cnt_thre:
-                    continue
-                # small_revise
+                # # small_revise
+                # true_count = np.sum(large_mask)
+                # if true_count < args.mask_true_cnt_thre:
+                #     continue
+                # # small_revise
 
 
                 if(args.is_depth_estimation_laser==True):
-                    # res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
-                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser_pinhole_to_panorama(large_mask, depth)
+                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
+                    # res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser_pinhole_to_panorama(large_mask, depth)
                 else:
                     res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
                 

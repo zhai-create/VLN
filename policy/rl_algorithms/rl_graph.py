@@ -134,7 +134,7 @@ class RL_Graph(object):
                 elif(env_args.is_llm==1):    
                     self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0]])], dim=0)
                 else:
-                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0]])], dim=0)
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0]])], dim=0)
                     # new_recheck_train
                     # 暂时关闭
                     # no_cluster_revise
@@ -142,14 +142,7 @@ class RL_Graph(object):
                     # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0, 0]])], dim=0)
                     # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0]])], dim=0)
                     # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0]])], dim=0)
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, 0]])], dim=0)
-                    # no_closer_revise
-                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0]])], dim=0)
-                    # no_closer_revise
-                    # cluster_revise
-                    # no_cluster_revise
-                    # 暂时关闭
-                    # new_recheck_train
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, 0]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
             elif(temp_node.node_type=="frontier_node"):
@@ -161,7 +154,7 @@ class RL_Graph(object):
                 elif(env_args.is_llm==1):
                     self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0.0]])], dim=0)
                 else:
-                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5]])], dim=0)
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5]])], dim=0)
                     # new_recheck_train
                     # 暂时关闭
                     # no_cluster_revise
@@ -169,14 +162,7 @@ class RL_Graph(object):
                     # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0.5, 0]])], dim=0)
                     # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 1, 0.5]])], dim=0)
                     # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0]])], dim=0)
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, 0.5]])], dim=0)
-                    # no_closer_revise
-                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 0.5]])], dim=0)
-                    # no_closer_revise
-                    # cluster_revise
-                    # no_cluster_revise
-                    # 暂时关闭
-                    # new_recheck_train
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -2, -2, -2, -2, -2, -2, -2, -2, -2, -2, 0.5]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
 
@@ -193,13 +179,12 @@ class RL_Graph(object):
                 elif(env_args.is_llm==1):
                     self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.room_flag]])], dim=0)
                 else:
-                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1]])], dim=0)
+                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1]])], dim=0)
                     # new_recheck_train
                     # 暂时关闭
                     # no_cluster_revise
                     # cluster_revise
-                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[np.mean(temp_node.intention_cluster), len(temp_node.intention_cluster), 1]])], dim=0)
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score_ls[0], temp_node.score_ls[1], temp_node.score_ls[2], temp_node.score_ls[3], temp_node.score_ls[4], temp_node.score_ls[5], temp_node.score_ls[6], temp_node.score_ls[7], temp_node.score_ls[8], temp_node.score_ls[9], temp_node.dis_ls[0], temp_node.dis_ls[1], temp_node.dis_ls[2], temp_node.dis_ls[3], temp_node.dis_ls[4], temp_node.dis_ls[5], temp_node.dis_ls[6], temp_node.dis_ls[7], temp_node.dis_ls[8], temp_node.dis_ls[9], temp_node.intention_type]])], dim=0)
+                    # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score_ls[0], temp_node.score_ls[1], temp_node.score_ls[2], temp_node.score_ls[3], temp_node.score_ls[4], temp_node.score_ls[5], temp_node.score_ls[6], temp_node.score_ls[7], temp_node.score_ls[8], temp_node.score_ls[9], temp_node.dis_ls[0], temp_node.dis_ls[1], temp_node.dis_ls[2], temp_node.dis_ls[3], temp_node.dis_ls[4], temp_node.dis_ls[5], temp_node.dis_ls[6], temp_node.dis_ls[7], temp_node.dis_ls[8], temp_node.dis_ls[9], temp_node.intention_type]])], dim=0)
                     # cluster_revise
                     # no_cluster_revise
                     # 暂时关闭
