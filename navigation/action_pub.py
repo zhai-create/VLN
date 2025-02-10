@@ -52,24 +52,24 @@ def choose_action(local_path, sub_map_node, habitat_env, habitat_planner):
     habitat_act_num = habitat_planner.get_next_action(pid_waypoint)
     next_action = act_num_str_map[habitat_act_num]
 
-    # # local_action_revise
-    # while True:
-    #     if(len(local_path)>args.path_length_thre and next_action=="suc"): # 发现底层执行器失败的现象
-    #         if(selected_index<=len(local_path)-2):
-    #             local_path.pop(selected_index)
-    #             waypoint_grid = local_path[selected_index]
-    #             waypoint_x = -(waypoint_grid[0] - half_len) * graph_args.resolution
-    #             waypoint_y = (waypoint_grid[1] - half_len) * graph_args.resolution
-    #             waypoint = np.array([waypoint_x, waypoint_y])
+    # local_action_revise
+    while True:
+        if(len(local_path)>args.path_length_thre and next_action=="suc"): # 发现底层执行器失败的现象
+            if(selected_index<=len(local_path)-2):
+                local_path.pop(selected_index)
+                waypoint_grid = local_path[selected_index]
+                waypoint_x = -(waypoint_grid[0] - half_len) * graph_args.resolution
+                waypoint_y = (waypoint_grid[1] - half_len) * graph_args.resolution
+                waypoint = np.array([waypoint_x, waypoint_y])
 
-    #             pid_waypoint = get_absolute_pos_world(waypoint[0], waypoint[1], sub_map_node.world_cx, sub_map_node.world_cy, sub_map_node.world_turn)
-    #             pid_waypoint = np.array([pid_waypoint[1], habitat_env._sim.get_agent_state(0).position[1], pid_waypoint[0]]) # pid_waypoint: 下一个路径点在世界坐标系下的坐标
+                pid_waypoint = get_absolute_pos_world(waypoint[0], waypoint[1], sub_map_node.world_cx, sub_map_node.world_cy, sub_map_node.world_turn)
+                pid_waypoint = np.array([pid_waypoint[1], habitat_env._sim.get_agent_state(0).position[1], pid_waypoint[0]]) # pid_waypoint: 下一个路径点在世界坐标系下的坐标
                 
-    #             habitat_act_num = habitat_planner.get_next_action(pid_waypoint)
-    #             next_action = act_num_str_map[habitat_act_num]
-    #         else:
-    #             break
-    #     else:
-    #         break
-    # # local_action_revise
+                habitat_act_num = habitat_planner.get_next_action(pid_waypoint)
+                next_action = act_num_str_map[habitat_act_num]
+            else:
+                break
+        else:
+            break
+    # local_action_revise
     return local_path, next_action
