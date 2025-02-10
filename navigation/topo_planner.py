@@ -1,4 +1,3 @@
-
 import copy
 import numpy as np
 
@@ -155,5 +154,3 @@ class TopoPlanner(object):
                 end_point = p2+np.array([half_len, half_len])
         # =============================================================
         return start_point, end_point, stitching_map
-
-

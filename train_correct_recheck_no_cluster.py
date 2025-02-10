@@ -49,7 +49,7 @@ if __name__=="__main__":
         # train_note = "_two_dim_small_thre_rgb_new_framework" # 注释当前训练处于什么阶段
         # train_note = "_two_dim_small_thre_rgb_old_framework" # 注释当前训练处于什么阶段
         # train_note = "_two_dim_small_thre_cluster_recheck" # 注释当前训练处于什么阶段
-        train_note = "_two_dim_node_type_revise_no_if_revise" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_time_series" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -192,9 +192,6 @@ if __name__=="__main__":
             occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
             cv2.imshow("occu_for_show", occu_for_show)
 
-        # new_recheck_train
-        action_node = None
-        # new_recheck_train
         while True:    
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
@@ -217,39 +214,22 @@ if __name__=="__main__":
                     Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
                     break
 
-            # action_node = rl_graph.all_nodes[polict_action]
+            action_node = rl_graph.all_nodes[polict_action]
 
-            # new_recheck_train
-            new_action_node = rl_graph.all_nodes[polict_action]
-            if(action_node is None):
-                action_node = new_action_node
-            else:
-                if(new_action_node.node_type=="intention_node" and action_node.node_type=="intention_node"):
-                    if(((new_action_node.world_cx-action_node.world_cx)**2+(new_action_node.world_cy-action_node.world_cy)**2)**0.5)<1.0:
-                        new_action_node.intention_cnt = -1
-                action_node = new_action_node
-            # new_recheck_train
             
 
             achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
-            
-            # # correct_recheck
-            # if(action_node.node_type=="intention_node"):
-            #     if(action_node.intention_cnt==-1):
-            #         for temp_intention_node in topo_graph.intention_nodes:
-            #             if(temp_intention_node.name==action_node.name):
-            #                 temp_intention_node.intention_type = 2 # 确定要去的intention
-            #             else:
-            #                 temp_intention_node.intention_type = 1 # 靠近的intention
-            #     else:
-            #         for temp_intention_node in topo_graph.intention_nodes:
-            #             temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-            #             if(temp_dis<1.0):
-            #                 temp_intention_node.intention_type = 2
-            #             else:
-            #                 temp_intention_node.intention_type = 1
-            # # correct_recheck
 
+            # new_recheck_train
+            if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and action_node.intention_type!=2 and achieved_result=="achieved"):
+                achieved_result = "EXCEED_RL" # 超过RL最大次数 
+            # new_recheck_train
+
+            print("======> achieved_result <=====", achieved_result)
+            print("=====> action_node_type <=====", action_node.node_type)
+
+            evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
+            
             # node_type_revise
             if(action_node.node_type=="intention_node"):
                 for temp_intention_node in topo_graph.intention_nodes:
@@ -258,24 +238,8 @@ if __name__=="__main__":
                         if(temp_dis<1.0):
                             temp_intention_node.intention_type = 2
             # node_type_revise
-                    
             
-            # # 0109_add
-            # if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="false_intention"):
-            # # 0109_add
-
-            # if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node"):
-            #     achieved_result = "EXCEED_RL" # 超过RL最大次数 
-
-            # new_recheck_train
-            if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and action_node.intention_cnt!=-1 and achieved_result=="achieved"):
-                achieved_result = "EXCEED_RL" # 超过RL最大次数 
-            # new_recheck_train
-
-            print("======> achieved_result <=====", achieved_result)
-            print("=====> action_node_type <=====", action_node.node_type)
-
-            evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
+            
             if(achieved_result=="block" or achieved_result=="Failed_Plan" or achieved_result=="exceed"):
                 break
             # 剩余情况只能是achieved_result=="achieved" or achieved_result=="EXCEED_RL"

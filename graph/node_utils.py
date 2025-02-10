@@ -37,9 +37,6 @@ class Node(object):
         # self.intention_flag = 0
         # # new_recheck
 
-        # new_recheck_train
-        self.intention_cnt = 0
-        # new_recheck_train
 
 
 

@@ -52,7 +52,7 @@ if __name__=="__main__":
         # val_note = "_two_dim_small_thre_rgb_old_framework_train_val"
         # val_note = "_two_dim_small_thre_cluster_recheck_train_val"
         # val_note = "_two_dim_small_thre_cluster_train_val"
-        val_note = "_two_dim_node_type_revise_no_closer_revise_train_val_ou"
+        val_note = "_two_dim_time_series_train_val_ji"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -89,7 +89,7 @@ if __name__=="__main__":
 
     # for temp_pre_model in range(1110, 80000, 10):
     # for temp_pre_model in range(265, 266):
-    for temp_pre_model in range(60, 80000, 20):
+    for temp_pre_model in range(30, 80000, 20):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
@@ -124,8 +124,6 @@ if __name__=="__main__":
         # =====> select episodes <=====
 
         for index_in_episodes in range(30):
-            # if(index_in_episodes!=28):
-            #     continue
             # rl_graph_init
             rl_graph = RL_Graph()
             # haitat_episode_init
@@ -170,9 +168,6 @@ if __name__=="__main__":
                 video_writer, map_writer, gt_writer = init_mp4(pre_model=args.graph_pre_model, episode_index=index_in_episodes+1)
                 get_top_down_map(habitat_env)
             
-            # new_recheck_train
-            action_node = None
-            # new_recheck_train
             while True:
                 # rl_graph_update
                 rl_graph.update(topo_graph)
@@ -196,18 +191,8 @@ if __name__=="__main__":
                         Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes)
                         break
 
-                # action_node = rl_graph.all_nodes[polict_action]
+                action_node = rl_graph.all_nodes[polict_action]
 
-                # new_recheck_train
-                new_action_node = rl_graph.all_nodes[polict_action]
-                if(action_node is None):
-                    action_node = new_action_node
-                else:
-                    if(action_node.node_type=="intention_node" and new_action_node.node_type=="intention_node"):
-                        if(((new_action_node.world_cx-action_node.world_cx)**2+(new_action_node.world_cy-action_node.world_cy)**2)**0.5)<1.0:
-                            new_action_node.intention_cnt = -1
-                    action_node = new_action_node
-                # new_recheck_train
 
 
                 if(args.is_gt==True):
@@ -221,23 +206,12 @@ if __name__=="__main__":
                     else:
                         achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
                 
-                # # correct_recheck
-                # if(action_node.node_type=="intention_node"):
-                #     if(action_node.intention_cnt==-1):
-                #         for temp_intention_node in topo_graph.intention_nodes:
-                #             if(temp_intention_node.name==action_node.name):
-                #                 temp_intention_node.intention_type = 2 # 确定要去的intention
-                #             else:
-                #                 temp_intention_node.intention_type = 1 # 靠近的intention
-                #     else:
-                #         for temp_intention_node in topo_graph.intention_nodes:
-                #             temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-                #             if(temp_dis<1.0):
-                #                 temp_intention_node.intention_type = 2
-                #             else:
-                #                 temp_intention_node.intention_type = 1
-                # # correct_recheck
-
+                
+                print("======> achieved_result <=====", achieved_result)
+                print("=====> action_node_type <=====", action_node.node_type)
+                
+                evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
+                
                 # node_type_revise
                 if(action_node.node_type=="intention_node"):
                     for temp_intention_node in topo_graph.intention_nodes:
@@ -247,11 +221,6 @@ if __name__=="__main__":
                                 temp_intention_node.intention_type = 2
                 # node_type_revise
                 
-                
-                print("======> achieved_result <=====", achieved_result)
-                print("=====> action_node_type <=====", action_node.node_type)
-                
-                evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
                 if(evaluate_res=="episode_stop"):
                     break
 

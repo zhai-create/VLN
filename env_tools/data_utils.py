@@ -249,6 +249,3 @@ color_dict = {
         }
     }
 # =====> color_dict <=====
-
-    
-

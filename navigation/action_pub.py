@@ -52,7 +52,7 @@ def choose_action(local_path, sub_map_node, habitat_env, habitat_planner):
     habitat_act_num = habitat_planner.get_next_action(pid_waypoint)
     next_action = act_num_str_map[habitat_act_num]
 
-
+    # local_action_revise
     while True:
         if(len(local_path)>args.path_length_thre and next_action=="suc"): # 发现底层执行器失败的现象
             if(selected_index<=len(local_path)-2):
@@ -71,6 +71,5 @@ def choose_action(local_path, sub_map_node, habitat_env, habitat_planner):
                 break
         else:
             break
+    # local_action_revise
     return local_path, next_action
-    
-        

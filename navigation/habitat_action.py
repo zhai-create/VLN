@@ -24,6 +24,8 @@ class HabitatAction:
     # train
     reward_per_episode = 0
 
+    intention_one_cnt = 0
+
     @staticmethod
     def reset(habitat_env):
         """
@@ -36,6 +38,8 @@ class HabitatAction:
         HabitatAction.this_episode_short_dis = habitat_env.get_metrics()['distance_to_goal']
         
         HabitatAction.reward_per_episode = 0
+
+        HabitatAction.intention_one_cnt = 0
 
     @staticmethod
     def set_habitat_action(action_name, topo_graph):

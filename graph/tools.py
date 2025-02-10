@@ -153,5 +153,3 @@ def get_current_world_pos(habitat_env):
     world_cz = habitat_env._sim.get_agent_state(0).position[1]
     world_turn = 2 * math.atan(habitat_env._sim.get_agent_state(0).rotation.y/habitat_env._sim.get_agent_state(0).rotation.w)
     return world_cx, world_cy, world_cz, world_turn
-
-

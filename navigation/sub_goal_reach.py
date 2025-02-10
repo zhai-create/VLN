@@ -123,7 +123,7 @@ class SubgoalReach:
                 #     return "exceed"
 
                 # new_recheck_train
-                if(action_node.node_type=="intention_node" and action_node.intention_cnt!=-1 and candidate_achieved_result=="achieved"):
+                if(action_node.node_type=="intention_node" and action_node.intention_type!=2 and candidate_achieved_result=="achieved"):
                     SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
                     return candidate_achieved_result 
                 else:
@@ -158,7 +158,7 @@ class SubgoalReach:
 
                 # 暂时关闭
                 # new_recheck_train
-                if(action_node.intention_cnt!=-1 and candidate_achieved_result=="achieved"):
+                if(action_node.intention_type!=2):
                     SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
                     return candidate_achieved_result
                 else:
@@ -427,28 +427,6 @@ class SubgoalReach:
             #             SubgoalReach.next_action = "suc"
             #             topo_planner.state_flag = "finish"
             # # new_recheck
-
-            # # no_closer_revise
-            # # new_recheck_train
-            # if(action_node.node_type=="intention_node" and action_node.intention_cnt != -1):
-            #     now_world_cx, now_world_cy, now_world_cz, now_world_turn = get_current_world_pos(habitat_env)
-            #     now_intention_dis = ((now_world_cx-topo_planner.world_object_cx)**2+(now_world_cy-topo_planner.world_object_cy)**2)**0.5
-            #     if(SubgoalReach.next_action == "suc" and topo_planner.state_flag=="finish") or (now_intention_dis<1.0):
-            #         SubgoalReach.next_action = "suc"
-            #         topo_planner.state_flag = "finish"
-            #         action_node.intention_cnt += 1
-            # # new_recheck_train
-            # # no_closer_revise
-
-            # closer_revise
-            if(action_node.node_type=="intention_node" and action_node.intention_cnt != -1):
-                if(SubgoalReach.next_action == "suc" and topo_planner.state_flag=="finish"):
-                    action_node.intention_cnt += 1
-            # closer_revise
-
-            
-
-
 
             
             print("next_action:", SubgoalReach.next_action)
