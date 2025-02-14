@@ -259,13 +259,13 @@ class Evaluate:
                 if(action_node.node_type=="frontier_node"):
                     return "next_rl_step" # 继续选择下一个action
 
-                # # new_recheck_train
-                # elif(action_node.node_type=="intention_node" and action_node.intention_type!=2):
-                #     return "next_rl_step"
-                # # new_recheck_train
+                # new_recheck_train
+                elif(action_node.node_type=="intention_node" and action_node.intention_type!=2):
+                    return "next_rl_step"
+                # new_recheck_train
     
 
-                elif(action_node.node_type=="intention_node"):
+                elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
                     if(habitat_metric['success']>0):
                         Evaluate.success_num += 1
                         writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)

@@ -61,9 +61,11 @@ class Node(object):
 
         self.score = score # float, 只有intention需要，其他两种node均为0
         # correct_recheck
-        self.score_ls = [score, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        # self.score_ls = [score, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        self.score_ls = [score] + [-1 for i in range(79)]
         # closer_revise
-        self.dis_ls = [-2, -2, -2, -2, -2, -2, -2, -2, -2, -2]
+        # self.dis_ls = [-2, -2, -2, -2, -2, -2, -2, -2, -2, -2]
+        self.dis_ls = [-2 for i in range(80)]
         # closer_revise
         # # no_closer_revise
         # self.dis_ls = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
