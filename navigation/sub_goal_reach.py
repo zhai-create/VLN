@@ -109,102 +109,33 @@ class SubgoalReach:
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
             if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
-            # # 0109_add
-            # if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved") or (action_node.node_type=="false_intention"):
-            # # 0109_add
+                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+                return candidate_achieved_result 
+            elif(action_node.node_type=="intention_node" and candidate_achieved_result=="achieved"):
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
                 return candidate_achieved_result 
             else:
-                # if not habitat_env.episode_over:
-                #     habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                #     observations = habitat_env.step(habitat_action)
-                #     return candidate_achieved_result
-                # else:
-                #     return "exceed"
-
-                # new_recheck_train
-                if(action_node.node_type=="intention_node" and action_node.intention_type!=2 and candidate_achieved_result=="achieved"):
-                    SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                    return candidate_achieved_result 
-                else:
-                    if not habitat_env.episode_over:
-                        habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                        observations = habitat_env.step(habitat_action)
-                        return candidate_achieved_result
-                    else:
-                        return "exceed"
-                # new_recheck_train
-
-        else: # 处于测试阶段
-            if(action_node.node_type=="intention_node"):
-                # if not habitat_env.episode_over:
-                #     habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                #     observations = habitat_env.step(habitat_action)
-                #     return candidate_achieved_result
-                # else:
-                #     return "exceed"
-
-                # # new_recheck
-                # if(action_node.intention_flag==0 and candidate_achieved_result=="achieved"):
-                #     return candidate_achieved_result
-                # else:
-                #     if not habitat_env.episode_over:
-                #         habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                #         observations = habitat_env.step(habitat_action)
-                #         return candidate_achieved_result
-                #     else:
-                #         return "exceed"
-                # # new_recheck
-
-                # 暂时关闭
-                # new_recheck_train
-                if(action_node.intention_type!=2):
-                    SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+                if not habitat_env.episode_over:
+                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                    observations = habitat_env.step(habitat_action)
                     return candidate_achieved_result
                 else:
-                    if not habitat_env.episode_over:
-                        habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                        observations = habitat_env.step(habitat_action)
-                        return candidate_achieved_result
-                    else:
-                        return "exceed"
-                # new_recheck_train
-                # 暂时关闭
+                    return "exceed"
 
-
-            else:
+        else: # 处于测试阶段
+            if(action_node.node_type=="intention_node" or action_node.node_type=="frontier_node"):
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                return candidate_achieved_result 
-            return candidate_achieved_result 
-
-
-            # if(action_node.node_type=="intention_node"):
-            #     if(candidate_achieved_result=="Failed_Plan"):
-            #         SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-            #         return candidate_achieved_result 
-            #     else:
-            #         if not habitat_env.episode_over:
-            #             habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-            #             observations = habitat_env.step(habitat_action)
-            #             return candidate_achieved_result
-            #         else:
-            #             return "exceed"
-            # else:
-            #     SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-            #     return candidate_achieved_result 
-            # return candidate_achieved_result 
-
-
-
+                return candidate_achieved_result
+            else:
+                if not habitat_env.episode_over:
+                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                    observations = habitat_env.step(habitat_action)
+                    return candidate_achieved_result
+                else:
+                    return "exceed"
 
     @staticmethod
-    # def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim=None, graph_train=False, rl_graph=None, video_writer=None, map_writer=None, gt_writer=None):
-    # # new_recheck
-    # def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim=None, graph_train=False, rl_graph=None, video_writer=None, map_writer=None, gt_writer=None, policy=None):
-    # # new_recheck
-    # new_recheck_train
-    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim=None, graph_train=False, rl_graph=None, video_writer=None, map_writer=None, gt_writer=None):
-    # new_recheck_train
+    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim=None, graph_train=False, rl_graph=None, video_writer=None, map_writer=None, gt_writer=None, achieved_result=None):
         """
             Go to the selected action node pos.
             :param topo_graph
@@ -214,6 +145,12 @@ class SubgoalReach:
         """
         topo_planner = TopoPlanner(topo_graph, action_node)
         SubgoalReach.reset(habitat_env)
+
+        if(action_node.node_type=="stop_node"):
+            # "achieved"
+            achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result=achieved_result, graph_train=graph_train)
+            return achieved_result
+
         while True:
             # 执行动作前的位置检测
             SubgoalReach.last_sim_location = get_sim_location(habitat_env)

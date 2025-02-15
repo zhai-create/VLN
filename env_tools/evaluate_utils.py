@@ -92,27 +92,16 @@ class Evaluate:
                 return "episode_stop" # 结束当前episode, 开始下一个episode
             
             elif(achieved_result=="achieved"):
-                # # 0109_add
-                # if(action_node.node_type=="frontier_node") or (action_node.node_type=="false_intention"):
-                # # 0109_add
-                # if(action_node.node_type=="frontier_node"):
-                # 暂时关闭(第一组没有recheck)
-                # new_recheck_train
-                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type!=2):
-                # new_recheck_train
-                # 暂时关闭
+                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node"):
                     reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+0
-                    # reward_per_rl_step = (SubgoalReach.init_dis_to_goal-distance_to_goal)/5+(HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+0
                     rl_graph.data['arrive'] = False
                     HabitatAction.reward_per_episode += reward_per_rl_step
 
-                elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
+                elif(action_node.node_type=="stop_node"):
                     if(distance_to_goal<=1.0):
-                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+40
-                        # reward_per_rl_step = (SubgoalReach.init_dis_to_goal-distance_to_goal)/5+(HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+40
+                        reward_per_rl_step = 1*(-1)/Evaluate.max_front_steps_per_rl_step+40
                     else:
-                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step
-                        # reward_per_rl_step = (SubgoalReach.init_dis_to_goal-distance_to_goal)/5+(HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step
+                        reward_per_rl_step = 1*(-1)/Evaluate.max_front_steps_per_rl_step
                     rl_graph.data['arrive'] = True
                     HabitatAction.reward_per_episode += reward_per_rl_step
                     writer.add_scalar('Result/reward_per_episode', HabitatAction.reward_per_episode, Evaluate.real_episode_num_in_train)
@@ -162,22 +151,14 @@ class Evaluate:
                 writer.add_scalar('Result/exceed_rl_num', Evaluate.exceed_rl_num, index_in_episodes+1)
                 writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
                 
-                # # 0109_add
-                # if(action_node.node_type=="frontier_node") or (action_node.node_type=="false_intention"):
-                # # 0109_add
-                # if(action_node.node_type=="frontier_node"):
-                # 暂时关闭
-                # new_recheck_train
-                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type!=2):
-                # new_recheck_train
-                # 暂时关闭
+
+                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node"):
                     return "next_rl_step"
-                elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
+                elif(action_node.node_type=="stop_node"):
                     return "episode_stop"
             
             elif(achieved_result=="EXCEED_RL"):
                 reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+0
-                # reward_per_rl_step = (SubgoalReach.init_dis_to_goal-distance_to_goal)/5+(HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+0
                 rl_graph.data['arrive'] = False
                 HabitatAction.reward_per_episode += reward_per_rl_step
                 writer.add_scalar('Result/reward_per_episode', HabitatAction.reward_per_episode, Evaluate.real_episode_num_in_train)
@@ -259,13 +240,17 @@ class Evaluate:
                 if(action_node.node_type=="frontier_node"):
                     return "next_rl_step" # 继续选择下一个action
 
-                # new_recheck_train
-                elif(action_node.node_type=="intention_node" and action_node.intention_type!=2):
+                elif(action_node.node_type=="intention_node"):
+                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                    now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                    
+                    if(now_action_dis>1):
+                        HabitatAction.is_control_failed = True
+                    else:
+                        HabitatAction.is_control_failed = False
                     return "next_rl_step"
-                # new_recheck_train
-    
 
-                elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
+                elif(action_node.node_type=="stop_node"):
                     if(habitat_metric['success']>0):
                         Evaluate.success_num += 1
                         writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)
@@ -274,10 +259,7 @@ class Evaluate:
                     elif(achieved_result=="Failed_Plan"):
                         writer.add_scalar('Simulator/ratio_state', -2, index_in_episodes+1)
                     else:
-                        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                        now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                        
-                        if(now_action_dis>1):
+                        if(HabitatAction.is_control_failed == True):
                             writer.add_scalar('Simulator/ratio_state', -5, index_in_episodes+1) # 底层控制器失败
                         else:
                             writer.add_scalar('Simulator/ratio_state', 0, index_in_episodes+1) # 到达错误的intention_node

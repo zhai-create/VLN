@@ -43,6 +43,7 @@ class GraphMap(object):
         self.explored_nodes = NodeList()
         self.frontier_nodes = []
         self.intention_nodes = []
+        self.stop_nodes = []
         self.all_nodes = []
 
         self.current_node = None

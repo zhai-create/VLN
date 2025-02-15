@@ -25,6 +25,7 @@ from perception.tools import fix_depth, get_rgb_image_ls
 from graph.graph_utils import GraphMap
 from graph.tools import find_node_path, get_absolute_pos
 from graph.arguments import args as graph_args
+from graph.node_utils import Node
 
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
@@ -42,7 +43,7 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 140
+    args.graph_pre_model = 130
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
@@ -51,7 +52,7 @@ if __name__=="__main__":
     else:
         # val_note = "_two_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
         # val_note = "_two_dim_small_thre_recheck_framework_val_47_server_"+str(args.graph_pre_model)
-        val_note = "_two_dim_long_time_series_val_"+str(args.graph_pre_model)+"_init_800"
+        val_note = "_two_dim_long_time_series_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -95,7 +96,6 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
     
-    
     for index_in_episodes in tqdm(range(args.graph_episode_num)):   
         # rl_graph_init
         rl_graph = RL_Graph()
@@ -103,8 +103,9 @@ if __name__=="__main__":
         print("=====> scene_id <=====", habitat_env.episodes[0].scene_id)
         observations = habitat_env.reset()
 
-        if(index_in_episodes<800):
-            continue
+        # if(index_in_episodes<800):
+        #     continue
+
         HabitatAction.reset(habitat_env) 
         habitat_metric = habitat_env.get_metrics()
         object_goal = args.object_ls[observations["objectgoal"][0]]
@@ -165,57 +166,39 @@ if __name__=="__main__":
                     break
 
             action_node = rl_graph.all_nodes[polict_action]
-            if(action_node.intention_type==1):
-                HabitatAction.intention_one_cnt += 1
-            
-            
-            # achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, index_in_episodes=index_in_episodes, writer=writer)
-            
-            # if(args.is_vis==True):
-            #     achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, video_writer=video_writer, map_writer=map_writer)
-            # else:
-            #     achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
-            
-            if(args.is_gt==True):
-                if(args.is_vis==True):
-                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim, graph_train=False, rl_graph=rl_graph, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
+        
+            if(args.is_vis==True):
+                if(action_node.node_type=="stop_node"):
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer, achieved_result=achieved_result)
                 else:
-                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim)
-            else:
-                if(args.is_vis==True):
                     achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
+            else:
+                if(action_node.node_type=="stop_node"):
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, achieved_result=achieved_result)
                 else:
                     achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
             
             print("======> achieved_result <=====", achieved_result)
             print("=====> action_node_type <=====", action_node.node_type)
             
-            rl_graph_action_node_name_ls = [(temp_node.name, temp_node.score) for temp_node in rl_graph.all_nodes if(temp_node.node_type!="explored_node")]
-            print("=====> rl_graph_action_node_name_ls <=====", rl_graph_action_node_name_ls)
-            print("============> intention_score <=============", action_node.score)
             
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
             
-            
             # node_type_revise
             if(action_node.node_type=="intention_node"):
-                for temp_intention_node in topo_graph.intention_nodes:
-                    if(temp_intention_node.intention_type==1):
-                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-                        if(temp_dis<1.0):
-                            temp_intention_node.intention_type = 2
+                if(len(topo_graph.stop_nodes)>0):
+                    temp_stop_node = topo_graph.stop_nodes[0]
+                    topo_graph.stop_nodes.remove(temp_stop_node)
+                    topo_graph.all_nodes.remove(temp_stop_node)
+                new_stop_node = Node(node_type="stop_node", rela_cx=0.25, rela_cy=0, parent_node=topo_graph.current_node)
+                topo_graph.stop_nodes.append(new_stop_node)
+                topo_graph.all_nodes.append(new_stop_node)     
+            elif(action_node.node_type=="frontier_node"):
+                if(len(topo_graph.stop_nodes)>0):
+                    temp_stop_node = topo_graph.stop_nodes[0]
+                    topo_graph.stop_nodes.remove(temp_stop_node)
+                    topo_graph.all_nodes.remove(temp_stop_node)
             # node_type_revise
-            
-            
+
             if(evaluate_res=="episode_stop"):
-                # =====> new_add_evaluate <=====
-                writer.add_scalar('Policy/selected_intention_score', action_node.score, index_in_episodes+1)
-                all_intention_score_ls = [temp_node.score for temp_node in rl_graph.all_nodes if(temp_node.node_type=="intention_node")]
-                all_frontier_score_ls = [temp_node.score for temp_node in rl_graph.all_nodes if(temp_node.node_type=="frontier_node")]
-                writer.add_scalar('Policy/len_intention_nodes', len(all_intention_score_ls), index_in_episodes+1)
-                writer.add_scalar('Policy/len_frontier_nodes', len(all_frontier_score_ls), index_in_episodes+1)
-                if(len(all_intention_score_ls)>0):
-                    writer.add_scalar('Policy/max_intention_score', max(all_intention_score_ls), index_in_episodes+1)
-                    writer.add_scalar('Policy/min_intention_score', min(all_intention_score_ls), index_in_episodes+1)
-                # =====> new_add_evaluate <=====
                 break

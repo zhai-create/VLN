@@ -24,11 +24,13 @@ from policy.rl_algorithms.rl_graph import RL_Graph
 from perception.tools import fix_depth, get_rgb_image_ls
 from perception.arguments import args as perception_args
 from graph.graph_utils import GraphMap
+from graph.node_utils import Node
 
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
 
 from perception.intention_utils_rcnn import object_detect
+
 
 if __name__=="__main__":
     env_args.task_stage = "train"
@@ -49,7 +51,7 @@ if __name__=="__main__":
         # train_note = "_two_dim_small_thre_rgb_new_framework" # 注释当前训练处于什么阶段
         # train_note = "_two_dim_small_thre_rgb_old_framework" # 注释当前训练处于什么阶段
         # train_note = "_two_dim_small_thre_cluster_recheck" # 注释当前训练处于什么阶段
-        train_note = "_two_dim_long_time_series_revise" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_stop_long_time_series" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -215,13 +217,13 @@ if __name__=="__main__":
                     break
 
             action_node = rl_graph.all_nodes[polict_action]
-
-            
-
-            achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
+            if(action_node.node_type=="stop_node"):
+                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train, achieved_result=achieved_result)
+            else:
+                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
 
             # new_recheck_train
-            if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and action_node.intention_type!=2 and achieved_result=="achieved"):
+            if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and achieved_result=="achieved"):
                 achieved_result = "EXCEED_RL" # 超过RL最大次数 
             # new_recheck_train
 
@@ -232,11 +234,18 @@ if __name__=="__main__":
             
             # node_type_revise
             if(action_node.node_type=="intention_node"):
-                for temp_intention_node in topo_graph.intention_nodes:
-                    if(temp_intention_node.intention_type==1):
-                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-                        if(temp_dis<1.0):
-                            temp_intention_node.intention_type = 2
+                if(len(topo_graph.stop_nodes)>0):
+                    temp_stop_node = topo_graph.stop_nodes[0]
+                    topo_graph.stop_nodes.remove(temp_stop_node)
+                    topo_graph.all_nodes.remove(temp_stop_node)
+                new_stop_node = Node(node_type="stop_node", rela_cx=0.25, rela_cy=0, parent_node=topo_graph.current_node)
+                topo_graph.stop_nodes.append(new_stop_node)
+                topo_graph.all_nodes.append(new_stop_node)     
+            elif(action_node.node_type=="frontier_node"):
+                if(len(topo_graph.stop_nodes)>0):
+                    temp_stop_node = topo_graph.stop_nodes[0]
+                    topo_graph.stop_nodes.remove(temp_stop_node)
+                    topo_graph.all_nodes.remove(temp_stop_node)
             # node_type_revise
             
             

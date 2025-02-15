@@ -25,6 +25,7 @@ class HabitatAction:
     reward_per_episode = 0
 
     intention_one_cnt = 0
+    is_control_failed = False
 
     @staticmethod
     def reset(habitat_env):
@@ -40,6 +41,7 @@ class HabitatAction:
         HabitatAction.reward_per_episode = 0
 
         HabitatAction.intention_one_cnt = 0
+        HabitatAction.is_control_failed = False
 
     @staticmethod
     def set_habitat_action(action_name, topo_graph):

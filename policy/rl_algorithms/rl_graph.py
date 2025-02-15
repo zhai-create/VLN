@@ -151,6 +151,18 @@ class RL_Graph(object):
                     # new_recheck_train
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
+            
+            elif(temp_node.node_type=="stop_node"):
+                feature_ls = [-1 for i in range(80)]+[-2 for i in range(80)]+[2]
+                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
+                temp_node.rl_node_index = len(self.all_nodes)
+                self.all_nodes.append(temp_node)
+
+                action_ls_index = len(self.all_action_nodes)
+                self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1
+                self.data['state']['action_mask'][0][action_ls_index] = 1.0
+                self.all_action_nodes.append(temp_node)
+            
             elif(temp_node.node_type=="frontier_node"):
                 if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                     continue
@@ -198,7 +210,7 @@ class RL_Graph(object):
                     # no_cluster_revise
                     # cluster_revise
                     # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score_ls[0], temp_node.score_ls[1], temp_node.score_ls[2], temp_node.score_ls[3], temp_node.score_ls[4], temp_node.score_ls[5], temp_node.score_ls[6], temp_node.score_ls[7], temp_node.score_ls[8], temp_node.score_ls[9], temp_node.dis_ls[0], temp_node.dis_ls[1], temp_node.dis_ls[2], temp_node.dis_ls[3], temp_node.dis_ls[4], temp_node.dis_ls[5], temp_node.dis_ls[6], temp_node.dis_ls[7], temp_node.dis_ls[8], temp_node.dis_ls[9], temp_node.intention_type]])], dim=0)
-                    feature_ls = [temp_node.score_ls[i] for i in range(80)]+[temp_node.dis_ls[i] for i in range(80)]+[temp_node.intention_type]
+                    feature_ls = [temp_node.score_ls[i] for i in range(80)]+[temp_node.dis_ls[i] for i in range(80)]+[1]
                     self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
 
 
@@ -213,7 +225,10 @@ class RL_Graph(object):
                 self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1
                 self.data['state']['action_mask'][0][action_ls_index] = 1.0
                 self.all_action_nodes.append(temp_node)
-        
+
+            
+
+
         
         for temp_node in self.all_nodes:
             if(temp_node.node_type!="explored_node"):
