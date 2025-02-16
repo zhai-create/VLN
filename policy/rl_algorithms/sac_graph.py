@@ -106,9 +106,22 @@ class SAC(RL_Policy):
                 action_index = torch.multinomial(action.exp(), 1).long().squeeze(1)
             action = state['action_idxes'][0, action_index.item()].cpu().numpy() # action在rl_topo中的index
             action_index = action_index.cpu().numpy() # action在action_space中的index
-        
         return action, action_index # idx in padding
 
+    @torch.no_grad()
+    def select_action_stop_node(self, state, rl_graph):
+        num_action = int(np.sum(state["action_mask"].cpu().numpy()))
+        all_action_indexes = state['action_idxes'].squeeze(-1).cpu().numpy()[0]
+        
+        action_index_val = 0
+        while action_index_val<num_action:
+            if(rl_graph.all_nodes[all_action_indexes[np.array([action_index_val])][0]].node_type=="stop_node"):
+                break
+            else:
+                action_index_val += 1
+        
+        action_index = np.array([action_index_val])
+        return action_index
 
     def train(self, writer, train_index, batch_size=16):
         if(train_index==0):
