@@ -51,7 +51,7 @@ if __name__=="__main__":
         # train_note = "_two_dim_small_thre_rgb_new_framework" # 注释当前训练处于什么阶段
         # train_note = "_two_dim_small_thre_rgb_old_framework" # 注释当前训练处于什么阶段
         # train_note = "_two_dim_small_thre_cluster_recheck" # 注释当前训练处于什么阶段
-        train_note = "_two_dim_stop_long_time_series" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_stop_right_data_long_time_series" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -92,14 +92,16 @@ if __name__=="__main__":
     rl_args.lr_tune = 0.5e-3
     # rl_args.graph_lr_actor = 0.5e-4
     # rl_args.graph_lr_critic = 0.5e-4
-    # rl_args.random_exploration_length = 400
-    rl_args.random_exploration_length = 80000
+    rl_args.random_exploration_length = 400
     random.seed(456)
 
     # only_train
-    rl_args.load_buffer_data_cnt = -1
     rl_args.save_buffer_data_path = "buffer_data/{}/".format(date_time)
-    rl_args.load_buffer_data_path = ""
+    # rl_args.load_buffer_data_cnt = -1
+    # rl_args.load_buffer_data_path = ""
+
+    rl_args.load_buffer_data_cnt = 200
+    rl_args.load_buffer_data_path = "stop_node_buffer_data"
 
     writer = SummaryWriter(env_args.logger_file_name)
 
@@ -157,7 +159,6 @@ if __name__=="__main__":
     #         break
     # # =====> all scene episodes  <=====
 
-    stop_data_cnt = 0
     
     for index_in_episodes in tqdm(range(env_args.graph_episode_num)):
         # rl_graph_init
@@ -198,31 +199,27 @@ if __name__=="__main__":
             cv2.imshow("occu_for_show", occu_for_show)
 
         while True:   
-            if(len(topo_graph.stop_nodes)>0):
-                policy_acton_idx = policy.select_action_stop_node(rl_graph.data['state'], rl_graph)
-                action_node = topo_graph.stop_nodes[0]
+            if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
+                polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
+                print("=====> real_action_selection <=====")
             else:
-                if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
+                topo_graph.ghost_patch()
+                if(len(topo_graph.frontier_nodes)>0):
+                    rl_graph.update(topo_graph)
+                    current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
-                    print("=====> real_action_selection <=====")
+                    print("=====> ghost_patch <=====")
                 else:
-                    topo_graph.ghost_patch()
-                    if(len(topo_graph.frontier_nodes)>0):
-                        rl_graph.update(topo_graph)
-                        current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
-                        polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
-                        print("=====> ghost_patch <=====")
+                    # action_space为空，结束当前episode
+                    if not habitat_env.episode_over: # 没有超过1w步的最大步长
+                        habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                        observations = habitat_env.step(habitat_action)
+                        achieved_result = "empty"
                     else:
-                        # action_space为空，结束当前episode
-                        if not habitat_env.episode_over: # 没有超过1w步的最大步长
-                            habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                            observations = habitat_env.step(habitat_action)
-                            achieved_result = "empty"
-                        else:
-                            achieved_result = "exceed"
-                        Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
-                        break
-                action_node = rl_graph.all_nodes[polict_action]
+                        achieved_result = "exceed"
+                    Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
+                    break
+            action_node = rl_graph.all_nodes[polict_action]
 
 
             if(action_node.node_type=="stop_node"):
@@ -231,7 +228,7 @@ if __name__=="__main__":
                 achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
 
             # new_recheck_train
-            if(policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved") or (policy.train_step==env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and achieved_result=="achieved"):
+            if(HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved") or (HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and achieved_result=="achieved"):
                 achieved_result = "EXCEED_RL" # 超过RL最大次数 
             # new_recheck_train
 
@@ -260,29 +257,14 @@ if __name__=="__main__":
             if(achieved_result=="block" or achieved_result=="Failed_Plan" or achieved_result=="exceed"):
                 break
             # 剩余情况只能是achieved_result=="achieved" or achieved_result=="EXCEED_RL"
-            rl_graph.update(topo_graph)
-            next_state = copy.deepcopy(rl_graph.data['state'])
+            
             reward = rl_graph.data['reward']
             done = rl_graph.data['arrive']
+
+            rl_graph.update(topo_graph)
+            next_state = copy.deepcopy(rl_graph.data['state'])
+
             policy.update_buffer(current_state, policy_acton_idx, next_state, reward, done, 0) # 一个样本
-            
-            # ===============> save buffer data <====================
-            habitat_metric = habitat_env.get_metrics()
-            distance_to_goal = habitat_metric['distance_to_goal']
-
-            if(action_node.node_type=="stop_node" and achieved_result=="achieved" and distance_to_goal<=1.0):
-                save_sample_dict = {}
-                save_sample_dict.update({"current_state": current_state})
-                save_sample_dict.update({"policy_acton_idx": policy_acton_idx})
-                save_sample_dict.update({"next_state": next_state})
-                save_sample_dict.update({"reward": reward})
-                save_sample_dict.update({"done": done})
-                np.save('stop_node_buffer_data/{}.npy'.format(stop_data_cnt), save_sample_dict)
-                stop_data_cnt += 1
-            # ===============> save buffer data <====================
-
-            
-            
             current_state = copy.deepcopy(next_state) # 迭代更新
 
             # =====> Train <=====

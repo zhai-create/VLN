@@ -27,14 +27,16 @@ class HabitatAction:
     intention_one_cnt = 0
     is_control_failed = False
 
+    episode_train_step = 0
+
     @staticmethod
     def reset(habitat_env):
         """
             Reset the static attributes.
             :param habitat_env
         """
-        HabitatAction.front_steps = 0
         HabitatAction.count_steps = 0
+        HabitatAction.front_steps = 0
         HabitatAction.walk_path_meter = 1e-5
         HabitatAction.this_episode_short_dis = habitat_env.get_metrics()['distance_to_goal']
         
@@ -42,6 +44,8 @@ class HabitatAction:
 
         HabitatAction.intention_one_cnt = 0
         HabitatAction.is_control_failed = False
+
+        HabitatAction.episode_train_step = 0
 
     @staticmethod
     def set_habitat_action(action_name, topo_graph):

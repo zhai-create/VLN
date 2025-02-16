@@ -827,5 +827,5 @@ def init_RL(args, rl_args, experiment, writer=None):
                 print(f"The new path:'{save_buffer_path}' has beed craeted!")
         
         # 导入buffer中的数据
-        policy.load_buffer_data(writer, load_buffer_data_cnt=rl_args.load_buffer_data_cnt)
+        policy.load_buffer_data(writer, load_buffer_data_cnt=rl_args.load_buffer_data_cnt, load_buffer_data_path=rl_args.load_buffer_data_path)
     return policy

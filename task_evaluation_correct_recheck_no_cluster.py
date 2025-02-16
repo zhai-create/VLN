@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import habitat_sim
@@ -43,7 +43,7 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 130
+    args.graph_pre_model = 10
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
@@ -52,7 +52,7 @@ if __name__=="__main__":
     else:
         # val_note = "_two_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
         # val_note = "_two_dim_small_thre_recheck_framework_val_47_server_"+str(args.graph_pre_model)
-        val_note = "_two_dim_long_time_series_val_"+str(args.graph_pre_model)
+        val_note = "_two_dim_stop_right_data_long_time_series_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -91,7 +91,7 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_02_13_09_44_23_two_dim_long_time_series_revise"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_02_16_10_14_50_two_dim_stop_right_data_long_time_series"
 
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)

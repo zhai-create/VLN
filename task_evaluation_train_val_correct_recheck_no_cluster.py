@@ -53,7 +53,7 @@ if __name__=="__main__":
         # val_note = "_two_dim_small_thre_rgb_old_framework_train_val"
         # val_note = "_two_dim_small_thre_cluster_recheck_train_val"
         # val_note = "_two_dim_small_thre_cluster_train_val"
-        val_note = "_two_dim_stop_long_time_series_train_val_ou"
+        val_note = "_two_dim_stop_right_data_long_time_series_train_val"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -90,7 +90,7 @@ if __name__=="__main__":
 
     # for temp_pre_model in range(1110, 80000, 10):
     # for temp_pre_model in range(265, 266):
-    for temp_pre_model in range(20, 80000, 20):
+    for temp_pre_model in range(10, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
@@ -99,7 +99,7 @@ if __name__=="__main__":
         # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_07_14_46_57_two_dim_small_thre_one_rgb_large_bs"
         # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_08_38_01_two_dim_small_thre_rgb_old_framework"
         # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_02_14_18_02_07_two_dim_stop_long_time_series"
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_02_16_10_14_50_two_dim_stop_right_data_long_time_series"
         
         while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
@@ -193,8 +193,6 @@ if __name__=="__main__":
                         break
 
                 action_node = rl_graph.all_nodes[polict_action]
-                
-                
 
                 if(args.is_vis==True):
                     if(action_node.node_type=="stop_node"):

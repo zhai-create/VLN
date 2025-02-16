@@ -19,6 +19,8 @@ from torch_geometric.data.batch import Batch
 from graph.tools import get_absolute_pos
 # from policy.rl_algorithms.arguments import args
 
+from navigation.habitat_action import HabitatAction
+
 
 class SAC(RL_Policy):
     def __init__(self, args):
@@ -126,6 +128,7 @@ class SAC(RL_Policy):
     def train(self, writer, train_index, batch_size=16):
         if(train_index==0):
             self.train_step += 1
+            HabitatAction.episode_train_step += 1
         if self.train_step < self.random_exploration_length:
             return self.train_step
 
@@ -198,15 +201,15 @@ class SAC(RL_Policy):
         self.actor_optimizer.load_state_dict(torch.load(dir_path + "_actor_optimizer"))
         self.actor_target = copy.deepcopy(self.actor)
 
-    def load_buffer_data(self, writer, load_buffer_data_cnt):
-        while self.train_step<=load_buffer_data_cnt:
-            load_dict = np.load(args.load_buffer_data_path+"{}.npy".format(self.train_step), allow_pickle=True).item()
-            load_state = load_dict['state']
-            load_action_indexes = load_dict['action_indexes']
+    def load_buffer_data(self, writer, load_buffer_data_cnt, load_buffer_data_path):
+        while self.train_step<load_buffer_data_cnt:
+            load_dict = np.load("{}/{}.npy".format(load_buffer_data_path, self.train_step), allow_pickle=True).item()
+            load_state = load_dict['current_state']
+            load_action_indexes = load_dict['policy_acton_idx']
             load_next_state = load_dict['next_state']
-            load_reward = load_dict['reward']
-            load_done = load_dict['done']
+            load_reward = 1*(-1)/200+40
+            load_done = True
 
-            policy.update_buffer(load_state, load_action_indexes, load_next_state, load_reward, load_done, 0) # 一个样本
+            self.update_buffer(load_state, load_action_indexes, load_next_state, load_reward, load_done, 0) # 一个样本
             self.train_step += 1
-            writer.add_scalar('Reward/reward_per_train_step', load_reward, self.train_step) # 记录每一个train_step的reward
+            writer.add_scalar('Result/reward_per_rl_step', load_reward, self.train_step) # 记录每一个train_step的reward
