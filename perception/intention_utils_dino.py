@@ -4,14 +4,14 @@ import cv2
 import numpy as np
 
 from segment_anything_hq import SamPredictor, sam_model_registry
-from sentence_transformers import SentenceTransformer
+# from sentence_transformers import SentenceTransformer
 from dependencies.GroundingDINO.groundingdino.util.inference import Model
 
 from perception.arguments import args
-from perception.tools import sam_show_mask, depth_estimation
+from perception.tools import sam_show_mask, depth_estimation_object_loc
 
 
-def object_detect(rgb_image_ls, depth, object_text):
+def object_detect_sam(rgb_image_ls, depth, object_text):
     """
     Get the candidate intention nodes, which need the pos transformer and the selection
     :param rgb_image_ls: [front_img, left_img, behind_img, right_img]
@@ -52,26 +52,19 @@ def object_detect(rgb_image_ls, depth, object_text):
         for temp_index in range(len(temp_class_id_ls)): # 遍历同一张图片检测出来的每一个result
             if(temp_confidence_ls[temp_index]<args.CONFIDENCE_TRESHOLE or temp_class_id_ls[temp_index]==None):
                 continue
-            
             new_mask = masks.cpu().numpy()[temp_index][0]
 
             # show
-            # image0 = rgb_image_ls[index].copy()
-            # cv2.rectangle(image0, (int(temp_box_ls[temp_index][0]/args.factor_0), int(temp_box_ls[temp_index][1]/args.factor_1)), (int(temp_box_ls[temp_index][2]/args.factor_0), int(temp_box_ls[temp_index][3]/args.factor_1)), (0, 255, 0), 2)
-            # sam_show_res = sam_show_mask(new_mask, image0)
-            # cv2.imwrite("sam_show_res_{}.jpg".format(temp_index+1), sam_show_res)
+            image0 = rgb_image_ls[index].copy()
+            cv2.rectangle(image0, (int(temp_box_ls[temp_index][0]/args.factor_0), int(temp_box_ls[temp_index][1]/args.factor_1)), (int(temp_box_ls[temp_index][2]/args.factor_0), int(temp_box_ls[temp_index][3]/args.factor_1)), (0, 255, 0), 2)
+            sam_show_res = sam_show_mask(new_mask, image0)
+            cv2.imwrite("sam_res/sam_show_res_{}.jpg".format(temp_index+1), sam_show_res)
 
-            false_matrix = np.zeros(new_mask.shape, dtype=bool)
-            if((index+1)==1):
-                large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], false_matrix, new_mask, false_matrix, false_matrix[:, :int(false_matrix.shape[1]//2)]))
-            elif((index+1)==2):
-                large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], new_mask, false_matrix, false_matrix, false_matrix[:, :int(false_matrix.shape[1]//2)]))
-            elif((index+1)==4):
-                large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, new_mask, false_matrix[:, :int(false_matrix.shape[1]//2)]))
-            elif((index+1)==3):
-                large_mask = np.hstack((new_mask[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, false_matrix, new_mask[:, :int(false_matrix.shape[1]//2)]))
-
-            res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
+            res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
+            
+            if(res_depth_2d_cx is None):
+                continue
+            
             if(temp_confidence_ls[temp_index] not in detect_res_pos_dict):
                 detect_res_pos_dict[temp_confidence_ls[temp_index]] = [[res_depth_2d_cx, res_depth_2d_cy]]
             else:

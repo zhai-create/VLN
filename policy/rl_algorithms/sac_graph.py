@@ -108,22 +108,18 @@ class SAC(RL_Policy):
                 action_index = torch.multinomial(action.exp(), 1).long().squeeze(1)
             action = state['action_idxes'][0, action_index.item()].cpu().numpy() # action在rl_topo中的index
             action_index = action_index.cpu().numpy() # action在action_space中的index
+        
         return action, action_index # idx in padding
 
     @torch.no_grad()
-    def select_action_stop_node(self, state, rl_graph):
+    def random_select_action(self, state, if_train=False):
         num_action = int(np.sum(state["action_mask"].cpu().numpy()))
+        action_index = np.random.choice(num_action, 1)
         all_action_indexes = state['action_idxes'].squeeze(-1).cpu().numpy()[0]
-        
-        action_index_val = 0
-        while action_index_val<num_action:
-            if(rl_graph.all_nodes[all_action_indexes[np.array([action_index_val])][0]].node_type=="stop_node"):
-                break
-            else:
-                action_index_val += 1
-        
-        action_index = np.array([action_index_val])
-        return action_index
+        action = all_action_indexes[action_index][0]
+        return action, action_index # idx in padding
+
+
 
     def train(self, writer, train_index, batch_size=16):
         if(train_index==0):
@@ -202,13 +198,13 @@ class SAC(RL_Policy):
         self.actor_target = copy.deepcopy(self.actor)
 
     def load_buffer_data(self, writer, load_buffer_data_cnt, load_buffer_data_path):
-        while self.train_step<load_buffer_data_cnt:
+        while self.train_step<=load_buffer_data_cnt:
             load_dict = np.load("{}/{}.npy".format(load_buffer_data_path, self.train_step), allow_pickle=True).item()
             load_state = load_dict['current_state']
             load_action_indexes = load_dict['policy_acton_idx']
             load_next_state = load_dict['next_state']
-            load_reward = 1*(-1)/200+40
-            load_done = True
+            load_reward = load_dict['reward']
+            load_done = load_dict['done']
 
             self.update_buffer(load_state, load_action_indexes, load_next_state, load_reward, load_done, 0) # 一个样本
             self.train_step += 1

@@ -15,11 +15,13 @@ def get_args():
 
     # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_plan")
     # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt")
+    
     # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_fakeintention_no_filter")
     # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_ctr")
     # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_ctr_plan_fakeintention")
 
-    parser.add_argument("--pre_path", type=str, default="vis_result_node_type_revise_closer_revise")
+    # parser.add_argument("--pre_path", type=str, default="vis_result_one_rgb_rotate")
+    parser.add_argument("--pre_path", type=str, default="vis_result_one_rgb_one_depth_rotate_new_temp")
 
     # parse arguments
     args = parser.parse_args()

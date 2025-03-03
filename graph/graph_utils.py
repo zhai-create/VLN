@@ -1,12 +1,13 @@
 import copy
 import numpy as np
-from graph.tools import find_current_node, get_absolute_pos, clear_fake_frontier, get_current_world_pos
+from graph.tools import find_current_node, find_current_node_world, get_absolute_pos, clear_fake_frontier, get_current_world_pos, find_node_path
 from graph.check_utils import second_check, third_check, forth_check
 from graph.node_utils import Node
 from graph.arguments import args
 from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
-# from perception.intention_utils_rcnn import object_detect
+from perception.tools import fix_depth, get_rgb_image_ls
+from perception.intention_utils_rcnn import object_detect
 
 from env_tools.arguments import args as env_args
 from navigation.tools import get_absolute_pos_world, get_relative_pos_world
@@ -20,10 +21,10 @@ from policy.rl_algorithms.arguments import args as rl_args
 
 import copy
 import time
+from navigation.habitat_action import HabitatAction
 
 
-
-half_len = (int)(perception_args.depth_scale/args.resolution)
+half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 
 
@@ -36,17 +37,21 @@ class NodeList(list):
         for existing_node in self:
             if existing_node.name != new_node.name:
                 new_node.add_other_node(existing_node, self)
-        
+
+
 
 class GraphMap(object):
     def __init__(self, habitat_env):
         self.explored_nodes = NodeList()
+        self.explored_rotate_nodes = []
         self.frontier_nodes = []
         self.intention_nodes = []
-        self.stop_nodes = []
         self.all_nodes = []
 
         self.current_node = None
+        self.current_rotate_node = None
+
+
         self.rela_cx = 0
         self.rela_cy = 0
         self.rela_turn = 0
@@ -56,6 +61,8 @@ class GraphMap(object):
         self.laser_2d_filtered_angle=None
         
         self.habitat_env = habitat_env
+
+        self.obs = None
 
 
     def set_current_pos(self, rela_cx, rela_cy, rela_turn):
@@ -227,7 +234,8 @@ class GraphMap(object):
 
     def add_ghost(self, final_frontier_pos_arr):
         for index in range(len(final_frontier_pos_arr)):
-            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node)
+            res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
             self.current_node.sub_frontiers.append(new_frontier)
             self.frontier_nodes.append(new_frontier)
             self.all_nodes.append(new_frontier)
@@ -276,7 +284,7 @@ class GraphMap(object):
     # # 0109_add
     
     
-    def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text, action_node=None, state_flag=None):
+    def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text):
         rela_loc = np.array([self.rela_cx, self.rela_cy])
         r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
         
@@ -352,61 +360,61 @@ class GraphMap(object):
                 #             action_node.closer_intention_ls.append(new_intention)
                 # # 0109_add
 
-        # correct_recheck
-        for temp_intention_node in self.intention_nodes:
-            if(temp_intention_node.name in new_intention_name_ls):
-                continue
-            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
-            now_temp_intention_dis = ((world_cx-temp_intention_node.world_cx)**2+(world_cy-temp_intention_node.world_cy)**2)**0.5
+        # # correct_recheck
+        # for temp_intention_node in self.intention_nodes:
+        #     if(temp_intention_node.name in new_intention_name_ls):
+        #         continue
+        #     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+        #     now_temp_intention_dis = ((world_cx-temp_intention_node.world_cx)**2+(world_cy-temp_intention_node.world_cy)**2)**0.5
             
-            # # no_closer_revise
-            # if(now_temp_intention_dis<3.0) or (action_node.name==temp_intention_node.name):
-            # # no_closer_revise
+        #     # # no_closer_revise
+        #     # if(now_temp_intention_dis<3.0) or (action_node.name==temp_intention_node.name):
+        #     # # no_closer_revise
             
-            # closer_revise
-            assert state_flag is not None
-            if(now_temp_intention_dis<2.0) or (action_node.name==temp_intention_node.name and state_flag=="finish"):
-            # closer_revise
+        #     # closer_revise
+        #     assert state_flag is not None
+        #     if(now_temp_intention_dis<2.0) or (action_node.name==temp_intention_node.name and state_flag=="finish"):
+        #     # closer_revise
 
-            # # only_action_revise
-            # assert state_flag is not None
-            # if(action_node.name==temp_intention_node.name and state_flag=="finish"):
-            # # only_action_revise
+        #     # # only_action_revise
+        #     # assert state_flag is not None
+        #     # if(action_node.name==temp_intention_node.name and state_flag=="finish"):
+        #     # # only_action_revise
 
-            # no_if_revise
-            # no_if_revise
-                min_dis = 10000
-                min_node = None
-                for temp_new_intention_node in new_intention_ls:
-                    temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
-                    if(temp_dis<min_dis):
-                        min_dis = temp_dis
-                        min_node = temp_new_intention_node
-                if(min_dis>0.5): # 在0.5m范围内没有找到合适的intention_node
-                    if(-1 not in temp_intention_node.score_ls):
-                        temp_intention_node.score_ls.append(0)
-                        temp_intention_node.score_ls.pop(0)
+        #     # no_if_revise
+        #     # no_if_revise
+        #         min_dis = 10000
+        #         min_node = None
+        #         for temp_new_intention_node in new_intention_ls:
+        #             temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
+        #             if(temp_dis<min_dis):
+        #                 min_dis = temp_dis
+        #                 min_node = temp_new_intention_node
+        #         if(min_dis>0.5): # 在0.5m范围内没有找到合适的intention_node
+        #             if(-1 not in temp_intention_node.score_ls):
+        #                 temp_intention_node.score_ls.append(0)
+        #                 temp_intention_node.score_ls.pop(0)
 
-                        temp_intention_node.dis_ls.append(-2)
-                        temp_intention_node.dis_ls.pop(0)
-                    else:
-                        score_index = temp_intention_node.score_ls.index(-1)
-                        temp_intention_node.score_ls[score_index] = 0
+        #                 temp_intention_node.dis_ls.append(-2)
+        #                 temp_intention_node.dis_ls.pop(0)
+        #             else:
+        #                 score_index = temp_intention_node.score_ls.index(-1)
+        #                 temp_intention_node.score_ls[score_index] = 0
 
-                        temp_intention_node.dis_ls[score_index] = -2
-                else:
-                    if(-1 not in temp_intention_node.score_ls):
-                        temp_intention_node.score_ls.append(min_node.score)
-                        temp_intention_node.score_ls.pop(0)
+        #                 temp_intention_node.dis_ls[score_index] = -2
+        #         else:
+        #             if(-1 not in temp_intention_node.score_ls):
+        #                 temp_intention_node.score_ls.append(min_node.score)
+        #                 temp_intention_node.score_ls.pop(0)
 
-                        temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
-                        temp_intention_node.dis_ls.pop(0)
-                    else:
-                        score_index = temp_intention_node.score_ls.index(-1)
-                        temp_intention_node.score_ls[score_index] = min_node.score
+        #                 temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
+        #                 temp_intention_node.dis_ls.pop(0)
+        #             else:
+        #                 score_index = temp_intention_node.score_ls.index(-1)
+        #                 temp_intention_node.score_ls[score_index] = min_node.score
 
-                        temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
-        # correct_recheck
+        #                 temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
+        # # correct_recheck
 
 
 
@@ -445,20 +453,19 @@ class GraphMap(object):
             object_score_ls = answer_ls[1]
         return room_score_ls, object_score_ls
 
-    
-    
-    # def update(self, rgb_image_ls, depth, object_text):
-    def update(self, depth):
-        point_for_close_loop_detection, laser_2d_filtered, laser_2d_filtered_angle = \
+
+    def get_laser_result(self, depth):
+        laser_2d_filtered, laser_2d_filtered_angle = \
         get_laser_point(depth)
+
         # 表示最新的laser感知信息
-        self.point_for_close_loop_detection = point_for_close_loop_detection
         self.laser_2d_filtered = laser_2d_filtered
         self.laser_2d_filtered_angle = laser_2d_filtered_angle
-        
-        flag, predict_node, [final_theta, final_t], [theta_to_current, t_to_current], ratio = \
-        find_current_node(self.explored_nodes, self.current_node, point_for_close_loop_detection, self.rela_turn, np.array([self.rela_cx, self.rela_cy]))
-
+    
+    def update(self):
+        # flag, predict_node, [final_theta, final_t], [theta_to_current, t_to_current], ratio = \
+        # find_current_node(self.explored_nodes, self.current_node, point_for_close_loop_detection, self.rela_turn, np.array([self.rela_cx, self.rela_cy]))
+        flag, predict_node, final_t, final_theta = find_current_node_world(self.explored_nodes, self.habitat_env)
 
         # update explored node
         if flag == True:
@@ -467,26 +474,25 @@ class GraphMap(object):
             
             if(last_node is None):
                 self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
-                predict_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, np.array([0,0]), 0.0)
+                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn)
                 self.current_node = predict_node
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
             else:
                 self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
-                predict_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, np.array([0,0]), 0.0)
+                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn)
                 self.current_node = predict_node
                 
-                last_node.add_neighbor(self.current_node, t_to_current, theta_to_current)
-                R = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
-                inverse_theta = -theta_to_current
-                inverse_t = np.dot(R, -t_to_current)
-                self.current_node.add_neighbor(last_node, inverse_t, inverse_theta)
+                current_node_in_last_node_loc = get_relative_pos_world(self.current_node.world_cx, self.current_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
+                current_node_in_last_node_turn = self.current_node.world_turn-last_node.world_turn
+                last_node.add_neighbor(self.current_node, current_node_in_last_node_loc, current_node_in_last_node_turn)
+                
+                last_node_in_current_node_loc =  get_relative_pos_world(last_node.world_cx, last_node.world_cy, self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+                last_node_in_current_node_turn = last_node.world_turn-self.current_node.world_turn
+                self.current_node.add_neighbor(last_node, last_node_in_current_node_loc, last_node_in_current_node_turn)
                 
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
-            
 
         elif flag == False and predict_node.name != self.current_node.name:
             self.set_current_pos(final_t[0], final_t[1], final_theta)
@@ -494,53 +500,95 @@ class GraphMap(object):
             last_node = self.current_node
             self.current_node = predict_node
 
-            R1 = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
-            theta_last_in_current_p = -theta_to_current
-            t_last_in_current_p = np.dot(R1, -t_to_current)
-            R2 = np.array([[np.cos(-final_theta), np.sin(-final_theta)], [-np.sin(-final_theta), np.cos(-final_theta)]])
-            theta_predicted_in_current_p = -final_theta
-            t_predicted_in_current_p = np.dot(R2, -final_t)
-
-            predicted_t_in_last = get_absolute_pos(t_predicted_in_current_p, t_to_current, theta_to_current)
-            predicted_theta_in_last = theta_predicted_in_current_p + theta_to_current
+            predicted_t_in_last = get_relative_pos_world(predict_node.world_cx, predict_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
+            predicted_theta_in_last = predict_node.world_turn-last_node.world_turn
             last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last)
-            
-            last_t_in_predicted = get_absolute_pos(t_last_in_current_p, final_t, final_theta)
-            last_theta_in_predicted = theta_last_in_current_p + final_theta
+
+
+            last_t_in_predicted = get_relative_pos_world(last_node.world_cx, last_node.world_cy, predict_node.world_cx, predict_node.world_cy, predict_node.world_turn)
+            last_theta_in_predicted = last_node.world_turn-predict_node.world_turn            
             self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)            
-            self.current_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, final_t, final_theta)
-
-
         else:
             self.set_current_pos(final_t[0], final_t[1], final_theta)
-            self.current_node.update_occupancy(laser_2d_filtered, laser_2d_filtered_angle, final_t, final_theta)
+        return flag
 
 
         # update frontier node
-        candidate_frontier_arr = predict_frontier(args.init_predict_ghost_thre1, laser_2d_filtered, laser_2d_filtered_angle)
-        res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-        final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
-        self.add_ghost(final_frontier_pos_arr)
-        self.frontier_delete()
+        # candidate_frontier_arr = predict_frontier(args.init_predict_ghost_thre1, laser_2d_filtered, laser_2d_filtered_angle)
+        # res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
+        # final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
+        # self.add_ghost(final_frontier_pos_arr)
+        # self.frontier_delete()
 
         # # update intention node
         # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_text)
         # self.add_intention(detect_res_pos_dict, rgb_image_ls, object_text)
 
+
+    def update_graph_frontier(self):
+        candidate_frontier_arr = predict_frontier(args.init_predict_ghost_thre1, self.laser_2d_filtered, self.laser_2d_filtered_angle)
+        
+        res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
+        final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
+        self.add_ghost(final_frontier_pos_arr)
+        self.frontier_delete()
+
+
+
     
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
-    def ghost_patch(self):
+    def ghost_patch(self, habitat_env, object_goal):
+        depth = fix_depth(self.obs["depth"])
+        self.get_laser_result(depth)
+
         predict_ghost_thre1 = args.init_predict_ghost_thre1
         while predict_ghost_thre1>=0:
             candidate_frontier_arr = predict_frontier(predict_ghost_thre1, self.laser_2d_filtered, self.laser_2d_filtered_angle)
             res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
             final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
-            if(final_frontier_pos_arr.shape[0]>0):
+
+            self.add_ghost(final_frontier_pos_arr)
+            self.frontier_delete()
+            if(len(self.frontier_nodes)>0):
                 break
             else:
                 predict_ghost_thre1 -= 0.1
-        self.add_ghost(final_frontier_pos_arr)
-        self.frontier_delete()
+
+        if(len(self.frontier_nodes)>0):
+            return "ok" # 表示没有超过最大步数
+        else: # 如果用当前点云进行阈值缩小后仍然没有找到合适的点云，则转圈
+            for i in range(12):
+                habitat_action = HabitatAction.set_habitat_action("r", self)
+                if not habitat_env.episode_over:
+                    observations = habitat_env.step(habitat_action)
+                    print("======> patch <=====")
+                    depth = fix_depth(observations["depth"])
+                    self.get_laser_result(depth)
+                    self.current_node.update_occupancy(self.laser_2d_filtered, self.laser_2d_filtered_angle, np.array([self.rela_cx, self.rela_cy]), self.rela_turn)
+
+                    predict_ghost_thre2 = args.init_predict_ghost_thre1
+                    while predict_ghost_thre2>=0:
+                        candidate_frontier_arr = predict_frontier(predict_ghost_thre2, self.laser_2d_filtered, self.laser_2d_filtered_angle)
+                        res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
+                        final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
+
+                        self.add_ghost(final_frontier_pos_arr)
+                        self.frontier_delete()
+
+                        if(len(self.frontier_nodes)>0):
+                            break
+                        else:
+                            predict_ghost_thre2 -= 0.1
+
+                    rgb_image_ls = get_rgb_image_ls(habitat_env)
+                    detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                    self.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+                else:
+                    return "exceed"
+
+            return "ok" # 表示没有超过最大步数
+                
+
 
         
 

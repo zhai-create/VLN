@@ -5,7 +5,7 @@ from graph.arguments import args
 
 
 
-half_len = (int)(perception_args.depth_scale/args.resolution)
+half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 class Node(object):
 
@@ -23,6 +23,20 @@ class Node(object):
         self.world_cy = world_cy
         self.world_cz = world_cz
         self.world_turn = world_turn
+
+        # cluster_revise
+        # self.intention_cluster = [] # 包含自己节点
+        # cluster_revise
+
+        # # 0109_add
+        # self.intention_flag = 0
+        # self.closer_intention_ls = []
+        # # 0109_add
+
+        # # new_recheck
+        # self.intention_flag = 0
+        # # new_recheck
+
 
         self.dis = (rela_cx**2+rela_cy**2)**0.5 # float
 
@@ -43,13 +57,24 @@ class Node(object):
             self.occupancy_map = None
 
         self.score = score # float, 只有intention需要，其他两种node均为0
-        self.score_ls = [score] + [-1 for i in range(79)]
-        self.dis_ls = [-2 for i in range(80)]
+        # correct_recheck
+        self.score_ls = [score, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        # closer_revise
+        self.dis_ls = [-2, -2, -2, -2, -2, -2, -2, -2, -2, -2]
+        # closer_revise
+        # # no_closer_revise
+        # self.dis_ls = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        # # no_closer_revise
         self.robot_intention_dis = -1
+        # correct_recheck
         self.parent_node = parent_node
 
         self.all_other_nodes_loc = {} # dict
+        self.all_other_rotate_nodes_loc = {} # dict
+
         self.neighbor = []
+        self.rotate_neighbor = []
+
         self.sub_frontiers = []
         self.sub_intentions = []
 
@@ -75,6 +100,12 @@ class Node(object):
             self.neighbor.append(neighbor.name)
             self.all_other_nodes_loc.update({neighbor.name: np.array([relative_loc[0], relative_loc[1], relative_turn])})
 
+    def add_rotate_neighbor(self, neighbor, relative_loc, relative_turn): # 添加当前结点的rotate邻居结点，及其相对于当前结点的位置和角度
+        if neighbor.name not in self.rotate_neighbor:
+            self.rotate_neighbor.append(neighbor.name)
+            self.all_other_rotate_nodes_loc.update({neighbor.name: np.array([relative_loc[0], relative_loc[1], relative_turn])})
+
+
     def add_other_node(self, other, explored_nodes): # 添加当前结点通路上除了邻居结点以外的其他结点，及其相对于当前结点的位置和角度
         if other.name not in self.all_other_nodes_loc:
             path = find_node_path(self, other, explored_nodes)
@@ -86,10 +117,17 @@ class Node(object):
             [front3, right3] = get_absolute_pos(np.array([front1, right1]), np.array([front2, right2]), relative_turn2) # 将path通路上所有结点的位置都转换到当前结点坐标系下
             relative_turn3 = relative_turn1 + relative_turn2
             self.all_other_nodes_loc.update({other.name: np.array([front3, right3, relative_turn3])})
-    
+
+
     
     def update_occupancy(self, laser_2d_filtered, laser_2d_filtered_angle, relative_loc, relative_turn):
         laser_2d_filtered, laser_2d_filtered_angle = fix_size(laser_2d_filtered, laser_2d_filtered_angle)
+        
+        # =====> bug_revise <=====
+        if(len(laser_2d_filtered)==0):
+            return
+        # =====> bug_revise <=====
+        
         sub_map = inverse_scanner(laser_2d_filtered, laser_2d_filtered_angle, relative_loc, relative_turn)
 
         temp_map = np.subtract(1.0, self.occupancy_map)

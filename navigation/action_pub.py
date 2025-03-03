@@ -7,7 +7,7 @@ from navigation.arguments import args
 from graph.arguments import args as graph_args
 from perception.arguments import args as perception_args
 
-half_len = (int)(perception_args.depth_scale/graph_args.resolution)
+half_len = (int)(perception_args.graid_map_scale/graph_args.resolution)
 
 def choose_action(local_path, sub_map_node, habitat_env, habitat_planner):
     if len(local_path) < args.path_length_thre: # 路径较短

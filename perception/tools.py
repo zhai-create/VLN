@@ -13,13 +13,14 @@ from habitat.sims.habitat_simulator.actions import HabitatSimActions
 
 from PIL import Image
 
-def fix_depth(depth):
+def fix_depth(depth, lower_bound:float=0.1/args.depth_scale, upper_bound:float=4.9/args.depth_scale):
     """
     Fix the sensor depth
     :param depth: original sensor depth
     :return depth: depth with real dis
     """
-    depth = depth / pre_depth.data[:, :, 4:]
+
+    depth[np.where((depth<lower_bound)|(depth>upper_bound))] = 0
     return depth
 
 def resize_matrix(matrix, new_shape):
@@ -71,6 +72,52 @@ def depth_estimation(large_mask, depth):
         ta_angle = ta_ls_array[int(average_y)]
         res_depth_2d_cx = average_depth * np.cos(ta_angle)
         res_depth_2d_cy = average_depth * np.sin(ta_angle)
+        return res_depth_2d_cx, res_depth_2d_cy
+
+
+def depth_estimation_object_loc(new_mask, depth):
+    if len(depth.shape) == 3:
+        depth = depth[:,:,0]
+
+    intrinsic = args.intrinsic_matrix 
+    filter_z,filter_x = np.where(depth>-10) # 原始depth中大于0的位置
+    depth_values_array = depth*args.depth_scale # meter
+
+    filter_z_array = filter_z.reshape(args.depth_height, args.depth_width) # 行号矩阵    
+    pixel_z = (depth.shape[0] - 1 - filter_z_array - intrinsic[1][2]) * depth_values_array / intrinsic[1][1] # 上面正，下面负
+
+
+
+    filter_x_array = filter_x.reshape(args.depth_height, args.depth_width) # 列号矩阵
+    pixel_x = (filter_x_array - intrinsic[0][2])*depth_values_array / intrinsic[0][0]
+    pixel_y = depth_values_array
+
+    laser_dis = (pixel_x**2+pixel_y**2)**0.5
+    laser_dis[(-pixel_z)>=(args.camera_height+0.13-args.height_thre-0.3)] = 10000
+
+
+    num_mask = np.where(new_mask, 1, 0)
+    res_depth_2d = np.multiply(num_mask, laser_dis)
+    res_depth_2d[res_depth_2d < args.depth_min_thre] = 10000
+
+    res_depth_2d_min = np.min(res_depth_2d, axis=0)
+    col_indices = np.where(res_depth_2d_min < args.depth_scale)[0] # 物体点云在depth中对应的列下标
+
+    res_depth_2d_cx = np.multiply(res_depth_2d_min, np.cos(ta_ls_array))
+    res_depth_2d_cy = np.multiply(res_depth_2d_min, np.sin(ta_ls_array))
+    res_center_ls = np.column_stack((res_depth_2d_cx, res_depth_2d_cy))
+
+    res_center_ls = res_center_ls[col_indices]
+
+    if(len(res_center_ls)==0):
+        return None, None
+    else:
+        dis_center_ls = [(res_center_ls[index][0]**2+res_center_ls[index][1]**2, (res_center_ls[index][0], res_center_ls[index][1]))  for index in range(len(res_center_ls))]
+        dis_center_ls = sorted(dis_center_ls)
+        dis_center_ls = dis_center_ls[len(dis_center_ls)//2:]
+        
+        res_depth_2d_cx = dis_center_ls[0][1][0]
+        res_depth_2d_cy = dis_center_ls[0][1][1]
         return res_depth_2d_cx, res_depth_2d_cy
 
 def depth_estimation_laser(large_mask, depth, rgb_image_ls=None):
@@ -327,10 +374,7 @@ def get_rgb_image_ls(env):
     #     3
     rgb_ls = []
 
-    if(env_args.is_one_rgb==True):
-        turn_id_ls = [1]
-    else:
-        turn_id_ls = range(1, 5)
+    turn_id_ls = [1]
 
     for turn_id in turn_id_ls:
         if(turn_id==1):
@@ -426,10 +470,7 @@ def get_gt_image_ls(vln_sim):
     #     3
     gt_image_ls = []
 
-    if(env_args.is_one_rgb==True):
-        turn_id_ls = [1]
-    else:
-        turn_id_ls = range(1, 5)
+    turn_id_ls = [1]
     
     # id: 1
     vln_obs = vln_sim.get_sensor_observations(0)

@@ -8,7 +8,7 @@ from graph.tools import get_absolute_pos
 
 from env_tools.arguments import args as env_args
 
-half_len = (int)(perception_args.depth_scale/graph_args.resolution)
+half_len = (int)(perception_args.graid_map_scale/graph_args.resolution)
 
 def get_nearest_grid(end_point, temp_ghost_obstacle_map, action_category): # 寻找目标1m范围内最近的空闲位置
     """

@@ -12,7 +12,7 @@ from collections import deque
 
 beta = 2*np.pi/perception_args.depth_width * 2
 alpha = 1*args.resolution
-half_len = (int)(perception_args.depth_scale/args.resolution)
+half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 def fix_size(laser_2d_filtered, laser_2d_filtered_angle):
     origin_width = laser_2d_filtered.shape[0]
@@ -23,6 +23,9 @@ def fix_size(laser_2d_filtered, laser_2d_filtered_angle):
     laser_2d_filtered_angle_res[:origin_width] = laser_2d_filtered_angle[:origin_width]
     laser_2d_filtered_angle_res[origin_width:] = laser_2d_filtered_angle[origin_width-1]
     return laser_2d_filtered_res, laser_2d_filtered_angle_res
+
+
+
 
 RESOLUTION = args.resolution
 DEPTH_SCALE = perception_args.depth_scale
@@ -76,6 +79,12 @@ def clear_fake_frontier(current_node, gx, gy):
             if np.absolute(current_map[gx+i, gy+j, 0] - args.ghost_map_g_val) <= args.ghost_map_delta:
                 current_map[gx+i, gy+j, 0] = args.free_val
 
+
+def get_relative_pos_world(real_world_cx, real_world_cy, world_cx, world_cy, world_turn):
+    real_r_matrix = np.array([[np.cos(world_turn), -np.sin(world_turn)], [np.sin(world_turn), np.cos(world_turn)]])  
+    rela_pos = np.dot(real_r_matrix, np.array([world_cx-real_world_cx, real_world_cy-world_cy]))
+    return rela_pos
+
 # RING
 def find_current_node(explored_nodes, current_node, current_pc, rela_turn, rela_t):
     src_pc = current_pc
@@ -116,6 +125,37 @@ def find_current_node(explored_nodes, current_node, current_pc, rela_turn, rela_
     else:
         flag = False # no generate
     return flag, pre_node, [final_theta, final_t], [theta_to_current, t_to_current], max_ratio
+
+
+def find_current_node_world(explored_nodes, habitat_env):
+    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+
+    if(len(explored_nodes)==0):
+        flag = True
+        pre_node = None
+        rela_pos = np.array([0, 0])
+        rela_turn = 0
+    else:
+        min_dis = 10000
+        min_node = None
+        for temp_explored_node in explored_nodes:
+            temp_dis = ((world_cx-temp_explored_node.world_cx)**2+(world_cy-temp_explored_node.world_cy)**2)**0.5
+            if(temp_dis<min_dis):
+                min_dis = temp_dis
+                min_node = temp_explored_node
+
+        if(min_dis<4):
+            flag = False
+            pre_node = min_node
+            rela_pos = get_relative_pos_world(world_cx, world_cy, min_node.world_cx, min_node.world_cy, min_node.world_turn)
+            rela_turn = world_turn-min_node.world_turn
+        else:
+            flag = True
+            pre_node = None
+            rela_pos = np.array([0, 0])
+            rela_turn = 0
+
+    return flag, pre_node, rela_pos, rela_turn
 
 
 def find_node_path(n1, n2, explored_nodes):

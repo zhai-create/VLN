@@ -1,3 +1,4 @@
+import numpy as np
 from dependencies import *
 import habitat
 from habitat.config.read_write import read_write
@@ -57,25 +58,36 @@ def hm3d_config(path:str=HM3D_CONFIG_PATH,stage:str='val',episodes=200, max_step
                 draw_goal_aabbs=True,
                 fog_of_war=FogOfWarConfig(
                     draw=True,
-                    # visibility_dist=5.0,
-                    visibility_dist=10.0,
+                    visibility_dist=5.0,
+                    # visibility_dist=10.0,
                     fov=90,
                 ),
             ),
             "collisions": CollisionsMeasurementConfig(),
         })
-        # habitat_config.habitat.simulator.agents.main_agent.sim_sensors.depth_sensor.max_depth=5.0
-        # habitat_config.habitat.simulator.agents.main_agent.sim_sensors.depth_sensor.normalize_depth=False
-        habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.max_depth=10.0
-        habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.normalize_depth=True
+        habitat_config.habitat.simulator.agents.main_agent.sim_sensors.depth_sensor.max_depth=5.0
+        habitat_config.habitat.simulator.agents.main_agent.sim_sensors.depth_sensor.normalize_depth=True
+        # habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.max_depth=5.0
+        # habitat_config.habitat.simulator.agents.main_agent.sim_sensors.equirect_depth_sensor.normalize_depth=True
         habitat_config.habitat.task.measurements.success.success_distance = 1.0
         habitat_config.habitat.environment.max_episode_steps = max_steps
         
-        if(args.is_one_rgb==True):
-            habitat_config.habitat.simulator.agents.main_agent.sim_sensors.rgb_sensor.width = 640
-            habitat_config.habitat.simulator.agents.main_agent.sim_sensors.rgb_sensor.height = 480
-            habitat_config.habitat.simulator.agents.main_agent.sim_sensors.rgb_sensor.hfov = 79
+        habitat_config.habitat.simulator.agents.main_agent.sim_sensors.rgb_sensor.width = 640
+        habitat_config.habitat.simulator.agents.main_agent.sim_sensors.rgb_sensor.height = 480
+        habitat_config.habitat.simulator.agents.main_agent.sim_sensors.rgb_sensor.hfov = 79
     return habitat_config
+
+def habitat_camera_intrinsic(config):
+    width = 640
+    height = 480
+    hfov = 79
+    xc = (width - 1.) / 2.
+    zc = (height - 1.) / 2.
+    f = (width / 2.) / np.tan(np.deg2rad(hfov / 2.))
+    intrinsic_matrix = np.array([[f,0,xc],
+                                 [0,f,zc],
+                                 [0,0,1]],np.float32)
+    return intrinsic_matrix
 
 
 def make_cfg(settings, habitat_env):

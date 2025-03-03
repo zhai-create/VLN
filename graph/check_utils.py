@@ -5,7 +5,7 @@ from graph.arguments import args
 from graph.tools import get_absolute_pos
 
 
-half_len = (int)(perception_args.depth_scale/args.resolution)
+half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 
 def second_check(cx, cy, map, r):

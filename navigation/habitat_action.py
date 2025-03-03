@@ -25,7 +25,6 @@ class HabitatAction:
     reward_per_episode = 0
 
     intention_one_cnt = 0
-    is_control_failed = False
 
     episode_train_step = 0
 
@@ -35,15 +34,14 @@ class HabitatAction:
             Reset the static attributes.
             :param habitat_env
         """
-        HabitatAction.count_steps = 0
         HabitatAction.front_steps = 0
+        HabitatAction.count_steps = 0
         HabitatAction.walk_path_meter = 1e-5
         HabitatAction.this_episode_short_dis = habitat_env.get_metrics()['distance_to_goal']
         
         HabitatAction.reward_per_episode = 0
 
         HabitatAction.intention_one_cnt = 0
-        HabitatAction.is_control_failed = False
 
         HabitatAction.episode_train_step = 0
 

@@ -21,9 +21,10 @@ def get_args():
     parser.add_argument("--thre_for_delete", type=int, default=3)
     parser.add_argument("--thre_for_detect", type=int, default=4)
 
-    parser.add_argument("--thre_for_blacklist_delete", type=float, default=1.0)
+    # parser.add_argument("--thre_for_blacklist_delete", type=float, default=1.0)
     # # laser_revise
     # parser.add_argument("--thre_for_blacklist_delete", type=float, default=0.40)
+    parser.add_argument("--thre_for_blacklist_delete", type=float, default=0.80)
     # # laser_revise
     parser.add_argument("--d_gap", type=float, default=1.1)
     parser.add_argument("--min_around_thre", type=float, default=0.31)
@@ -31,8 +32,9 @@ def get_args():
     parser.add_argument("--third_check_thre", type=float, default=0.16)
     # # laser_revise
     # parser.add_argument("--init_predict_ghost_thre1", type=float, default=0.4)
+    parser.add_argument("--init_predict_ghost_thre1", type=float, default=0.8)
     # # laser_revise
-    parser.add_argument("--init_predict_ghost_thre1", type=float, default=1.2)
+    # parser.add_argument("--init_predict_ghost_thre1", type=float, default=1.2)
     
 
     parser.add_argument("--clear_fake_lower", type=int, default=-3)

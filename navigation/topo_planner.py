@@ -7,7 +7,7 @@ from graph.arguments import args as graph_args
 
 from navigation.tools import is_temp_node_see
 
-half_len = (int)(perception_args.depth_scale/graph_args.resolution)
+half_len = (int)(perception_args.graid_map_scale/graph_args.resolution)
 
 class TopoPlanner(object):
     """
@@ -85,7 +85,7 @@ class TopoPlanner(object):
                 for temp_row_col_index in range(origin_row_col_indices.shape[0]):
                     row_index, column_index = origin_row_col_indices[temp_row_col_index][0], origin_row_col_indices[temp_row_col_index][1] 
 
-                    rela_row_column_loc = get_absolute_pos(np.array([perception_args.depth_scale-graph_args.resolution*row_index, graph_args.resolution*column_index-perception_args.depth_scale]), prior_node_in_end_node[:2], prior_node_in_end_node[2])
+                    rela_row_column_loc = get_absolute_pos(np.array([perception_args.graid_map_scale-graph_args.resolution*row_index, graph_args.resolution*column_index-perception_args.graid_map_scale]), prior_node_in_end_node[:2], prior_node_in_end_node[2])
                     row_column_t2 = rela_row_column_loc/graph_args.resolution
                     row_column_p2 = np.array([-row_column_t2[0], row_column_t2[1]])
                     row_column_loc = row_column_p2+np.array([half_len, half_len])

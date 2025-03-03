@@ -8,9 +8,11 @@ def get_args():
     # General Arguments
     parser.add_argument("--camera_height", type=float, default=0.88)
     parser.add_argument("--height_thre", type=float, default=0.2, help="height threshold for judging if it is a obstacle")
-    parser.add_argument("--depth_height", type=int, default=241)
-    parser.add_argument("--depth_width", type=int, default=481)
-    parser.add_argument("--depth_scale", type=int, default=10)
+    parser.add_argument("--depth_height", type=int, default=480)
+    parser.add_argument("--depth_width", type=int, default=640)
+    parser.add_argument("--depth_scale", type=int, default=5)
+    parser.add_argument("--graid_map_scale", type=int, default=10)
+
     parser.add_argument("--filter_thre", type=float, default=0.25)
     parser.add_argument("--index_ratio", type=int, default=1, help="get the 1/index_ratio of the original laser_2d_filtered")
     parser.add_argument("--angle_depth", type=float, default=35.264389682754654, help="angle for pre_depth")
@@ -131,6 +133,7 @@ class PreDepth(object):
                 else:
                     self.data[i, j, 4] = np.sin(self.data[i, j, 2])
 
+intrinsic_matrix = None
 
 pre_depth = PreDepth()
 pre_depth.get_data()
@@ -138,11 +141,12 @@ pre_depth.get_data()
 
 ta_ls = []
 for i in range(args.depth_width):
-    ta = 1.5 * np.pi - i / args.depth_width * 2 * np.pi 
-    if ta >= np.pi:
-        ta = ta - 2*np.pi
+    # ta = 1.5 * np.pi - i / args.depth_width * 2 * np.pi 
+    ta = 129.5*np.pi/180-(i/args.depth_width)*79*np.pi/180
     ta_ls.append(ta)
 ta_ls_array = np.array(ta_ls)
+
+
 
 coco_categories_mapping = {
         "chair": 56,
@@ -152,4 +156,7 @@ coco_categories_mapping = {
         "toilet": 61,
         "tv_monitor": 62
     }
+
+
+
 

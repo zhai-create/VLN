@@ -2,7 +2,7 @@ import numpy as np
 from perception.arguments import args
 from graph.arguments import args as graph_args
 
-half_len = (int)(args.depth_scale/graph_args.resolution)
+half_len = (int)(args.graid_map_scale/graph_args.resolution)
 
 def predict_frontier(thre1, laser_2d_filtered, laser_2d_filtered_angle):
     """
@@ -18,31 +18,30 @@ def predict_frontier(thre1, laser_2d_filtered, laser_2d_filtered_angle):
     candidate_frontier_ls = []
     laser_len = len(laser_2d_filtered)
 
-    for i in range(-1, laser_len):
+    # for i in range(-1, laser_len):
+    #     laser_dis = laser_2d_filtered[i]
+    #     laser_angle = laser_2d_filtered_angle[i]
+    #     tx = laser_dis * args.depth_scale * np.cos(laser_angle)
+    #     ty = laser_dis * args.depth_scale * np.sin(laser_angle)
+    #     laser_pos_ls.append(np.array([ty,tx]))
+
+    #     if i >= 0 and np.absolute(laser_dis - laser_2d_filtered[(laser_len+i-1)%laser_len]) * args.depth_scale >= thre1 and laser_dis * args.depth_scale>= 0.01 and laser_2d_filtered[(laser_len+i-1)%laser_len] * args.depth_scale >= 0.01: 
+    #         candidate_frontier_d1 = (ty + laser_pos_ls[-2][0])/2
+    #         candidate_frontier_d2 = (tx + laser_pos_ls[-2][1])/2
+    #         candidate_frontier_ls.append([candidate_frontier_d1, candidate_frontier_d2])
+
+    for i in range(0, laser_len):
         laser_dis = laser_2d_filtered[i]
         laser_angle = laser_2d_filtered_angle[i]
         tx = laser_dis * args.depth_scale * np.cos(laser_angle)
         ty = laser_dis * args.depth_scale * np.sin(laser_angle)
         laser_pos_ls.append(np.array([ty,tx]))
 
-        if i >= 0 and np.absolute(laser_dis - laser_2d_filtered[(laser_len+i-1)%laser_len]) * args.depth_scale >= thre1 and laser_dis * args.depth_scale>= 0.01 and laser_2d_filtered[(laser_len+i-1)%laser_len] * args.depth_scale >= 0.01: 
-            candidate_frontier_d1 = (ty + laser_pos_ls[-2][0])/2
-            candidate_frontier_d2 = (tx + laser_pos_ls[-2][1])/2
-
-            candidate_frontier_ls.append([candidate_frontier_d1, candidate_frontier_d2])
-
-
-        # if(laser_dis>0 and laser_angle>0 and laser_angle<np.pi/2):
-        #     center_point_d1 = (int)(half_len-ty/0.1)
-        #     center_point_d2 = (int)(half_len+tx/0.1)
-
-        #     print("laser_dis:", laser_dis)
-        #     print("laser_angle:", laser_angle*180/np.pi)
-
-        #     print("center_point_d1:", center_point_d1)
-        #     print("center_point_d2:", center_point_d2)
-
-        #     breakpoint()
-
-
+        if i>=1 and np.absolute(laser_dis - laser_2d_filtered[i-1]) * args.depth_scale >= thre1: 
+            if(laser_dis * args.depth_scale<0.01) and (laser_2d_filtered[i-1] * args.depth_scale<0.01):
+                continue
+            else:
+                candidate_frontier_d1 = (ty + laser_pos_ls[-2][0])/2
+                candidate_frontier_d2 = (tx + laser_pos_ls[-2][1])/2
+                candidate_frontier_ls.append([candidate_frontier_d1, candidate_frontier_d2])
     return np.array(candidate_frontier_ls)

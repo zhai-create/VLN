@@ -14,12 +14,14 @@ from typing import TYPE_CHECKING, Union, cast
 from navigation.tools import get_absolute_pos_world
 from graph.tools import get_current_world_pos
 
-from perception.tools import get_rgb_image_ls, get_gt_image_ls, fix_depth
+from perception.tools import get_rgb_image_ls, get_gt_image_ls
 
 from vis_tools.arguments import args
 from PIL import Image
 
 from env_tools.arguments import args as env_args
+from habitat.sims.habitat_simulator.actions import HabitatSimActions
+from navigation.habitat_action import HabitatAction
 
 
 def get_top_down_map(habitat_env):
@@ -100,6 +102,7 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
                 circle = plt.Circle((ty, tx), radius=30, color=(210/255,174/255,172/255), zorder=2)  # 设置圆圈的大小、颜色等
             else:
                 circle = plt.Circle((ty, tx), radius=30, color=(142/255,165/255,200/255), zorder=2)  # 设置圆圈的大小、颜色等
+
             ax.add_patch(circle)
             G.add_node(temp_node.name, pos=(ty, tx))
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
@@ -116,10 +119,14 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
                 sim=habitat_env.sim,
             )
             
-            if(action_node.name==temp_node.name):
-                circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            if(action_node is not None):
+                if(action_node.name==temp_node.name):
+                    circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+                else:
+                    circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
             else:
                 circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
+            
             ax.add_patch(circle)
             G.add_node(temp_node.name, pos=(ty, tx))
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
@@ -137,19 +144,22 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
                 sim=habitat_env.sim,
             )
 
-            if(action_node.name==temp_node.name):
-                circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            if(action_node is not None):
+                if(action_node.name==temp_node.name):
+                    circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+                else:
+                    circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
             else:
                 circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
             
-            # 添加 score 文字标注
-            if(-1 in temp_node.score_ls):
-                score_index = temp_node.score_ls.index(-1)
-                temp_node_score = temp_node.score_ls[score_index-1]
-            else:
-                temp_node_score = temp_node.score_ls[-1]
-            plt.text(ty, tx - 35, f"{temp_node_score:.2f}", fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
-            # 添加 score 文字标注
+            # # 添加 score 文字标注
+            # if(-1 in temp_node.score_ls):
+            #     score_index = temp_node.score_ls.index(-1)
+            #     temp_node_score = temp_node.score_ls[score_index-1]
+            # else:
+            #     temp_node_score = temp_node.score_ls[-1]
+            # plt.text(ty, tx - 35, f"{temp_node_score:.2f}", fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+            # # 添加 score 文字标注
 
 
             ax.add_patch(circle)
@@ -178,16 +188,17 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
     circle = plt.Circle((current_ty, current_tx), radius=30, color=(235/255,161/255,51/255), zorder=2)  # 设置圆圈的大小、颜色等
     ax.add_patch(circle)
 
-    sub_goal_absolute_pos = get_absolute_pos_world(action_node.rela_cx, action_node.rela_cy, action_node.parent_node.world_cx, action_node.parent_node.world_cy, action_node.parent_node.world_turn)
-    sub_goal_tx, sub_goal_ty = maps.to_grid(
-        sub_goal_absolute_pos[0],
-        sub_goal_absolute_pos[1],
-        (background_image.shape[0], background_image.shape[1]),
-        sim=habitat_env.sim,
-    )
+    if(action_node is not None):
+        sub_goal_absolute_pos = get_absolute_pos_world(action_node.rela_cx, action_node.rela_cy, action_node.parent_node.world_cx, action_node.parent_node.world_cy, action_node.parent_node.world_turn)
+        sub_goal_tx, sub_goal_ty = maps.to_grid(
+            sub_goal_absolute_pos[0],
+            sub_goal_absolute_pos[1],
+            (background_image.shape[0], background_image.shape[1]),
+            sim=habitat_env.sim,
+        )
 
-    circle = plt.Circle((sub_goal_ty, sub_goal_tx), radius=30, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-    ax.add_patch(circle)
+        circle = plt.Circle((sub_goal_ty, sub_goal_tx), radius=30, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+        ax.add_patch(circle)
 
     pos = nx.get_node_attributes(G, "pos")
     nx.draw_networkx_edges(G, pos, ax=ax, edge_color=(95/255, 95/255, 95/255))
@@ -204,6 +215,19 @@ def init_mp4(pre_model, episode_index):
     robot_trajectory = []
     if(not os.path.exists('{}/'.format(args.pre_path))):
         os.makedirs('{}/'.format(args.pre_path))
+    
+    occu_path = "{}/occu_{:04d}_{:04d}.mp4".format(args.pre_path, pre_model, episode_index)
+    occu_writer = imageio.get_writer(
+        occu_path,
+        codec="h264",
+        fps=10,
+        quality=None,
+        pixelformat="yuv420p",
+        bitrate=0,
+        output_params=["-crf", "31"],
+    )
+    
+    
     save_path = "{}/rgb_{:04d}_{:04d}.mp4".format(args.pre_path, pre_model, episode_index)
     video_writer = imageio.get_writer(
         save_path,
@@ -237,10 +261,10 @@ def init_mp4(pre_model, episode_index):
         output_params=["-crf", "31"],
     )
 
-    return video_writer, map_writer, gt_writer
+    return occu_writer, video_writer, map_writer, gt_writer
 
 
-def save_mp4(video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal, vln_sim=None):
+def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=None, vln_sim=None):
     plt_topo_map = plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node)
 
     rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
@@ -264,15 +288,19 @@ def save_mp4(video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_gr
     # # ===========> new <============
 
 
-
-
-    if(action_node.node_type=="frontier_node"):
-        cv2.putText(video_image, "Go to frontier node", args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
-    else:
-        cv2.putText(video_image, "Go to intention node", args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
+    if(action_node is not None):
+        if(action_node.node_type=="frontier_node"):
+            cv2.putText(video_image, "Go to frontier node", args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
+        else:
+            cv2.putText(video_image, "Go to intention node", args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
 
     video_writer.append_data(video_image)
     map_writer.append_data(plt_topo_map)
+
+    occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
+    occu_for_show = (occu_for_show*255).astype(np.uint8)
+    cv2.putText(occu_for_show, "{}".format(HabitatAction.count_steps-1), args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
+    occu_writer.append_data(occu_for_show)
 
     if(env_args.is_gt==True):
         gt_writer.append_data(gt_image)

@@ -9,7 +9,7 @@ from detectron2.modeling import build_model
 from detectron2.checkpoint import DetectionCheckpointer
 
 from perception.arguments import args, coco_categories_mapping
-from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser, depth_estimation_laser_pinhole_to_panorama
+from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser, depth_estimation_laser_pinhole_to_panorama, depth_estimation_object_loc
 
 from env_tools.arguments import args as env_args
 
@@ -48,49 +48,23 @@ def object_detect(rgb_image_ls, depth, object_text):
         for temp_index in range(temp_boxes.shape[0]): # 遍历每一个图像实例
             if(int(temp_pre_labels[temp_index].item())==coco_categories_mapping[object_text]):
                 new_mask = temp_masks.cpu().numpy()[temp_index]
-                
-                # show
-                # image0 = rgb_image_ls[index].copy()
-                # cv2.rectangle(image0, (int(temp_boxes[temp_index][0]), int(temp_boxes[temp_index][1])), (int(temp_boxes[temp_index][2]), int(temp_boxes[temp_index][3])), (0, 255, 0), 2)
-                # sam_show_res = sam_show_mask(new_mask, image0)
-                # cv2.imwrite("sam_show_res_{}_{}.jpg".format(index, temp_index), sam_show_res)
-                
-                if(env_args.is_one_rgb==True): # 是使用一张rgb
-                    new_add_half_width = int(((new_mask.shape[1]*90/79)-new_mask.shape[1])/2)
-                    new_add_false_matrix = np.zeros((new_mask.shape[0], new_add_half_width), dtype=bool)
-                    new_mask = np.hstack((new_add_false_matrix, new_mask, new_add_false_matrix))
-                
-                
-                false_matrix = np.zeros(new_mask.shape, dtype=bool)
-                if((index+1)==1):
-                    large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], false_matrix, new_mask, false_matrix, false_matrix[:, :int(false_matrix.shape[1]//2)]))
-                elif((index+1)==2):
-                    large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], new_mask, false_matrix, false_matrix, false_matrix[:, :int(false_matrix.shape[1]//2)]))
-                elif((index+1)==4):
-                    large_mask = np.hstack((false_matrix[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, new_mask, false_matrix[:, :int(false_matrix.shape[1]//2)]))
-                elif((index+1)==3):
-                    large_mask = np.hstack((new_mask[:, int(false_matrix.shape[1]//2):], false_matrix, false_matrix, false_matrix, new_mask[:, :int(false_matrix.shape[1]//2)]))
 
-                # small_revise
-                true_count = np.sum(large_mask)
-                if true_count < args.mask_true_cnt_thre:
-                    continue
-                # small_revise
+                # # small_revise
+                # true_count = np.sum(large_mask)
+                # if true_count < args.mask_true_cnt_thre:
+                #     continue
+                # # small_revise
 
+                res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
 
-                if(args.is_depth_estimation_laser==True):
-                    # res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
-                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser_pinhole_to_panorama(large_mask, depth)
-                else:
-                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
                 
-                if(res_depth_2d_cx is None):
+                if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
                     continue
                 
                 if(temp_pre_scores[temp_index].item() not in detect_res_pos_dict):
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy, index]]
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy]]
                 else:
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy, index])
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy])
     return detect_res_pos_dict
 
 

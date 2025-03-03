@@ -103,11 +103,14 @@ class LocalPlanner(object):
         if(len(local_path)==0):
             local_path = []
             next_action = "suc"
+            print("condition_1")
         elif(self.state_flag=="node_path" and is_in_free_grid(topo_planner.remain_nodes[0], self.topo_graph.current_node, self.topo_graph.rela_cx, self.topo_graph.rela_cy)==True):
             local_path = []
             next_action = "suc"
+            print("condition_2")
         else:
             local_path, next_action = choose_action(local_path, self.sub_map_node, self.habitat_env, self.habitat_planner)
+            print("condition_3")
         return next_action, local_path
             
 
