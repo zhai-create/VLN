@@ -78,7 +78,7 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
 
-    for temp_pre_model in range(30, 80000, 10):
+    for temp_pre_model in range(190, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
