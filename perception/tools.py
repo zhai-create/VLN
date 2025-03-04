@@ -459,40 +459,28 @@ def get_rgb_image_ls(env):
 
 
 
-def get_gt_image_ls(vln_sim):
-    """
-    Get the image list
-    :param env: habitat_env
-    :return image_ls: [gt_1, gt_2, gt_3, gt_4]
-    """
-    #     1
-    # 2        4
-    #     3
-    gt_image_ls = []
-
+def get_gt_image_ls(env):
+    gt_ls = []
     turn_id_ls = [1]
-    
-    # id: 1
-    vln_obs = vln_sim.get_sensor_observations(0)
-    gt_image_ls.append(vln_obs["gt"][:, :, :3])
+    for turn_id in turn_id_ls:
+        if(turn_id==1):
+            dis, angle = 0, 0
+            p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
+            state = env._sim.get_agent_state(0)
+            translation = state.position # 1: right; 2: up; 3: back
+            rotation = state.rotation # anti-clockwise / up-righthand principle
+            euler = quaternion.as_euler_angles(rotation)
+            if euler[0]!=0:
+                euler[1] = 2*euler[0]-euler[1]
+                euler[0] = 0
+                euler[2] = 0
+            ref_true_loc = np.array([-translation[2], translation[0]])
+            ref_true_dir = euler[1]
+            rotation = quaternion.from_euler_angles(euler)
 
-    # id: 2
-    for i in range(3):
-        vln_obs = vln_sim.step(HabitatSimActions.turn_left)
-    gt_image_ls.append(vln_obs["gt"][:, :, :3])
-
-    # id: 3
-    for i in range(3):
-        vln_obs = vln_sim.step(HabitatSimActions.turn_left)
-    gt_image_ls.append(vln_obs["gt"][:, :, :3])
-
-    # id: 4
-    for i in range(3):
-        vln_obs = vln_sim.step(HabitatSimActions.turn_left)
-    gt_image_ls.append(vln_obs["gt"][:, :, :3])
-
-    # id: 1
-    for i in range(3):
-        vln_obs = vln_sim.step(HabitatSimActions.turn_left)
-        
-    return gt_image_ls
+            p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
+            goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
+            obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
+            gt_img = obs["semantic"]
+        gt_ls.append(gt_img)
+    return gt_ls

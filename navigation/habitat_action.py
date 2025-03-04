@@ -28,8 +28,59 @@ class HabitatAction:
 
     episode_train_step = 0
 
+    scene_file_dict = {}
+    object_id_num_ls = []
+
     @staticmethod
-    def reset(habitat_env):
+    def get_current_scene_dict(habitat_env):
+        current_scene = habitat_env.current_episode.scene_id
+        scene_num = current_scene.split('/')[-2].split("-")[0]
+        scene_name = current_scene.split('/')[-2].split("-")[1]
+
+        scene_file_dict = {} # key: object, value: id
+        with open("dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name), 'r') as file:
+            next(file)  # 跳过第一行
+            for line in file:
+                columns = line.strip().split(',')
+                temp_object_id = eval(columns[0])
+                temp_object_name = columns[2].replace('"', '')
+        
+                if(temp_object_name not in scene_file_dict):
+                    scene_file_dict[temp_object_name] = [temp_object_id]
+                else:
+                    scene_file_dict[temp_object_name].append(temp_object_id)
+        return scene_file_dict
+
+    @staticmethod
+    def get_object_num_ls(scene_file_dict, object_text):
+        object_id_num_ls = []
+        
+        if(object_text=="bed" or object_text=="toilet"):
+            if(object_text in scene_file_dict):
+                object_id_num_ls = scene_file_dict[object_text]
+            else:
+                object_id_num_ls = []
+        
+        elif(object_text=="sofa"):
+            for temp_object_name in scene_file_dict:
+                if(temp_object_name==object_text) or (temp_object_name=="couch"):
+                    object_id_num_ls += scene_file_dict[temp_object_name]
+
+        elif(object_text=="tv_monitor"):
+            for temp_object_name in scene_file_dict:
+                if(temp_object_name==object_text) or (temp_object_name=="tv"):
+                    object_id_num_ls += scene_file_dict[temp_object_name]
+
+        else:
+            for temp_object_name in scene_file_dict:
+                if(object_text in temp_object_name):
+                    object_id_num_ls += scene_file_dict[temp_object_name]
+
+        return object_id_num_ls
+
+
+    @staticmethod
+    def reset(habitat_env, object_text):
         """
             Reset the static attributes.
             :param habitat_env
@@ -40,10 +91,11 @@ class HabitatAction:
         HabitatAction.this_episode_short_dis = habitat_env.get_metrics()['distance_to_goal']
         
         HabitatAction.reward_per_episode = 0
-
         HabitatAction.intention_one_cnt = 0
-
         HabitatAction.episode_train_step = 0
+        HabitatAction.scene_file_dict = HabitatAction.get_current_scene_dict(habitat_env)
+        HabitatAction.object_id_num_ls = HabitatAction.get_object_num_ls(HabitatAction.scene_file_dict, object_text)
+
 
     @staticmethod
     def set_habitat_action(action_name, topo_graph):

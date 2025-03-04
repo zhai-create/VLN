@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import time
@@ -48,7 +48,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_train_val"
     else:
-        val_note = "_two_dim_one_depth_rotation_train_val_ji_reward_revise_40_factor"
+        val_note = "_two_dim_one_depth_rotation_train_val_ji_reward_revise_12_factor_fake_intention_gt"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -78,11 +78,11 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
 
-    for temp_pre_model in range(45, 80000, 10):
+    for temp_pre_model in range(30, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_02_06_00_53_two_dim_one_depth_rotation_reward_revise_40_factor"
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_04_08_34_57_two_dim_one_depth_rotation_reward_revise_12_factor_fake_inetntion_gt"
         
         while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
@@ -117,11 +117,9 @@ if __name__=="__main__":
             habitat_env.episodes = [selected_episodes[index_in_episodes]]
             observations = habitat_env.reset()
 
-            if(args.is_gt==True):
-                vln_sim = init_gt_sensor(habitat_env)
-
-            HabitatAction.reset(habitat_env) 
+            
             object_goal = args.object_ls[observations["objectgoal"][0]]
+            HabitatAction.reset(habitat_env, object_goal) 
             print("scene_id:", (habitat_env.current_episode.scene_id, object_goal))
             # print("=====> object_goal <=====", object_goal)
             # topo_graph_init
@@ -137,23 +135,20 @@ if __name__=="__main__":
                 topo_graph.update_graph_frontier()
 
                 rgb_image_ls = get_rgb_image_ls(habitat_env)
-                detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                gt_image_ls = get_gt_image_ls(habitat_env)
+                # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
                 topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                 # 底层仿真器动作执行
                 habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
                 observations = habitat_env.step(habitat_action)
                 topo_graph.obs = observations
-                if(args.is_gt==True):
-                    vln_sim.agents[0].set_state(habitat_env.sim.get_agent_state(0))
                 
             
                 # 用于录制视频
                 if(args.is_vis==True):
-                    if(args.is_gt==True):
-                        save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal, vln_sim)
-                    else:
-                        save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
+                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
             
             while True:
                 # rl_graph_update

@@ -29,7 +29,6 @@ def get_args():
     parser.add_argument("--is_auto", type=bool, default=True)
     parser.add_argument("--is_vis", type=bool, default=False)
     parser.add_argument("--is_llm", type=bool, default=0)
-    parser.add_argument("--is_gt", type=bool, default=False)
 
     # parse arguments
     args = parser.parse_args()

@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '5'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '5'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import random
 import cv2
 import copy
@@ -21,7 +21,7 @@ from system_utils import process_info
 from policy.tools.utils import init_RL, system_info
 from policy.rl_algorithms.rl_graph import RL_Graph
 
-from perception.tools import fix_depth, get_rgb_image_ls
+from perception.tools import fix_depth, get_rgb_image_ls, get_gt_image_ls
 from perception.arguments import args as perception_args
 from graph.graph_utils import GraphMap
 from graph.node_utils import Node
@@ -30,6 +30,7 @@ from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
 
 from perception.intention_utils_rcnn import object_detect
+from perception.intention_utils_gt import object_detect_gt
 
 
 if __name__=="__main__":
@@ -47,7 +48,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_two_dim_one_depth_rotation_reward_revise_40_factor" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_one_depth_rotation_reward_revise_12_factor_fake_inetntion_gt" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -159,11 +160,11 @@ if __name__=="__main__":
             observations = habitat_env.reset()
         except:
             continue
-        HabitatAction.reset(habitat_env) 
-        habitat_metric = habitat_env.get_metrics()
-        object_goal = env_args.object_ls[observations["objectgoal"][0]]
 
+        object_goal = env_args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
+        HabitatAction.reset(habitat_env, object_goal) 
+        habitat_metric = habitat_env.get_metrics()
         # topo_graph_init
         topo_graph = GraphMap(habitat_env=habitat_env)
         topo_graph.set_current_pos(rela_cx=0.0, rela_cy=0.0, rela_turn=0.0)
@@ -177,23 +178,20 @@ if __name__=="__main__":
             topo_graph.update_graph_frontier()
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
-            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            gt_image_ls = get_gt_image_ls(habitat_env)
+            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
             topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
             # 底层仿真器动作执行
             habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
             observations = habitat_env.step(habitat_action)
             topo_graph.obs = observations
-            if(env_args.is_gt==True):
-                vln_sim.agents[0].set_state(habitat_env.sim.get_agent_state(0))
             
         
             # 用于录制视频
             if(env_args.is_vis==True):
-                if(env_args.is_gt==True):
-                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal, vln_sim)
-                else:
-                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
+                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
 
         # rl_graph_update

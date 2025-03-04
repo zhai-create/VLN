@@ -5,79 +5,94 @@ import random
 
 from perception.arguments import args
 from env_tools.data_utils import color_dict
-from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser, depth_estimation_laser_pinhole_to_panorama
+from perception.tools import sam_show_mask, depth_estimation_object_loc
 
 
-def object_detect_gt(rgb_image_ls, depth, object_text, habitat_env):
-    detect_res_pos_dict = {}    
-    large_rgb = np.hstack((rgb_image_ls[2][:, int(rgb_image_ls[0].shape[1]//2):], rgb_image_ls[1], rgb_image_ls[0], rgb_image_ls[3], rgb_image_ls[2][:, :int(rgb_image_ls[0].shape[1]//2)]))
 
-    # for hex_color in color_dict[habitat_env.episodes[0].scene_id][object_text]: # 遍历每一个样例
-    for hex_color in color_dict[habitat_env.current_episode.scene_id][object_text]: # 遍历每一个样例
-        rgb_color = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-        large_mask = np.all(large_rgb == rgb_color, axis=-1)
+def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls):
+    detect_res_pos_dict = {}  
 
-        true_count = np.sum(large_mask)
-        if true_count < args.mask_true_cnt_thre:
+    for temp_id_num in object_id_num_ls:
+        new_mask = (gt_image_ls[0]==temp_id_num)[:, :, 0]
+        true_count = np.sum(new_mask)
+
+        if true_count < 50:
             continue
-        # if not np.any(large_mask): # 当前样例不存在于大图片中
-        #     continue
         else:
-            if(args.is_depth_estimation_laser==True):
-                # res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
-                res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser_pinhole_to_panorama(large_mask, depth)
-            else:
-                res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
-
-            if(res_depth_2d_cx is None):
+            res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
+            if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
                 continue
 
-            # cv2.imwrite("large_mask_{}_{}_{}.jpg".format(res_depth_2d_cx, res_depth_2d_cy, true_count), (large_mask*255).astype(np.uint8))
-            
-            if(1 not in detect_res_pos_dict):
-                detect_res_pos_dict[1] = [[res_depth_2d_cx, res_depth_2d_cy]]
+            rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
+            rule_score = (0.2/(1+rule_dis**2))+0.8+np.random.normal(loc=0, scale=0.1, size=1)[0]
+            if (rule_score>1):
+                rule_score = 1
+            elif(rule_score<0.8):
+                rule_score = 0.8
+
+            if(rule_score not in detect_res_pos_dict):
+                detect_res_pos_dict[rule_score] = [[res_depth_2d_cx, res_depth_2d_cy]]
             else:
-                detect_res_pos_dict[1].append([res_depth_2d_cx, res_depth_2d_cy])
+                detect_res_pos_dict[rule_score].append([res_depth_2d_cx, res_depth_2d_cy])
+
+
+
+    # ==============> fake_intention <==============
+    if(len(detect_res_pos_dict.keys())==0):
+        if(random.uniform(0, 1)<0.3):
+            is_generate_fake_flag = True
+        else:
+            is_generate_fake_flag = False
+    else:
+        if(random.uniform(0, 1)<0.1):
+            is_generate_fake_flag = True
+        else:
+            is_generate_fake_flag = False
     
-    
-    
-    # other_object_ls = list(color_dict[habitat_env.current_episode.scene_id].keys())
-    # other_object_ls.remove(object_text)
-    # # 训练需要下面两行
-    # # random.shuffle(other_object_ls)
-    # # other_object_ls = other_object_ls[0:2]
+    if(is_generate_fake_flag==True):
+        all_zero_matrix = np.zeros((120, 640))
+        for temp_id_num in object_id_num_ls:
+            num_mask = (gt_image_ls[0]==temp_id_num)[:, :, 0]
+            all_zero_matrix += num_mask.astype(int)[180:300, :]
+        
+        all_bool_matrix = (all_zero_matrix==0)
+        filtered_elements = gt_image_ls[0][180:300, :, 0][all_bool_matrix]
 
-    # # for false_object in color_dict[habitat_env.current_episode.scene_id]: # 遍历其他错误类别
-    # for false_object in other_object_ls:
-    #     if(false_object==object_text):
-    #         continue
-    #     for hex_color in color_dict[habitat_env.current_episode.scene_id][object_text]: # 遍历每一个错误类别的样例
-    #         rgb_color = tuple(int(hex_color[i:i+2], 16) for i in (0, 2, 4))
-    #         large_mask = np.all(large_rgb == rgb_color, axis=-1)
+        if(filtered_elements.shape[0]!=0):
+            unique_filtered_elements = np.unique(filtered_elements)[:random.randint(1, 3)]
+            for temp_index in range(unique_filtered_elements.shape[0]):
+                temp_id_num = unique_filtered_elements[temp_index]
 
-    #         true_count = np.sum(large_mask)
-    #         if true_count < args.mask_true_cnt_thre:
-    #             continue
-    #         # if not np.any(large_mask): # 当前样例不存在于大图片中
-    #         #     continue
-    #         else:
-    #             if(args.is_depth_estimation_laser==True):
-    #                 # res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser(large_mask, depth)
-    #                 res_depth_2d_cx, res_depth_2d_cy = depth_estimation_laser_pinhole_to_panorama(large_mask, depth)
-    #             else:
-    #                 res_depth_2d_cx, res_depth_2d_cy = depth_estimation(large_mask, depth) # 相对于机器人的位姿
+                new_mask = (gt_image_ls[0]==temp_id_num)[:, :, 0]
+                true_count = np.sum(new_mask)
 
-    #             if(res_depth_2d_cx is None):
-    #                 continue
-    #             false_score = random.uniform(0.6, 0.7)
-    #             if(false_score not in detect_res_pos_dict):
-    #                 detect_res_pos_dict[false_score] = [[res_depth_2d_cx, res_depth_2d_cy]]
-    #             else:
-    #                 detect_res_pos_dict[false_score].append([res_depth_2d_cx, res_depth_2d_cy])
+                if true_count < 10:
+                    continue
+                else:
+                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
+                    if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
+                        continue
 
+                    rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
+                    rule_score = (0.15/(1+rule_dis**2))+0.6+np.random.normal(loc=0, scale=0.1, size=1)[0]
+                    if (rule_score>0.75):
+                        rule_score = 0.75
+                    elif(rule_score<0.6):
+                        rule_score = 0.6
+
+                    if(rule_score not in detect_res_pos_dict):
+                        detect_res_pos_dict[rule_score] = [[res_depth_2d_cx, res_depth_2d_cy]]
+                    else:
+                        detect_res_pos_dict[rule_score].append([res_depth_2d_cx, res_depth_2d_cy])
+    # ==============> fake_intention <==============
 
     return detect_res_pos_dict
 
 print('GT perception initialize success!')
+
+
+
+
+
 
 

@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '7'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '7'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import habitat_sim
@@ -21,7 +21,7 @@ from policy.tools.utils import init_RL
 from policy.rl_algorithms.rl_graph import RL_Graph
 
 
-from perception.tools import fix_depth, get_rgb_image_ls
+from perception.tools import fix_depth, get_rgb_image_ls, get_gt_image_ls
 from graph.graph_utils import GraphMap
 from graph.tools import find_node_path, get_absolute_pos
 from graph.arguments import args as graph_args
@@ -35,6 +35,8 @@ from vis_tools.vis_utils import init_mp4, get_top_down_map, save_mp4
 from perception.arguments import args as perception_args
 from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_dino import object_detect_sam
+from perception.intention_utils_gt import object_detect_gt
+
 
 if __name__=="__main__":
     args.task_stage = "val"
@@ -44,14 +46,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 694
+    args.graph_pre_model = 50
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_two_dim_one_depth_rotation_val_50_factor_"+str(args.graph_pre_model)+"_init_800"
+        val_note = "_two_dim_one_depth_rotation_val_reward_revise_12_factor_gt_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -61,7 +63,7 @@ if __name__=="__main__":
     args.success_distance = 1.0 
     args.max_steps = 500
 
-    args.is_vis = False # 录制视频
+    args.is_vis = True # 录制视频
 
     rl_args.score_top_k = 50
     if(args.is_llm==2):
@@ -86,10 +88,12 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_02_27_13_52_44_two_dim_one_depth_rotation_50_factor"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_03_12_31_35_two_dim_one_depth_rotation_reward_revise_12_factor_gt"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
     
+    max_step_index_ls = [1, 4, 17, 18, 19, 24, 28, 30, 41, 42, 50, 54, 62, 81, 82, 99, 103, 106, 109, 111, 122, 127, 130, 131, 132, 133, 135, 137, 141, 145, 147, 154, 158, 160, 161, 162, 165, 167, 173, 188, 189, 190, 195, 197, 199, 201, 208, 209, 210, 213, 214, 217, 218, 221, 225, 227, 234, 238, 240, 241, 243, 245, 246, 251, 268, 269, 271, 275, 278, 280, 282, 283, 284, 296, 299, 301, 303, 304, 305, 306, 308, 309, 313, 316, 320, 321, 325, 336, 337, 342, 343, 346, 347, 348, 354, 356, 417, 431, 454, 458, 460, 464, 466, 481, 484, 487, 489, 490, 494, 498, 503, 508, 527, 535, 538, 541, 554, 557, 560, 565, 575, 576, 578, 581, 583, 587, 589, 602, 603, 604, 606, 614, 616, 621, 628, 630, 642, 647, 648, 656, 661, 679, 683, 685, 700, 701, 703, 707, 715, 718, 722, 724, 725, 729, 732, 735, 737, 743, 744, 746, 748, 749, 755, 756, 757, 763, 764, 767, 769, 771, 772, 776, 779, 781, 785, 787, 788, 789, 790, 794, 802, 806, 809, 811, 812, 815, 818, 819, 826, 827, 832, 838, 839, 842, 846, 851, 853, 854, 855, 859, 860, 862, 863, 866, 874, 892, 896, 902, 904, 906, 913, 917, 921, 926, 931, 933, 935, 938, 955, 974, 976, 977, 980, 984, 987, 991, 992, 994, 995, 997, 998]
+
     for index_in_episodes in tqdm(range(args.graph_episode_num)):   
         # 用于录制视频
         if(args.is_vis==True):
@@ -99,18 +103,21 @@ if __name__=="__main__":
         # rl_graph_init
         rl_graph = RL_Graph()
         # haitat_episode_init
-        print("=====> scene_id <=====", habitat_env.episodes[0].scene_id)
-        observations = habitat_env.reset()
+        print("=====> scene_id <=====", habitat_env.current_episode.scene_id)
 
-        if(index_in_episodes<800):
+        observations = habitat_env.reset()
+        object_goal = args.object_ls[observations["objectgoal"][0]]
+        print("=====> object_goal <=====", object_goal)
+
+        if((index_in_episodes+1) not in max_step_index_ls):
             continue
 
-        HabitatAction.reset(habitat_env) 
+        # if(index_in_episodes<800):
+        #     continue
+
+        HabitatAction.reset(habitat_env, object_goal) 
         habitat_metric = habitat_env.get_metrics()
-        object_goal = args.object_ls[observations["objectgoal"][0]]
         
-        # print(habitat_env.agent.AgentConfiguration().sensor_specifications)
-        print("=====> object_goal <=====", object_goal)
         # topo_graph_init
         topo_graph = GraphMap(habitat_env=habitat_env)
         topo_graph.set_current_pos(rela_cx=0.0, rela_cy=0.0, rela_turn=0.0)
@@ -118,10 +125,7 @@ if __name__=="__main__":
         
         # 用于录制视频
         if(args.is_vis==True):
-            if(args.is_gt==True):
-                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, object_goal, vln_sim)
-            else:
-                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
+            save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
         
         for i in range(12):
             # get sensor data: depth, 2d_laser
@@ -131,7 +135,9 @@ if __name__=="__main__":
             topo_graph.update_graph_frontier()
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
-            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            gt_image_ls = get_gt_image_ls(habitat_env)
+            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
             topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
             # 底层仿真器动作执行
@@ -139,16 +145,10 @@ if __name__=="__main__":
             observations = habitat_env.step(habitat_action)
             topo_graph.obs = observations
 
-            if(args.is_gt==True):
-                vln_sim.agents[0].set_state(habitat_env.sim.get_agent_state(0))
 
             # 用于录制视频
             if(args.is_vis==True):
-                if(args.is_gt==True):
-                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, object_goal, vln_sim)
-                else:
-                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
-
+                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
         while True:
             # rl_graph_update

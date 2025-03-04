@@ -17,6 +17,7 @@ from vis_tools.vis_utils import save_mp4
 
 from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_dino import object_detect_sam
+from perception.intention_utils_gt import object_detect_gt
 
 from graph.tools import get_current_world_pos
 
@@ -87,7 +88,7 @@ class SubgoalReach:
         return False
 
     @staticmethod
-    def achieved_remove_action_node(topo_graph, action_node):
+    def achieved_remove_action_node(topo_graph, action_node, habitat_env):
         """
             When the robot achieves the sub-goal, delete the action node in the topo-graph.
             :param topo_graph
@@ -117,7 +118,9 @@ class SubgoalReach:
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
             if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                # topo_graph.determine_loc_ls.append((world_cx, world_cy))
+                SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             else:
                 if not habitat_env.episode_over:
@@ -136,7 +139,9 @@ class SubgoalReach:
                 else:
                     return "exceed"
             else:
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                # topo_graph.determine_loc_ls.append((world_cx, world_cy))
+                SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             return candidate_achieved_result 
 
@@ -166,17 +171,12 @@ class SubgoalReach:
                 if not habitat_env.episode_over:
                     observations = habitat_env.step(habitat_action)
                     topo_graph.obs = observations
-                    if(env_args.is_gt==True):
-                        vln_sim.agents[0].set_state(habitat_env.sim.get_agent_state(0))
                 else:
                     return "exceed"
 
                 # 用于录制视频
                 if(env_args.is_vis==True):
-                    if(env_args.is_gt==True):
-                        save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal, vln_sim)
-                    else:
-                        save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
+                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
                 # ===========> 以下为new <=========
                 # 检查是否卡住
                 if(SubgoalReach.next_action=="f"):
@@ -194,7 +194,9 @@ class SubgoalReach:
                         topo_graph.update_graph_frontier()
 
                         rgb_image_ls = get_rgb_image_ls(habitat_env)
-                        detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                        gt_image_ls = get_gt_image_ls(habitat_env)
+                        # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                        detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
                         topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                         # depth = fix_depth(observations["depth"])
@@ -237,17 +239,12 @@ class SubgoalReach:
                         if not habitat_env.episode_over:
                             observations = habitat_env.step(habitat_action)
                             topo_graph.obs = observations
-                            if(env_args.is_gt==True):
-                                vln_sim.agents[0].set_state(habitat_env.sim.get_agent_state(0))
                         else:
                             return "exceed"
 
                         # 用于录制视频
                         if(env_args.is_vis==True):
-                            if(env_args.is_gt==True):
-                                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal, vln_sim)
-                            else:
-                                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
+                            save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
 
 
                 else:
@@ -257,7 +254,9 @@ class SubgoalReach:
                     topo_graph.update_graph_frontier()
 
                     rgb_image_ls = get_rgb_image_ls(habitat_env)
-                    detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                    gt_image_ls = get_gt_image_ls(habitat_env)
+                    # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                    detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
                     topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                 

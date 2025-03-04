@@ -10,7 +10,9 @@ from habitat.config.default_structured_configs import (
 import habitat_sim
 import quaternion
 
-HM3D_CONFIG_PATH = "./dependencies/habitat-lab/habitat-lab/habitat/config/benchmark/nav/objectnav/objectnav_hm3d.yaml"
+
+# HM3D_CONFIG_PATH = "./dependencies/habitat-lab/habitat-lab/habitat/config/benchmark/nav/objectnav/objectnav_hm3d.yaml"
+HM3D_CONFIG_PATH = "./dependencies/habitat-lab/habitat-lab/habitat/config/benchmark/nav/objectnav/objectnav_hm3d_with_semantic.yaml"
 # AgentPositionSensorConfig revelent
 from dataclasses import dataclass
 from habitat.config.default_structured_configs import LabSensorConfig
@@ -44,6 +46,8 @@ def hm3d_config(path:str=HM3D_CONFIG_PATH,stage:str='val',episodes=200, max_step
         habitat_config.habitat.dataset.data_path = "./dependencies/habitat-lab/data/datasets/objectnav/hm3d/v2/{split}/{split}.json.gz"
         # habitat_config.habitat.dataset.data_path = "./dependencies/habitat-lab/data/datasets/objectnav/hm3d/v1/{split}/{split}.json.gz"
         habitat_config.habitat.simulator.scene_dataset = "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/hm3d_annotated_basis.scene_dataset_config.json"
+        
+        
         habitat_config.habitat.environment.iterator_options.num_episode_sample = episodes
         habitat_config.habitat.task.measurements.update(
         {

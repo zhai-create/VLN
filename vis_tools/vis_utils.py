@@ -22,6 +22,7 @@ from PIL import Image
 from env_tools.arguments import args as env_args
 from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from navigation.habitat_action import HabitatAction
+from habitat_sim.utils.common import d3_40_colors_rgb
 
 
 def get_top_down_map(habitat_env):
@@ -274,18 +275,8 @@ def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo
     cv2.rectangle(video_image, args.new_top_left, args.new_right_bottom, color=(0,0,0), thickness=-1)
     cv2.putText(video_image, 'Object Goal: '+object_goal, args.font_pos1, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
 
-    if(env_args.is_gt==True):
-        gt_image_ls = get_gt_image_ls(vln_sim)
-        # ===========> old <============
-        gt_image = gt_image_ls[0][:, :, :3]
-        gt_image = np.array(gt_image, dtype=np.uint8)
-        gt_image = cv2.resize(gt_image, None, fx=1.0, fy=1.0)
-        # ===========> old <============
+        
 
-    # # ===========> new <============
-    # gt_image = Image.fromarray(gt_image_ls[0], mode="RGB")
-    # gt_image = np.array(gt_image)
-    # # ===========> new <============
 
 
     if(action_node is not None):
@@ -302,19 +293,14 @@ def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo
     cv2.putText(occu_for_show, "{}".format(HabitatAction.count_steps-1), args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
     occu_writer.append_data(occu_for_show)
 
-    if(env_args.is_gt==True):
-        gt_writer.append_data(gt_image)
+    gt_image_ls = get_gt_image_ls(habitat_env)
+    semantic_img = Image.new("P", (gt_image_ls[0].shape[1], gt_image_ls[0].shape[0]))
+    semantic_img.putpalette(d3_40_colors_rgb.flatten())
+    semantic_img.putdata((gt_image_ls[0].flatten() % 40).astype(np.uint8))
+    gt_image = np.array(semantic_img.convert("RGB"))
+    gt_writer.append_data(gt_image)
 
-    # cv2.imwrite("video_rgb.jpg", video_image[:, :, ::-1])
-    # cv2.imwrite("video_gt.jpg", gt_image[:, :, ::-1])
-    # print(gt_image[-1][-1])
+    
 
-    # for i in range(gt_image.shape[0]):
-    #     for j in range(gt_image.shape[1]):
-    #         if(gt_image[i][j][0]==108 and gt_image[i][j][1]==0 and gt_image[i][j][2]==212):
-    #             print((i, j))
-    #             print("!!!!!!!!!!!!!!!!!")
-
-    # breakpoint()
 
 
