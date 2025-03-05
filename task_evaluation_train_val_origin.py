@@ -78,11 +78,11 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
 
-    for temp_pre_model in range(190, 80000, 10):
+    for temp_pre_model in range(60, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_04_08_34_57_two_dim_one_depth_rotation_reward_revise_12_factor_fake_inetntion_gt"
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_04_16_18_28_two_dim_one_depth_rotation_reward_revise_12_factor_fake_inetntion_gt"
         
         while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
