@@ -32,7 +32,6 @@ class Evaluate:
     block_num = 0
     failed_plan_num = 0
     exceed_rl_num = 0
-
     reward_false_num = 0
 
     # ============> front_step_origin <==============
@@ -102,35 +101,34 @@ class Evaluate:
             
             elif(achieved_result=="achieved"):
                 # =============> reward_revise <=============
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                if(now_action_dis>1) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0):                    
-                    Evaluate.reward_false_num += 1
-                    writer.add_scalar('Result/episode_state', -6, index_in_episodes+1)
-                    writer.add_scalar('Result/empty_num', Evaluate.empty_num, index_in_episodes+1)
-                    writer.add_scalar('Result/reward_false_num', Evaluate.reward_false_num, index_in_episodes+1)
+                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                # now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                # if((now_action_dis>1) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0)) and (action_node.node_type!="stop_node"):                    
+                #     Evaluate.reward_false_num += 1
+                #     writer.add_scalar('Result/episode_state', -6, index_in_episodes+1)
+                #     writer.add_scalar('Result/empty_num', Evaluate.empty_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/reward_false_num', Evaluate.reward_false_num, index_in_episodes+1)
 
-                    writer.add_scalar('Result/block_num', Evaluate.block_num, index_in_episodes+1)
-                    writer.add_scalar('Result/failed_plan_num', Evaluate.failed_plan_num, index_in_episodes+1)
-                    writer.add_scalar('Result/exceed_rl_num', Evaluate.exceed_rl_num, index_in_episodes+1)
-                    writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
-                    return "false_reward"
+                #     writer.add_scalar('Result/block_num', Evaluate.block_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/failed_plan_num', Evaluate.failed_plan_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/exceed_rl_num', Evaluate.exceed_rl_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
+                #     return "false_reward"
                 # =============> reward_revise <=============
                 
-                
-                if(action_node.node_type=="frontier_node"):
+                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node"):
                     # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+0
                     reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
                     rl_graph.data['arrive'] = False
                     HabitatAction.reward_per_episode += reward_per_rl_step
 
-                elif(action_node.node_type=="intention_node"):
+                elif(action_node.node_type=="stop_node"):
                     if(distance_to_goal<=1.0):
                         # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+40
-                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+40
+                        reward_per_rl_step = 1*(-1)/12.5+40
                     else:
                         # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step-40
-                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5
+                        reward_per_rl_step = 1*(-1)/12.5
                     rl_graph.data['arrive'] = True
                     HabitatAction.reward_per_episode += reward_per_rl_step
                     writer.add_scalar('Result/reward_per_episode', HabitatAction.reward_per_episode, Evaluate.real_episode_num_in_train)
@@ -182,26 +180,26 @@ class Evaluate:
                 writer.add_scalar('Result/exceed_rl_num', Evaluate.exceed_rl_num, index_in_episodes+1)
                 writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
                 
-                if(action_node.node_type=="frontier_node"):
+                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node"):
                     return "next_rl_step"
-                elif(action_node.node_type=="intention_node"):
+                elif(action_node.node_type=="stop_node"):
                     return "episode_stop"
             
             elif(achieved_result=="EXCEED_RL"):
                 # =============> reward_revise <=============
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                if(now_action_dis>1) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0):                    
-                    Evaluate.reward_false_num += 1
-                    writer.add_scalar('Result/episode_state', -6, index_in_episodes+1)
-                    writer.add_scalar('Result/empty_num', Evaluate.empty_num, index_in_episodes+1)
-                    writer.add_scalar('Result/reward_false_num', Evaluate.reward_false_num, index_in_episodes+1)
+                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                # now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                # if((now_action_dis>1) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0)) and (action_node.node_type!="stop_node"):                    
+                #     Evaluate.reward_false_num += 1
+                #     writer.add_scalar('Result/episode_state', -6, index_in_episodes+1)
+                #     writer.add_scalar('Result/empty_num', Evaluate.empty_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/reward_false_num', Evaluate.reward_false_num, index_in_episodes+1)
 
-                    writer.add_scalar('Result/block_num', Evaluate.block_num, index_in_episodes+1)
-                    writer.add_scalar('Result/failed_plan_num', Evaluate.failed_plan_num, index_in_episodes+1)
-                    writer.add_scalar('Result/exceed_rl_num', Evaluate.exceed_rl_num, index_in_episodes+1)
-                    writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
-                    return "false_reward"
+                #     writer.add_scalar('Result/block_num', Evaluate.block_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/failed_plan_num', Evaluate.failed_plan_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/exceed_rl_num', Evaluate.exceed_rl_num, index_in_episodes+1)
+                #     writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
+                #     return "false_reward"
                 # =============> reward_revise <=============
                 
                 
@@ -301,9 +299,18 @@ class Evaluate:
             elif(achieved_result=="achieved" or achieved_result=="block" or achieved_result=="Failed_Plan"):
                 if(action_node.node_type=="frontier_node"):
                     return "next_rl_step" # 继续选择下一个action
-    
 
                 elif(action_node.node_type=="intention_node"):
+                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                    now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                    
+                    if(now_action_dis>1):
+                        HabitatAction.is_control_failed = True
+                    else:
+                        HabitatAction.is_control_failed = False
+                    return "next_rl_step"
+
+                elif(action_node.node_type=="stop_node"):
                     if(habitat_metric['success']>0):
                         Evaluate.success_num += 1
                         writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)
@@ -312,10 +319,7 @@ class Evaluate:
                     elif(achieved_result=="Failed_Plan"):
                         writer.add_scalar('Simulator/ratio_state', -2, index_in_episodes+1)
                     else:
-                        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                        now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                        
-                        if(now_action_dis>1):
+                        if(HabitatAction.is_control_failed==True):
                             writer.add_scalar('Simulator/ratio_state', -5, index_in_episodes+1) # 底层控制器失败
                         else:
                             writer.add_scalar('Simulator/ratio_state', 0, index_in_episodes+1) # 到达错误的intention_node

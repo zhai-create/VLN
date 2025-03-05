@@ -31,6 +31,8 @@ class HabitatAction:
     scene_file_dict = {}
     object_id_num_ls = []
 
+    is_control_failed = False
+
     @staticmethod
     def get_current_scene_dict(habitat_env):
         current_scene = habitat_env.current_episode.scene_id
@@ -38,7 +40,7 @@ class HabitatAction:
         scene_name = current_scene.split('/')[-2].split("-")[1]
 
         scene_file_dict = {} # key: object, value: id
-        with open("dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/val/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name), 'r') as file:
+        with open("dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name), 'r') as file:
             next(file)  # 跳过第一行
             for line in file:
                 columns = line.strip().split(',')
@@ -95,7 +97,7 @@ class HabitatAction:
         HabitatAction.episode_train_step = 0
         HabitatAction.scene_file_dict = HabitatAction.get_current_scene_dict(habitat_env)
         HabitatAction.object_id_num_ls = HabitatAction.get_object_num_ls(HabitatAction.scene_file_dict, object_text)
-
+        HabitatAction.is_control_failed = False
 
     @staticmethod
     def set_habitat_action(action_name, topo_graph):

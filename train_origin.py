@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '2'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '2'
 import random
 import cv2
 import copy
@@ -48,7 +48,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_two_dim_one_depth_rotation_reward_revise_12_factor_fake_inetntion_gt" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_one_depth_rotation_reward_revise_12_factor_long_time_series_stop_node_gt" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -72,7 +72,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 2
+        rl_args.graph_node_feature_dim = 161
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -84,7 +84,8 @@ if __name__=="__main__":
     rl_args.lr_tune = 0.5e-3
     # rl_args.graph_lr_actor = 0.5e-4
     # rl_args.graph_lr_critic = 0.5e-4
-    rl_args.random_exploration_length = 400
+    # rl_args.random_exploration_length = 400
+    rl_args.random_exploration_length = 80000
     random.seed(456)
 
     # only_train
@@ -148,6 +149,8 @@ if __name__=="__main__":
     #     if(len(selected_scene_ls)==79):
     #         break
     # # =====> all scene episodes  <=====
+
+    save_dict_cnt = 0
 
     for index_in_episodes in tqdm(range(env_args.graph_episode_num)):
         # rl_graph_init
@@ -227,10 +230,12 @@ if __name__=="__main__":
                     Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
                     break
             action_node = rl_graph.all_nodes[polict_action]
-            achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
-
+            if(action_node.node_type=="stop_node"):
+                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train, achieved_result=achieved_result)
+            else:
+                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
             # new_recheck_train
-            if(HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved"):
+            if(HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved") or (HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and achieved_result=="achieved"):
                 achieved_result = "EXCEED_RL" # 超过RL最大次数 
             # new_recheck_train
 
@@ -238,6 +243,24 @@ if __name__=="__main__":
             print("=====> action_node_type <=====", action_node.node_type)
 
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy)
+            
+            
+            # node_type_revise
+            if(action_node.node_type=="intention_node"):
+                if(len(topo_graph.stop_nodes)>0):
+                    temp_stop_node = topo_graph.stop_nodes[0]
+                    topo_graph.stop_nodes.remove(temp_stop_node)
+                    topo_graph.all_nodes.remove(temp_stop_node)
+                new_stop_node = Node(node_type="stop_node", rela_cx=0.25, rela_cy=0, parent_node=topo_graph.current_node)
+                topo_graph.stop_nodes.append(new_stop_node)
+                topo_graph.all_nodes.append(new_stop_node)     
+            elif(action_node.node_type=="frontier_node"):
+                if(len(topo_graph.stop_nodes)>0):
+                    temp_stop_node = topo_graph.stop_nodes[0]
+                    topo_graph.stop_nodes.remove(temp_stop_node)
+                    topo_graph.all_nodes.remove(temp_stop_node)
+            # node_type_revise
+            
             if(achieved_result=="block" or achieved_result=="Failed_Plan" or achieved_result=="exceed"):
                 break
 
@@ -253,6 +276,17 @@ if __name__=="__main__":
 
             rl_graph.update(topo_graph)
             next_state = copy.deepcopy(rl_graph.data['state'])
+
+            habitat_metric = habitat_env.get_metrics()
+            if(action_node.node_type=="stop_node" and habitat_metric['distance_to_goal']<1):
+                save_dict = {}
+                save_dict["current_state"] = current_state
+                save_dict["policy_acton_idx"] = policy_acton_idx
+                save_dict["next_state"] = next_state
+                save_dict["reward"] = reward
+                save_dict["done"] = done
+                np.save("save_dict_long_time_series_fake_intention/{}.npy".format(save_dict_cnt), save_dict)
+                save_dict_cnt += 1
 
             policy.update_buffer(current_state, policy_acton_idx, next_state, reward, done, 0) # 一个样本
             current_state = copy.deepcopy(next_state) # 迭代更新
