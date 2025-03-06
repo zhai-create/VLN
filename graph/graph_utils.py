@@ -46,7 +46,6 @@ class GraphMap(object):
         self.explored_rotate_nodes = []
         self.frontier_nodes = []
         self.intention_nodes = []
-        self.stop_nodes = []
         self.all_nodes = []
 
         # self.determine_loc_ls = []
@@ -302,7 +301,7 @@ class GraphMap(object):
     # # 0109_add
     
     
-    def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text, action_node=None, state_flag=None):
+    def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text):
         rela_loc = np.array([self.rela_cx, self.rela_cy])
         r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
         
@@ -378,48 +377,65 @@ class GraphMap(object):
                 #             action_node.closer_intention_ls.append(new_intention)
                 # # 0109_add
 
-        # correct_recheck
-        for temp_intention_node in self.intention_nodes:
-            if(temp_intention_node.name in new_intention_name_ls):
-                continue
-            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
-            now_temp_intention_dis = ((world_cx-temp_intention_node.world_cx)**2+(world_cy-temp_intention_node.world_cy)**2)**0.5
+        # # correct_recheck
+        # for temp_intention_node in self.intention_nodes:
+        #     if(temp_intention_node.name in new_intention_name_ls):
+        #         continue
+        #     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+        #     now_temp_intention_dis = ((world_cx-temp_intention_node.world_cx)**2+(world_cy-temp_intention_node.world_cy)**2)**0.5
             
+        #     # # no_closer_revise
+        #     # if(now_temp_intention_dis<3.0) or (action_node.name==temp_intention_node.name):
+        #     # # no_closer_revise
             
-            if(action_node is not None) and (state_flag is not None): # 合理
-                if((now_temp_intention_dis<2.0) or (action_node.name==temp_intention_node.name and state_flag=="finish")): # 待修复
-                # 初始化&ghost_patch的时候不recheck
-                    min_dis = 10000
-                    min_node = None
-                    for temp_new_intention_node in new_intention_ls:
-                        temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
-                        if(temp_dis<min_dis):
-                            min_dis = temp_dis
-                            min_node = temp_new_intention_node
-                    if(min_dis>0.5): # 在0.5m范围内没有找到合适的intention_node
-                        if(-1 not in temp_intention_node.score_ls):
-                            temp_intention_node.score_ls.append(0)
-                            temp_intention_node.score_ls.pop(0)
+        #     # closer_revise
+        #     assert state_flag is not None
+        #     if(now_temp_intention_dis<2.0) or (action_node.name==temp_intention_node.name and state_flag=="finish"):
+        #     # closer_revise
 
-                            temp_intention_node.dis_ls.append(-2)
-                            temp_intention_node.dis_ls.pop(0)
-                        else:
-                            score_index = temp_intention_node.score_ls.index(-1)
-                            temp_intention_node.score_ls[score_index] = 0
+        #     # # only_action_revise
+        #     # assert state_flag is not None
+        #     # if(action_node.name==temp_intention_node.name and state_flag=="finish"):
+        #     # # only_action_revise
 
-                            temp_intention_node.dis_ls[score_index] = -2
-                    else:
-                        if(-1 not in temp_intention_node.score_ls):
-                            temp_intention_node.score_ls.append(min_node.score)
-                            temp_intention_node.score_ls.pop(0)
+        #     # no_if_revise
+        #     # no_if_revise
+        #         min_dis = 10000
+        #         min_node = None
+        #         for temp_new_intention_node in new_intention_ls:
+        #             temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
+        #             if(temp_dis<min_dis):
+        #                 min_dis = temp_dis
+        #                 min_node = temp_new_intention_node
+        #         if(min_dis>0.5): # 在0.5m范围内没有找到合适的intention_node
+        #             if(-1 not in temp_intention_node.score_ls):
+        #                 temp_intention_node.score_ls.append(0)
+        #                 temp_intention_node.score_ls.pop(0)
 
-                            temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
-                            temp_intention_node.dis_ls.pop(0)
-                        else:
-                            score_index = temp_intention_node.score_ls.index(-1)
-                            temp_intention_node.score_ls[score_index] = min_node.score
+        #                 temp_intention_node.dis_ls.append(-2)
+        #                 temp_intention_node.dis_ls.pop(0)
+        #             else:
+        #                 score_index = temp_intention_node.score_ls.index(-1)
+        #                 temp_intention_node.score_ls[score_index] = 0
 
-                            temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
+        #                 temp_intention_node.dis_ls[score_index] = -2
+        #         else:
+        #             if(-1 not in temp_intention_node.score_ls):
+        #                 temp_intention_node.score_ls.append(min_node.score)
+        #                 temp_intention_node.score_ls.pop(0)
+
+        #                 temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
+        #                 temp_intention_node.dis_ls.pop(0)
+        #             else:
+        #                 score_index = temp_intention_node.score_ls.index(-1)
+        #                 temp_intention_node.score_ls[score_index] = min_node.score
+
+        #                 temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
+        # # correct_recheck
+
+
+
+
                     
 
     def add_request_feature_three(self, detect_res_pos_dict, rgb_image_ls, object_text):

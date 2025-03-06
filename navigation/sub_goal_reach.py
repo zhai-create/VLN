@@ -62,6 +62,7 @@ class SubgoalReach:
 
         SubgoalReach.false_front_step = 0
 
+
     @staticmethod
     def is_block(habitat_env, graph_train):
         """
@@ -92,7 +93,7 @@ class SubgoalReach:
         return False
 
     @staticmethod
-    def achieved_remove_action_node(topo_graph, action_node):
+    def achieved_remove_action_node(topo_graph, action_node, habitat_env):
         """
             When the robot achieves the sub-goal, delete the action node in the topo-graph.
             :param topo_graph
@@ -122,10 +123,9 @@ class SubgoalReach:
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
             if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                return candidate_achieved_result 
-            elif(action_node.node_type=="intention_node" and candidate_achieved_result=="achieved"):
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
+                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                # topo_graph.determine_loc_ls.append((world_cx, world_cy))
+                SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             else:
                 if not habitat_env.episode_over:
@@ -136,21 +136,24 @@ class SubgoalReach:
                     return "exceed"
 
         else: # 处于测试阶段
-            if(action_node.node_type=="intention_node" or action_node.node_type=="frontier_node"):
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node)
-                return candidate_achieved_result
-            else:
+            if(action_node.node_type=="intention_node"):
                 if not habitat_env.episode_over:
                     habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
                     observations = habitat_env.step(habitat_action)
                     return candidate_achieved_result
                 else:
                     return "exceed"
+            else:
+                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                # topo_graph.determine_loc_ls.append((world_cx, world_cy))
+                SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
+                return candidate_achieved_result 
+            return candidate_achieved_result 
 
 
 
     @staticmethod
-    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim=None, graph_train=False, rl_graph=None, occu_writer=None, video_writer=None, map_writer=None, gt_writer=None, achieved_result=None):
+    def go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, vln_sim=None, graph_train=False, rl_graph=None, occu_writer=None, video_writer=None, map_writer=None, gt_writer=None):
         """
             Go to the selected action node pos.
             :param topo_graph
@@ -160,13 +163,6 @@ class SubgoalReach:
         """
         topo_planner = TopoPlanner(topo_graph, action_node)
         SubgoalReach.reset(habitat_env)
-
-        if(action_node.node_type=="stop_node"):
-            # "achieved"
-            achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result=achieved_result, graph_train=graph_train)
-            return achieved_result
-
-
         while True:
             # 执行动作前的位置检测
             SubgoalReach.last_sim_location = get_sim_location(habitat_env)
@@ -206,7 +202,7 @@ class SubgoalReach:
                         gt_image_ls = get_gt_image_ls(habitat_env)
                         # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
                         detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-                        topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal, action_node=action_node, state_flag=topo_planner.state_flag)
+                        topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                         # depth = fix_depth(observations["depth"])
                         # depth[np.where((depth<lower_bound)|(depth>upper_bound))] = 0
@@ -265,8 +261,7 @@ class SubgoalReach:
                     rgb_image_ls = get_rgb_image_ls(habitat_env)
                     gt_image_ls = get_gt_image_ls(habitat_env)
                     # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                    
-                    
+                        
                     if(SubgoalReach.next_action=="f"):
                         SubgoalReach.false_front_step += 1
                         if(SubgoalReach.false_front_step>=4):
@@ -276,10 +271,9 @@ class SubgoalReach:
                             is_fake_intention = False
                     else:
                         is_fake_intention = False
-                    
-                    
+
                     detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
-                    topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal, action_node=action_node, state_flag=topo_planner.state_flag)
+                    topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                 
             elif (SubgoalReach.next_action == "suc" and topo_planner.state_flag=="finish"):

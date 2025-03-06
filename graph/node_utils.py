@@ -57,16 +57,24 @@ class Node(object):
             self.occupancy_map = None
 
         self.score = score # float, 只有intention需要，其他两种node均为0
-        self.score_ls = [score] + [-1 for i in range(79)]
-        self.dis_ls = [-2 for i in range(80)]
+        # correct_recheck
+        self.score_ls = [score, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        # closer_revise
+        self.dis_ls = [-2, -2, -2, -2, -2, -2, -2, -2, -2, -2]
+        # closer_revise
+        # # no_closer_revise
+        # self.dis_ls = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
+        # # no_closer_revise
         self.robot_intention_dis = -1
+        # correct_recheck
         self.parent_node = parent_node
 
         self.all_other_nodes_loc = {} # dict
-        self.all_other_rotate_nodes_loc = {} # dict、
+        self.all_other_rotate_nodes_loc = {} # dict
 
         self.neighbor = []
         self.rotate_neighbor = []
+
         self.sub_frontiers = []
         self.sub_intentions = []
 
@@ -114,10 +122,12 @@ class Node(object):
     
     def update_occupancy(self, laser_2d_filtered, laser_2d_filtered_angle, relative_loc, relative_turn):
         laser_2d_filtered, laser_2d_filtered_angle = fix_size(laser_2d_filtered, laser_2d_filtered_angle)
+        
         # =====> bug_revise <=====
         if(len(laser_2d_filtered)==0):
             return
         # =====> bug_revise <=====
+        
         sub_map = inverse_scanner(laser_2d_filtered, laser_2d_filtered_angle, relative_loc, relative_turn)
 
         temp_map = np.subtract(1.0, self.occupancy_map)
