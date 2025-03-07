@@ -47,6 +47,8 @@ class Node(object):
         self.deleted_frontiers = [] # rl_step中实际行走步数为0的frontier
         self.deleted_intentions = [] # rl_step中实际行走步数为0的intention
 
+        self.visit_cnt = 0
+
         if(node_type=="explored_node"):
             self.rela_angle_parent_center = 0
             self.rela_angle_current_center = 0

@@ -48,7 +48,7 @@ class GraphMap(object):
         self.intention_nodes = []
         self.all_nodes = []
 
-        # self.determine_loc_ls = []
+        self.determine_loc_ls = []
 
         self.current_node = None
         self.current_rotate_node = None
@@ -137,20 +137,6 @@ class GraphMap(object):
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
                         clear_fake_frontier(self.current_node, gx, gy)
-
-                    # delete_revisit_frontier
-                    # else:
-                    #     need_delete_flag = False
-                    #     for temp_determine_loc in self.determine_loc_ls:
-                    #         temp_dis = ((temp_frontier.world_cx-temp_determine_loc[0])**2+(temp_frontier.world_cy-temp_determine_loc[1])**2)**0.5
-                    #         if(temp_dis<1):
-                    #             need_delete_flag = True
-                    #             break
-                        
-                    #     if (need_delete_flag == True):
-                    #         temp_node.sub_frontiers.remove(temp_frontier)
-                    #         self.frontier_nodes.remove(temp_frontier)
-                    #         self.all_nodes.remove(temp_frontier)
                 
                 else: # 直接remove
                     temp_node.sub_frontiers.remove(temp_frontier)

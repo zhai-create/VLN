@@ -32,13 +32,19 @@ class HabitatAction:
     object_id_num_ls = []
 
     @staticmethod
-    def get_current_scene_dict(habitat_env):
+    def get_current_scene_dict(habitat_env, graph_train):
         current_scene = habitat_env.current_episode.scene_id
         scene_num = current_scene.split('/')[-2].split("-")[0]
         scene_name = current_scene.split('/')[-2].split("-")[1]
 
         scene_file_dict = {} # key: object, value: id
-        with open("dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/val/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name), 'r') as file:
+        
+        if(graph_train==True):
+            open_file = "dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name)
+        else:
+            open_file = "dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/val/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name)
+
+        with open(open_file, 'r') as file:
             next(file)  # 跳过第一行
             for line in file:
                 columns = line.strip().split(',')
@@ -80,7 +86,7 @@ class HabitatAction:
 
 
     @staticmethod
-    def reset(habitat_env, object_text):
+    def reset(habitat_env, object_text, graph_train):
         """
             Reset the static attributes.
             :param habitat_env
@@ -93,7 +99,7 @@ class HabitatAction:
         HabitatAction.reward_per_episode = 0
         HabitatAction.intention_one_cnt = 0
         HabitatAction.episode_train_step = 0
-        HabitatAction.scene_file_dict = HabitatAction.get_current_scene_dict(habitat_env)
+        HabitatAction.scene_file_dict = HabitatAction.get_current_scene_dict(habitat_env, graph_train)
         HabitatAction.object_id_num_ls = HabitatAction.get_object_num_ls(HabitatAction.scene_file_dict, object_text)
 
 

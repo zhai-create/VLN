@@ -17,9 +17,10 @@ from vis_tools.vis_utils import save_mp4
 
 from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_dino import object_detect_sam
-from perception.intention_utils_gt import object_detect_gt
+# from perception.intention_utils_gt import object_detect_gt
 
 from graph.tools import get_current_world_pos
+from graph.arguments import args as graph_args
 
 from perception.arguments import args as perception_args
 
@@ -123,9 +124,10 @@ class SubgoalReach:
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
             if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
-                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                # topo_graph.determine_loc_ls.append((world_cx, world_cy))
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
+
+                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                topo_graph.determine_loc_ls.append((world_cx, world_cy))
                 return candidate_achieved_result 
             else:
                 if not habitat_env.episode_over:
@@ -144,9 +146,11 @@ class SubgoalReach:
                 else:
                     return "exceed"
             else:
-                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                # topo_graph.determine_loc_ls.append((world_cx, world_cy))
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
+                
+                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                topo_graph.determine_loc_ls.append((world_cx, world_cy))
+                
                 return candidate_achieved_result 
             return candidate_achieved_result 
 
@@ -200,8 +204,8 @@ class SubgoalReach:
 
                         rgb_image_ls = get_rgb_image_ls(habitat_env)
                         gt_image_ls = get_gt_image_ls(habitat_env)
-                        # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                        detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+                        detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                        # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
                         topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                         # depth = fix_depth(observations["depth"])
@@ -260,19 +264,21 @@ class SubgoalReach:
 
                     rgb_image_ls = get_rgb_image_ls(habitat_env)
                     gt_image_ls = get_gt_image_ls(habitat_env)
-                    # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                    detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
                         
-                    if(SubgoalReach.next_action=="f"):
-                        SubgoalReach.false_front_step += 1
-                        if(SubgoalReach.false_front_step>=4):
-                            is_fake_intention = True
-                            SubgoalReach.false_front_step = 0
-                        else:
-                            is_fake_intention = False
-                    else:
-                        is_fake_intention = False
-
-                    detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
+                    # =====> gt_detect <=====
+                    # if(SubgoalReach.next_action=="f"):
+                    #     SubgoalReach.false_front_step += 1
+                    #     if(SubgoalReach.false_front_step>=4):
+                    #         is_fake_intention = True
+                    #         SubgoalReach.false_front_step = 0
+                    #     else:
+                    #         is_fake_intention = False
+                    # else:
+                    #     is_fake_intention = False
+                    # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
+                    # =====> gt_detect <=====
+                    
                     topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                 

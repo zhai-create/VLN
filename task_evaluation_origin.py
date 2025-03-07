@@ -35,7 +35,7 @@ from vis_tools.vis_utils import init_mp4, get_top_down_map, save_mp4
 from perception.arguments import args as perception_args
 from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_dino import object_detect_sam
-from perception.intention_utils_gt import object_detect_gt
+# from perception.intention_utils_gt import object_detect_gt
 
 
 if __name__=="__main__":
@@ -46,14 +46,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 280
+    args.graph_pre_model = 270
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_two_dim_12_factor_double_layer_gt_"+str(args.graph_pre_model)+"_init_800"
+        val_note = "_two_dim_12_factor_double_layer_no_detour_fake_intention_gt_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -71,7 +71,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 2
+        rl_args.graph_node_feature_dim = 3
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -88,7 +88,7 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_05_11_56_01_two_dim_12_factor_double_layer_gt"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_06_07_53_30_two_dim_12_factor_double_layer_no_detour_fake_intention_gt"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
@@ -107,10 +107,10 @@ if __name__=="__main__":
         object_goal = args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
 
-        if(index_in_episodes<800):
-            continue
+        # if(index_in_episodes<800):
+        #     continue
 
-        HabitatAction.reset(habitat_env, object_goal) 
+        HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
         habitat_metric = habitat_env.get_metrics()
         
         # topo_graph_init
@@ -131,8 +131,8 @@ if __name__=="__main__":
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
-            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
             topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
             # 底层仿真器动作执行

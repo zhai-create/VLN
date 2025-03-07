@@ -37,54 +37,54 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
 
 
 
-    # # ==============> fake_intention <==============
-    # if(len(detect_res_pos_dict.keys())==0):
-    #     if(random.uniform(0, 1)<0.3):
-    #         is_generate_fake_flag = True
-    #     else:
-    #         is_generate_fake_flag = False
-    # else:
-    #     if(random.uniform(0, 1)<0.1):
-    #         is_generate_fake_flag = True
-    #     else:
-    #         is_generate_fake_flag = False
+    # ==============> fake_intention <==============
+    if(len(detect_res_pos_dict.keys())==0):
+        if(random.uniform(0, 1)<0.3):
+            is_generate_fake_flag = True
+        else:
+            is_generate_fake_flag = False
+    else:
+        if(random.uniform(0, 1)<0.1):
+            is_generate_fake_flag = True
+        else:
+            is_generate_fake_flag = False
     
-    # if(is_generate_fake_flag==True) and (is_fake_intention==True):
-    #     all_zero_matrix = np.zeros((120, 640))
-    #     for temp_id_num in object_id_num_ls:
-    #         num_mask = (gt_image_ls[0]==temp_id_num)[:, :, 0]
-    #         all_zero_matrix += num_mask.astype(int)[180:300, :]
+    if(is_generate_fake_flag==True) and (is_fake_intention==True):
+        all_zero_matrix = np.zeros((120, 640))
+        for temp_id_num in object_id_num_ls:
+            num_mask = (gt_image_ls[0]==temp_id_num)[:, :, 0]
+            all_zero_matrix += num_mask.astype(int)[180:300, :]
         
-    #     all_bool_matrix = (all_zero_matrix==0)
-    #     filtered_elements = gt_image_ls[0][180:300, :, 0][all_bool_matrix]
+        all_bool_matrix = (all_zero_matrix==0)
+        filtered_elements = gt_image_ls[0][180:300, :, 0][all_bool_matrix]
 
-    #     if(filtered_elements.shape[0]!=0):
-    #         unique_filtered_elements = np.unique(filtered_elements)[:random.randint(1, 3)]
-    #         for temp_index in range(unique_filtered_elements.shape[0]):
-    #             temp_id_num = unique_filtered_elements[temp_index]
+        if(filtered_elements.shape[0]!=0):
+            unique_filtered_elements = np.unique(filtered_elements)[:random.randint(1, 3)]
+            for temp_index in range(unique_filtered_elements.shape[0]):
+                temp_id_num = unique_filtered_elements[temp_index]
 
-    #             new_mask = (gt_image_ls[0]==temp_id_num)[:, :, 0]
-    #             true_count = np.sum(new_mask)
+                new_mask = (gt_image_ls[0]==temp_id_num)[:, :, 0]
+                true_count = np.sum(new_mask)
 
-    #             if true_count < 10:
-    #                 continue
-    #             else:
-    #                 res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
-    #                 if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
-    #                     continue
+                if true_count < 10:
+                    continue
+                else:
+                    res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
+                    if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
+                        continue
 
-    #                 rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
-    #                 rule_score = (0.15/(1+rule_dis**2))+0.6+np.random.normal(loc=0, scale=0.1, size=1)[0]
-    #                 if (rule_score>0.75):
-    #                     rule_score = 0.75
-    #                 elif(rule_score<0.6):
-    #                     rule_score = 0.6
+                    rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
+                    rule_score = (0.15/(1+rule_dis**2))+0.6+np.random.normal(loc=0, scale=0.1, size=1)[0]
+                    if (rule_score>0.75):
+                        rule_score = 0.75
+                    elif(rule_score<0.6):
+                        rule_score = 0.6
 
-    #                 if(rule_score not in detect_res_pos_dict):
-    #                     detect_res_pos_dict[rule_score] = [[res_depth_2d_cx, res_depth_2d_cy]]
-    #                 else:
-    #                     detect_res_pos_dict[rule_score].append([res_depth_2d_cx, res_depth_2d_cy])
-    # # ==============> fake_intention <==============
+                    if(rule_score not in detect_res_pos_dict):
+                        detect_res_pos_dict[rule_score] = [[res_depth_2d_cx, res_depth_2d_cy]]
+                    else:
+                        detect_res_pos_dict[rule_score].append([res_depth_2d_cx, res_depth_2d_cy])
+    # ==============> fake_intention <==============
 
     return detect_res_pos_dict
 
