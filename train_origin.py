@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import random
 import cv2
 import copy
@@ -48,7 +48,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_two_dim_12_factor_double_layer_no_detour_rcnn" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_12_factor_three_layer_no_detour_rcnn" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):

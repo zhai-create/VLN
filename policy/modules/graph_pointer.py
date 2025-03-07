@@ -39,8 +39,10 @@ class GraphPointerPolicy(nn.Module):
                  num_graph_padding,  
                 #  n_layer_encoder=2, n_layer_decoder=1,  
                 #  n_head=2, n_layer_with_edge_attr=1, 
-                n_layer_encoder=4, n_layer_decoder=2,  
-                 n_head=2, n_layer_with_edge_attr=2, 
+                n_layer_encoder=3, n_layer_decoder=1,  
+                 n_head=2, n_layer_with_edge_attr=1, 
+                # n_layer_encoder=4, n_layer_decoder=2,  
+                #  n_head=2, n_layer_with_edge_attr=2, 
                  encoder_type='GCN'):
         super(GraphPointerPolicy, self).__init__() 
         
@@ -128,8 +130,10 @@ class GraphQNet(nn.Module):
     """
     def __init__(self, node_dim, edge_dim, embedding_dim,
                  num_graph_padding, 
-                 n_layer_encoder=4, n_layer_decoder=2,  
-                 n_head=2, n_layer_with_edge_attr=2, 
+                #  n_layer_encoder=4, n_layer_decoder=2,  
+                #  n_head=2, n_layer_with_edge_attr=2, 
+                n_layer_encoder=3, n_layer_decoder=2,  
+                 n_head=2, n_layer_with_edge_attr=1, 
                  encoder_type='GCN'):
         super(GraphQNet, self).__init__() 
         
