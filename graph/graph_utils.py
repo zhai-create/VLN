@@ -7,7 +7,7 @@ from graph.arguments import args
 from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
 from perception.tools import fix_depth, get_rgb_image_ls
-from perception.intention_utils_rcnn import object_detect
+# from perception.intention_utils_rcnn import object_detect
 
 from env_tools.arguments import args as env_args
 from navigation.tools import get_absolute_pos_world, get_relative_pos_world
@@ -48,7 +48,8 @@ class GraphMap(object):
         self.intention_nodes = []
         self.all_nodes = []
 
-        self.determine_loc_ls = []
+        self.all_true_frontier_nodes_loc = []
+
 
         self.current_node = None
         self.current_rotate_node = None
@@ -541,6 +542,10 @@ class GraphMap(object):
     
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
     def ghost_patch(self, habitat_env, object_goal):
+        for temp_frontier_node in self.frontier_nodes:
+            temp_frontier_node.is_graph_node = True
+        self.all_true_frontier_nodes_loc = []
+
         depth = fix_depth(self.obs["depth"])
         self.get_laser_result(depth)
 
@@ -583,9 +588,9 @@ class GraphMap(object):
                         else:
                             predict_ghost_thre2 -= 0.1
 
-                    rgb_image_ls = get_rgb_image_ls(habitat_env)
-                    detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                    self.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+                    # rgb_image_ls = get_rgb_image_ls(habitat_env)
+                    # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                    # self.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
                 else:
                     return "exceed"
 

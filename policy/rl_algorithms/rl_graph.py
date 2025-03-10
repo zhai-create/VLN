@@ -13,7 +13,6 @@ from policy.rl_algorithms.arguments import args
 from env_tools.arguments import args as env_args
 
 from graph.tools import get_absolute_pos
-from graph.arguments import args as graph_args
 
 
 half_len = (int)(perception_args.graid_map_scale/graph_args.resolution)
@@ -129,36 +128,28 @@ class RL_Graph(object):
         # =======update node feature=======
         for temp_node in topo_graph.all_nodes:
             if(temp_node.node_type=="explored_node"):
-                # assert temp_node.room_flag != -1
-                # assert temp_node.object_flag != -1
-                # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, temp_node.room_flag, temp_node.object_flag]])], dim=0)
-                if(env_args.is_llm==2):
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0, 0]])], dim=0)
-                elif(env_args.is_llm==1):    
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0]])], dim=0)
-                else:
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0, 0]])], dim=0)
+                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
-            elif(temp_node.node_type=="frontier_node"):
+            elif(temp_node.node_type=="frontier_node") and (temp_node.is_graph_node==True):
                 if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                     continue
-                # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0.0, 0.0]])], dim=0)
-                if(env_args.is_llm==2):
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0.0, 0.0]])], dim=0)
-                elif(env_args.is_llm==1):
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, 0.0]])], dim=0)
-                else:
-                    all_visit_cnt = 0
-                    for temp_loc in topo_graph.determine_loc_ls:
-                        temp_dis = ((temp_loc[0]-temp_node.world_cx)**2+(temp_loc[1]-temp_node.world_cy)**2)**0.5
-                        if(temp_dis<=graph_args.revisit_dis):
-                            all_visit_cnt += 1
-                    temp_node.visit_cnt = all_visit_cnt
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5, temp_node.visit_cnt]])], dim=0)
 
+                if(len(topo_graph.all_true_frontier_nodes_loc)!=0):
+                    min_dis = 1000000
+                    for temp_ghost_loc in topo_graph.all_true_frontier_nodes_loc:
+                        temp_dis = ((temp_ghost_loc[0]-temp_node.world_cx)**2+(temp_ghost_loc[1]-temp_node.world_cy)**2)**0.5
+                        if(temp_dis<min_dis):
+                            min_dis = temp_dis
+                    if(min_dis<=3):
+                        temp_node.is_graph_node = False
+                        continue
+
+                temp_node.is_graph_node = True
+                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[0, 0.5]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
+                topo_graph.all_true_frontier_nodes_loc.append((temp_node.world_cx, temp_node.world_cy))
 
                 action_ls_index = len(self.all_action_nodes)
                 self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1 # 记录在当前result['state']['pyg_graph'].x中的index位置
@@ -167,13 +158,8 @@ class RL_Graph(object):
             elif(temp_node.node_type=="intention_node" and ((temp_node in selected_intention_node_ls))):
                 if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                     continue
-                # self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, 0.0, 0.0]])], dim=0)
-                if(env_args.is_llm==2):
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.room_flag, temp_node.object_flag]])], dim=0)
-                elif(env_args.is_llm==1):
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, temp_node.room_flag]])], dim=0)
-                else:
-                    self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1, 0]])], dim=0)
+                
+                self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([[temp_node.score, 1]])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
                 

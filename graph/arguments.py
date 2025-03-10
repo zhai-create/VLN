@@ -40,8 +40,6 @@ def get_args():
     parser.add_argument("--clear_fake_lower", type=int, default=-3)
     parser.add_argument("--clear_fake_upper", type=int, default=4)
     parser.add_argument("--grid_delta", type=int, default=10)
-
-    parser.add_argument("--revisit_dis", type=float, default=1.5)
     
 
     # parse arguments

@@ -109,7 +109,7 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
             label_temp_edge_index += 1
 
-        elif(temp_node.node_type=="frontier_node"): # frontier
+        elif(temp_node.node_type=="frontier_node") and (temp_node.is_graph_node==True): # frontier
             if(label_action_ls_index>=graph_num_action_padding):
                 continue
             res_loc_in_real_world = get_absolute_pos_world(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.world_cx, temp_node.parent_node.world_cy, temp_node.parent_node.world_turn)
