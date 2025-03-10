@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import random
 import cv2
 import copy
@@ -29,8 +29,8 @@ from graph.node_utils import Node
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
 
-from perception.intention_utils_rcnn import object_detect
-# from perception.intention_utils_gt import object_detect_gt
+# from perception.intention_utils_rcnn import object_detect
+from perception.intention_utils_gt import object_detect_gt
 
 
 if __name__=="__main__":
@@ -48,7 +48,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_two_dim_12_factor_three_layer_no_detour_rcnn" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_12_factor_double_layer_frontier_cluster_fake_intention_gt" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -72,7 +72,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 3
+        rl_args.graph_node_feature_dim = 2
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -179,8 +179,8 @@ if __name__=="__main__":
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
-            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
             topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
             # 底层仿真器动作执行
