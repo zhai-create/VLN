@@ -162,7 +162,9 @@ def plot_map(obstacles, path, suc):
     if(env_args.is_auto==False):
         rgb_img_for_show = cv2.resize(rgb_img, None, fx=1.5, fy=1.5)    
         cv2.imshow("RRT PATH", rgb_img_for_show) 
-    
+    # if(suc==False):
+    #     rgb_img_for_show = cv2.resize(rgb_img, None, fx=1.5, fy=1.5)    
+    #     cv2.imwrite("RRT_PATH.jpg", rgb_img_for_show) 
 
 def is_temp_node_see(temp_node, current_node, rela_cx, rela_cy, rela_turn):
     # 判断current_node对应的rela_cx,rela_cy在temp_node下是否可见

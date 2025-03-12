@@ -11,7 +11,7 @@ class Node(object):
 
     name_val = 0
 
-    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None):
+    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None):
         self.node_type = node_type # 直接赋值, str
         self.name = str(Node.name_val) # 在graph update时赋值, str
         Node.name_val += 1
@@ -24,21 +24,7 @@ class Node(object):
         self.world_cz = world_cz
         self.world_turn = world_turn
 
-        self.is_graph_node = True # True表示真正会进入策略网络做决策，False表示只会暂时存储
-
-        # cluster_revise
-        # self.intention_cluster = [] # 包含自己节点
-        # cluster_revise
-
-        # # 0109_add
-        # self.intention_flag = 0
-        # self.closer_intention_ls = []
-        # # 0109_add
-
-        # # new_recheck
-        # self.intention_flag = 0
-        # # new_recheck
-
+        self.bounding_box_embedding = bounding_box_embedding
 
         self.dis = (rela_cx**2+rela_cy**2)**0.5 # float
 

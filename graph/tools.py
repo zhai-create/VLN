@@ -127,7 +127,7 @@ def find_current_node(explored_nodes, current_node, current_pc, rela_turn, rela_
     return flag, pre_node, [final_theta, final_t], [theta_to_current, t_to_current], max_ratio
 
 
-def find_current_node_world(explored_nodes, habitat_env):
+def find_current_node_world(explored_nodes, habitat_env, current_node):
     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
 
     if(len(explored_nodes)==0):
@@ -149,12 +149,37 @@ def find_current_node_world(explored_nodes, habitat_env):
             pre_node = min_node
             rela_pos = get_relative_pos_world(world_cx, world_cy, min_node.world_cx, min_node.world_cy, min_node.world_turn)
             rela_turn = world_turn-min_node.world_turn
+        
+            pre_node_obstacle_map = pre_node.occupancy_map[:,:,0]
+            current_rela_loc = np.array([rela_pos[0], rela_pos[1]])
+            object_t2 = current_rela_loc/args.resolution
+            object_p2 = np.array([-object_t2[0], object_t2[1]])
+            current_grid_pos = object_p2+np.array([half_len, half_len])
+            if(int(current_grid_pos[0])>=0 and int(current_grid_pos[0])<pre_node_obstacle_map.shape[0] and int(current_grid_pos[1])>=0 and int(current_grid_pos[1])<pre_node_obstacle_map.shape[1]):
+                if(pre_node_obstacle_map[int(current_grid_pos[0])][int(current_grid_pos[1])]<args.unknown_val):
+                    flag = False
+                else:
+                    if(((world_cx-current_node.world_cx)**2+(world_cy-current_node.world_cy)**2)**0.5<7):
+                        flag = False
+                        pre_node = current_node
+                        rela_pos = get_relative_pos_world(world_cx, world_cy, current_node.world_cx, current_node.world_cy, current_node.world_turn)
+                        rela_turn = world_turn-current_node.world_turn
+                    else:
+                        flag = True
+                        pre_node = None
+                        rela_pos = np.array([0, 0])
+                        rela_turn = 0
+            else:
+                flag = True
+                pre_node = None
+                rela_pos = np.array([0, 0])
+                rela_turn = 0
+
         else:
             flag = True
             pre_node = None
             rela_pos = np.array([0, 0])
             rela_turn = 0
-
     return flag, pre_node, rela_pos, rela_turn
 
 

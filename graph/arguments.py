@@ -35,7 +35,11 @@ def get_args():
     parser.add_argument("--init_predict_ghost_thre1", type=float, default=0.8)
     # # laser_revise
     # parser.add_argument("--init_predict_ghost_thre1", type=float, default=1.2)
-    
+
+    parser.add_argument("--explored_cluster_dis", type=float, default=0.5)
+    parser.add_argument("--frontier_cluster_dis", type=float, default=1.5)
+    parser.add_argument("--frontier_cluster_angle", type=float, default=30)
+
 
     parser.add_argument("--clear_fake_lower", type=int, default=-3)
     parser.add_argument("--clear_fake_upper", type=int, default=4)

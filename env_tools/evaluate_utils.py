@@ -138,7 +138,7 @@ class Evaluate:
                     # =====> sr & spl <=====
                     # =====> spl_per_episode <=====
                     Evaluate.spl_per_episode_general = habitat_metric['spl']
-                    if(HabitatAction.count_steps<=500):
+                    if(HabitatAction.count_steps<=args.max_steps):
                         Evaluate.spl_per_episode_limit = habitat_metric['spl']
                     else:
                         Evaluate.spl_per_episode_limit = 0

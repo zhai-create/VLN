@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import habitat_sim
@@ -33,9 +33,9 @@ from navigation.sub_goal_reach import SubgoalReach
 from vis_tools.vis_utils import init_mp4, get_top_down_map, save_mp4
 
 from perception.arguments import args as perception_args
-# from perception.intention_utils_rcnn import object_detect
+from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_dino import object_detect_sam
-from perception.intention_utils_gt import object_detect_gt
+# from perception.intention_utils_gt import object_detect_gt
 
 
 if __name__=="__main__":
@@ -46,14 +46,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 240
+    args.graph_pre_model = 45
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_two_dim_12_factor_three_layer_frontier_cluster_gt_show_"+str(args.graph_pre_model)
+        val_note = "_two_dim_12_factor_rcnn_one_show_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -88,11 +88,10 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_07_09_30_13_two_dim_12_factor_three_layer_frontier_cluster_gt"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_11_16_49_44_two_dim_12_factor_revise_topo_rcnn"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
-    # max_step_ls = [1, 16, 17, 19, 28, 30, 41, 42, 46, 50, 54, 56, 62, 82, 85, 89, 90, 94, 99, 103, 106, 109, 111, 122, 132, 133, 135, 137, 138, 139, 141, 145, 147, 158, 160, 161, 162, 165, 167, 173, 188, 189, 190, 195, 196, 197, 199, 200, 204, 205, 210, 211, 213, 217, 218, 221, 225, 234, 238, 240, 241, 243, 245, 255, 267, 271, 272, 275, 278, 282, 299, 300, 304, 305, 306, 309, 313, 316, 320, 321, 328, 329, 336, 337, 343, 344, 346, 357, 454, 458, 460, 464, 466, 469, 472, 473, 474, 475, 476, 481, 484, 487, 494, 526, 536, 541, 546, 557, 565, 575, 576, 578, 581, 583, 584, 587, 589, 603, 604, 609, 614, 616, 621, 628, 630, 639, 644, 647, 650, 672, 680, 683, 685, 697, 700, 705, 707, 711, 722, 724, 725, 729, 731, 732, 735, 739, 743, 744, 748, 756, 757, 760, 763, 764, 771, 772, 773, 779, 784, 785, 787, 788, 789, 790, 794, 796, 802, 806, 807, 809, 811, 812, 815, 819, 827, 832, 838, 839, 841, 842, 848, 851, 853, 855, 859, 871, 874, 892, 895, 904, 906, 914, 916, 921, 927, 933, 935, 943, 966, 976, 977, 980, 992, 994, 995, 997, 998]
     for index_in_episodes in tqdm(range(args.graph_episode_num)):   
         # 用于录制视频
         if(args.is_vis==True):
@@ -108,9 +107,7 @@ if __name__=="__main__":
         object_goal = args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
 
-        # if((index_in_episodes+1) not in max_step_ls):
-        #     continue
-        # if(index_in_episodes<800):
+        # if(index_in_episodes<3):
         #     continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
@@ -134,8 +131,8 @@ if __name__=="__main__":
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
-            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
             topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
             # 底层仿真器动作执行

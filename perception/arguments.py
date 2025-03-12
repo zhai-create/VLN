@@ -27,6 +27,11 @@ def get_args():
     parser.add_argument("--rcnn_yaml_path", type=str, default="/home/zhaishichao/Data/VLN/dependencies/mask_rcnn/mask_rcnn_R_50_FPN_3x.yaml")
 
 
+    parser.add_argument("--resnet_tar_path", type=str, default="/home/zhaishichao/Data/VLN/dependencies/Obj_encoder.pth.tar")
+    parser.add_argument("--object_feature_dim", type=int, default=32)
+    parser.add_argument("--objgraph_node_th", type=float, default=0.8)
+    
+
     parser.add_argument("--BOX_THRESHOLD", type=float, default=0.6)
     parser.add_argument("--CONFIDENCE_TRESHOLE", type=float, default=0.6)
     parser.add_argument("--mask_rcnn_thre", type=float, default=0.6)

@@ -10,8 +10,6 @@ from detectron2.checkpoint import DetectionCheckpointer
 
 from perception.arguments import args, coco_categories_mapping
 from perception.tools import sam_show_mask, depth_estimation, depth_estimation_laser, depth_estimation_laser_pinhole_to_panorama, depth_estimation_object_loc
-from perception.intention_utils_resnet import embed_object
-
 
 from env_tools.arguments import args as env_args
 
@@ -47,32 +45,7 @@ def object_detect(rgb_image_ls, depth, object_text):
         temp_pre_labels = temp_outputs["instances"].pred_classes
         temp_pre_scores = temp_outputs["instances"].scores
 
-        if(len(temp_boxes)==0):
-            return detect_res_pos_dict
-
-        temp_box_ls = copy.deepcopy(temp_boxes)
-        temp_box_for_embed = np.zeros((temp_box_ls.shape[0], 5))
-        temp_box_for_embed[:, 1] = temp_box_ls[:, 0]/args.depth_width
-        temp_box_for_embed[:, 2] = temp_box_ls[:, 1]/args.depth_height
-        temp_box_for_embed[:, 3] = temp_box_ls[:, 2]/args.depth_width
-        temp_box_for_embed[:, 4] = temp_box_ls[:, 3]/args.depth_height
-
-        temp_boxes_embedding = embed_object(rgb_image_ls[index], temp_box_for_embed)
-
-
-        for temp_index in range(temp_boxes.shape[0]): # 遍历每一个图像实例
-            if(int(temp_pre_labels[temp_index].item())==coco_categories_mapping[object_text]):
-                new_mask = temp_masks.cpu().numpy()[temp_index]
-                res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
-
-                if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
-                    continue
-
-                if(temp_pre_scores[temp_index].item() not in detect_res_pos_dict):
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy, temp_boxes_embedding[temp_index].reshape(1, 32)]]
-                else:
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy, temp_boxes_embedding[temp_index].reshape(1, 32)])
-    return detect_res_pos_dict
+    return temp_masks, temp_boxes, temp_pre_scores
 
 
 """
@@ -104,5 +77,33 @@ print('Mask-rcnn initialize success!')
 print("\n\n\n\n\n")
 print("args.mask_rcnn_thre:", args.mask_rcnn_thre)
 
+
+test_img1 = cv2.imread("/home/zhaishichao/Data/VLN/save_rgb/1741598048.3027678.jpg")
+test_img2 = cv2.imread("/home/zhaishichao/Data/VLN/save_rgb/1741598049.3499246.jpg")
+
+
+
+masks_1, boxes_1, pre_scores_1 = object_detect([test_img1], None, "plant")
+masks_2, boxes_2, pre_scores_2 = object_detect([test_img2], None, "plant")
+
+
+cv2.rectangle(test_img1, (int(boxes_1[0][0]), int(boxes_1[0][1])), (int(boxes_1[0][2]), int(boxes_1[0][3])), (0, 255, 0), 2)
+cv2.imwrite("test_img1.jpg", test_img1)
+
+cv2.rectangle(test_img2, (int(boxes_2[0][0]), int(boxes_2[0][1])), (int(boxes_2[0][2]), int(boxes_2[0][3])), (0, 255, 0), 2)
+cv2.imwrite("test_img2.jpg", test_img1)
+
+res_box_1 = boxes_1[0].reshape(1, 4)
+res_box_2 = boxes_2[0].reshape(1, 4)
+
+print(boxes_1)
+
+print(np.array([boxes_1[0], boxes_2[0]]))
+
+# np.save("res_box_1.npy", res_box_1)
+# np.save("res_box_2.npy", res_box_2)
+
+
+# res_dict_1 = {"res_box_1": res_box_1, }
 
 

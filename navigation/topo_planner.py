@@ -126,7 +126,7 @@ class TopoPlanner(object):
 
         t1 = rela_loc / graph_args.resolution 
         p1 = np.array([-t1[0], t1[1]])
-        start_point = p1+np.array([half_len, half_len]) # 单位：格，有小数，数组坐标。以current_rrt_node为参考系
+        start_point = p1+np.array([half_len, half_len]) # 单位：格，有小数，数组坐标。以current_rrt_node为参考系        
         # =============================================================
 
         # ===================> get_the_end_point <===================

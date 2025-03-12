@@ -43,6 +43,7 @@ class HabitatAction:
             open_file = "dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name)
         else:
             open_file = "dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/val/{}-{}/{}.semantic.txt".format(scene_num, scene_name, scene_name)
+
         with open(open_file, 'r') as file:
             next(file)  # 跳过第一行
             for line in file:

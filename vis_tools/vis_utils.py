@@ -24,6 +24,8 @@ from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from navigation.habitat_action import HabitatAction
 from habitat_sim.utils.common import d3_40_colors_rgb
 
+import time
+
 
 def get_top_down_map(habitat_env):
     top_down_map = maps.get_topdown_map_from_sim(
@@ -109,7 +111,7 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
             label_temp_edge_index += 1
 
-        elif(temp_node.node_type=="frontier_node") and (temp_node.is_graph_node==True): # frontier
+        elif(temp_node.node_type=="frontier_node"): # frontier
             if(label_action_ls_index>=graph_num_action_padding):
                 continue
             res_loc_in_real_world = get_absolute_pos_world(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.world_cx, temp_node.parent_node.world_cy, temp_node.parent_node.world_turn)
@@ -133,6 +135,8 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
             label_temp_edge_index += 1
             label_action_ls_index += 1
+
+            # plt.text(ty, tx - 35, "{}".format(temp_node.name), fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
             
         elif(temp_node.node_type=="intention_node" and ((temp_node in selected_intention_node_ls))): 
             if(label_action_ls_index>=graph_num_action_padding):
@@ -272,12 +276,10 @@ def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo
     video_image = rgb_image_ls[0][..., ::-1]
     video_image = np.array(video_image, dtype=np.uint8)
     video_image = cv2.resize(video_image, None, fx=1.0, fy=1.0)
+
+    # cv2.imwrite("save_rgb/{}.jpg".format(time.time()), video_image[..., ::-1])
     cv2.rectangle(video_image, args.new_top_left, args.new_right_bottom, color=(0,0,0), thickness=-1)
     cv2.putText(video_image, 'Object Goal: '+object_goal, args.font_pos1, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
-
-        
-
-
 
     if(action_node is not None):
         if(action_node.node_type=="frontier_node"):
