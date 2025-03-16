@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import time
@@ -29,8 +29,8 @@ from navigation.sub_goal_reach import SubgoalReach
 
 from perception.arguments import args as perception_args
 
-from perception.intention_utils_rcnn import object_detect
-# from perception.intention_utils_gt import object_detect_gt
+# from perception.intention_utils_rcnn import object_detect
+from perception.intention_utils_gt import object_detect_gt
 
 from vis_tools.vis_utils import init_mp4, get_top_down_map
 
@@ -48,7 +48,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_train_val"
     else:
-        val_note = "_two_dim_12_factor_revise_topo_rcnn_train_val"
+        val_note = "_two_dim_12_factor_frontier_sector_topo_reward_gt_train_val"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -78,11 +78,11 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
 
-    for temp_pre_model in range(25, 80000, 10):
+    for temp_pre_model in range(30, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_11_16_49_44_two_dim_12_factor_revise_topo_rcnn"
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_13_12_29_28_two_dim_12_factor_frontier_sector_topo_reward_gt"
         
         while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
@@ -136,8 +136,8 @@ if __name__=="__main__":
 
                 rgb_image_ls = get_rgb_image_ls(habitat_env)
                 gt_image_ls = get_gt_image_ls(habitat_env)
-                detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+                # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
                 topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
                 # 底层仿真器动作执行

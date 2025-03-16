@@ -7,7 +7,7 @@ from graph.tools import get_absolute_pos
 
 from perception.arguments import args as perception_args
 
-from graph.tools import get_current_world_pos
+from graph.tools import get_current_world_pos, find_node_path
 
 class Evaluate:
     success_num = 0 # sr
@@ -65,6 +65,19 @@ class Evaluate:
         Evaluate.all_count_steps = 0
         Evaluate.all_dis_shape = 0
 
+    @staticmethod
+    def get_topo_walk_dis(action_node, topo_graph):
+        topo_walk_dis = 0
+        start_explored_node = SubgoalReach.init_explored_node
+        end_explored_node = action_node.parent_node
+        start_end_node_path = find_node_path(start_explored_node, end_explored_node, topo_graph.explored_nodes)
+        for temp_index, temp_node in enumerate(start_end_node_path):
+            if(temp_index==0):
+                continue
+            topo_walk_dis += ((start_end_node_path[temp_index].world_cx-start_end_node_path[temp_index-1].world_cx)**2+(start_end_node_path[temp_index].world_cy-start_end_node_path[temp_index-1].world_cy)**2)**0.5
+        topo_walk_dis += (SubgoalReach.init_rela_cx**2+SubgoalReach.init_rela_cy**2)**0.5
+        topo_walk_dis += (action_node.rela_cx**2+action_node.rela_cy**2)**0.5
+        return topo_walk_dis
 
 
     @staticmethod
@@ -119,18 +132,25 @@ class Evaluate:
                 
                 
                 if(action_node.node_type=="frontier_node"):
-                    # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+0
-                    reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
+                    topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
+
+                    # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
+                    reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
+
                     rl_graph.data['arrive'] = False
                     HabitatAction.reward_per_episode += reward_per_rl_step
 
+
                 elif(action_node.node_type=="intention_node"):
+                    topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
+                    
                     if(distance_to_goal<=1.0):
-                        # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+40
-                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+40
+                        # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+40
+                        reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+40
                     else:
-                        # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step-40
-                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5
+                        # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5
+                        reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5
+                    
                     rl_graph.data['arrive'] = True
                     HabitatAction.reward_per_episode += reward_per_rl_step
                     writer.add_scalar('Result/reward_per_episode', HabitatAction.reward_per_episode, Evaluate.real_episode_num_in_train)
@@ -171,7 +191,9 @@ class Evaluate:
 
                 rl_graph.data['reward'] = reward_per_rl_step
                 writer.add_scalar('Result/reward_per_rl_step', reward_per_rl_step, policy.train_step+1)
-                
+
+                writer.add_scalar('Result/topo_walk_dis', topo_walk_dis, policy.train_step+1)
+                writer.add_scalar('Result/real_walk_dis', (HabitatAction.front_steps-SubgoalReach.init_front_steps)*0.25, policy.train_step+1)
                 
                 writer.add_scalar('Result/episode_state', Evaluate.state_dict[achieved_result], index_in_episodes+1)
                 writer.add_scalar('Result/empty_num', Evaluate.empty_num, index_in_episodes+1)
@@ -204,9 +226,12 @@ class Evaluate:
                     return "false_reward"
                 # =============> reward_revise <=============
                 
+                topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
                 
-                # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/Evaluate.max_front_steps_per_rl_step+0
-                reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
+                # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
+                reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
+
+            
                 rl_graph.data['arrive'] = False
                 HabitatAction.reward_per_episode += reward_per_rl_step
                 writer.add_scalar('Result/reward_per_episode', HabitatAction.reward_per_episode, Evaluate.real_episode_num_in_train)
@@ -241,6 +266,9 @@ class Evaluate:
 
                 rl_graph.data['reward'] = reward_per_rl_step
                 writer.add_scalar('Result/reward_per_rl_step', reward_per_rl_step, policy.train_step+1)
+
+                writer.add_scalar('Result/topo_walk_dis', topo_walk_dis, policy.train_step+1)
+                writer.add_scalar('Result/real_walk_dis', (HabitatAction.front_steps-SubgoalReach.init_front_steps)*0.25, policy.train_step+1)
 
                 Evaluate.exceed_rl_num += 1
                 writer.add_scalar('Result/episode_state', Evaluate.state_dict[achieved_result], index_in_episodes+1)

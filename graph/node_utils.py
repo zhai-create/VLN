@@ -66,6 +66,7 @@ class Node(object):
         self.sub_frontiers = []
         self.sub_intentions = []
 
+
         self.room_flag = 0
         self.receptacle_flag = 0
         self.guide_flag = 1

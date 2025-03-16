@@ -21,7 +21,7 @@ def get_args():
     # parser.add_argument("--pre_path", type=str, default="vis_result_0107_onlygt_ctr_plan_fakeintention")
 
     # parser.add_argument("--pre_path", type=str, default="vis_result_one_rgb_rotate")
-    parser.add_argument("--pre_path", type=str, default="vis_result_one_intention_one_frontier_final")
+    parser.add_argument("--pre_path", type=str, default="vis_result_temp_gt")
     # parser.add_argument("--pre_path", type=str, default="vis_result_many_intention")
 
     # parse arguments

@@ -111,6 +111,8 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
             label_temp_edge_index += 1
 
+            # plt.text(ty, tx - 35, "{}".format(temp_node.name), fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+
         elif(temp_node.node_type=="frontier_node"): # frontier
             if(label_action_ls_index>=graph_num_action_padding):
                 continue
@@ -292,8 +294,23 @@ def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo
 
     occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
     occu_for_show = (occu_for_show*255).astype(np.uint8)
-    cv2.putText(occu_for_show, "{}".format(HabitatAction.count_steps-1), args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
+    
+
+    # # 临时添加
+    # for temp_frontier in topo_graph.current_node.sub_frontiers:
+    #     if(temp_frontier.name=="18"):
+    #         center_point_g1 = (int)(100-temp_frontier.rela_cx/0.1)
+    #         center_point_g2 = (int)(100+temp_frontier.rela_cy/0.1)
+    #         cv2.circle(occu_for_show, (center_point_g2, center_point_g1), 2, (0, 0, 0), 2)
+    #         cv2.imwrite("occu_for_show.jpg", occu_for_show)
+    #         breakpoint()
+    # # 临时添加
+
+    # cv2.putText(occu_for_show, "{}".format(HabitatAction.count_steps-1), args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
+    cv2.putText(occu_for_show, "{}".format(topo_graph.current_node.name), args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
     occu_writer.append_data(occu_for_show)
+
+
 
     gt_image_ls = get_gt_image_ls(habitat_env)
     semantic_img = Image.new("P", (gt_image_ls[0].shape[1], gt_image_ls[0].shape[0]))

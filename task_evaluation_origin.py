@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
 import cv2
 import habitat
 import habitat_sim
@@ -33,9 +33,9 @@ from navigation.sub_goal_reach import SubgoalReach
 from vis_tools.vis_utils import init_mp4, get_top_down_map, save_mp4
 
 from perception.arguments import args as perception_args
-from perception.intention_utils_rcnn import object_detect
+# from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_dino import object_detect_sam
-# from perception.intention_utils_gt import object_detect_gt
+from perception.intention_utils_gt import object_detect_gt
 
 
 if __name__=="__main__":
@@ -46,14 +46,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 45
+    args.graph_pre_model = 100
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_two_dim_12_factor_rcnn_one_show_"+str(args.graph_pre_model)
+        val_note = "_two_dim_12_factor_frontier_sector_gt_val_"+str(args.graph_pre_model)+"_init_600"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -63,7 +63,7 @@ if __name__=="__main__":
     args.success_distance = 1.0 
     args.max_steps = 500
 
-    args.is_vis = True # 录制视频
+    args.is_vis = False # 录制视频
 
     rl_args.score_top_k = 50
     if(args.is_llm==2):
@@ -88,7 +88,7 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_11_16_49_44_two_dim_12_factor_revise_topo_rcnn"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_13_12_16_33_two_dim_12_factor_frontier_sector_gt"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
@@ -107,8 +107,8 @@ if __name__=="__main__":
         object_goal = args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
 
-        # if(index_in_episodes<3):
-        #     continue
+        if(index_in_episodes<600):
+            continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
         habitat_metric = habitat_env.get_metrics()
@@ -131,8 +131,8 @@ if __name__=="__main__":
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
-            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
             topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
             # 底层仿真器动作执行
@@ -152,7 +152,7 @@ if __name__=="__main__":
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
                 print("=====> real_action_selection <=====")
             else:
-                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
+                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, args.graph_train)
                 if(len(topo_graph.frontier_nodes)>0) and (ghost_patch_res=="ok"):
                     rl_graph.update(topo_graph)
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
