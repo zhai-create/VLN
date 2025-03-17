@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import random
 import cv2
 import copy
@@ -49,7 +49,7 @@ if __name__=="__main__":
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
         # train_note = "_two_dim_12_factor_frontier_sector_gt" # 注释当前训练处于什么阶段
-        train_note = "_two_dim_12_factor_frontier_sector_gt" # 注释当前训练处于什么阶段
+        train_note = "_two_dim_12_factor_frontier_cluster_gt" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -211,12 +211,12 @@ if __name__=="__main__":
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
                 print("=====> real_action_selection <=====")
             else:
-                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, env_args.graph_train)
-                if(len(topo_graph.frontier_nodes)>0) and (ghost_patch_res=="ok"):
-                    rl_graph.update(topo_graph)
+                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, rl_graph)
+                rl_graph.update(topo_graph)
+                if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
+                    print("=====> ghost_patch <=====")
                     current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
-                    print("=====> ghost_patch <=====")
                 else:
                     # action_space为空，结束当前episode
                     if not habitat_env.episode_over: # 没有超过1w步的最大步长

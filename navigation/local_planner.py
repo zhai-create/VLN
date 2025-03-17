@@ -57,8 +57,6 @@ class LocalPlanner(object):
             min_rrt_x, min_rrt_y = get_nearest_grid(self.end_point, temp_ghost_obstacle_map=rrt.obstacles, action_category=self.action_node.node_type)
             if(min_rrt_x==-1): # 如果最近区域不可见
                 zero_rrt_x, zero_rrt_y = get_nearest_grid(self.end_point, temp_ghost_obstacle_map=self.stitching_map, action_category=self.action_node.node_type)
-                if(zero_rrt_x==-1):
-                    zero_rrt_x, zero_rrt_y = get_nearest_grid(self.end_point, temp_ghost_obstacle_map=self.stitching_map, action_category="frontier_node")   
                 if(zero_rrt_x!=-1): # 0311新加代码
                     self.end_point[0], self.end_point[1] = zero_rrt_x, zero_rrt_y
                 rrt = RRTStar(self.stitching_map, self.start_point, self.end_point, inflation_distance=0) # 用膨胀因子为0的地图找
@@ -78,7 +76,6 @@ class LocalPlanner(object):
                 local_path = astar_path
             else:
                 local_path = None
-
         return local_path # 得到的local_path不包括起点
 
 

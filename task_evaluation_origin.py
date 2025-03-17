@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '2'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '2'
 import cv2
 import habitat
 import habitat_sim
@@ -46,14 +46,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 100
+    args.graph_pre_model = 285
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_two_dim_12_factor_frontier_sector_gt_val_"+str(args.graph_pre_model)+"_init_600"
+        val_note = "_two_dim_12_factor_frontier_cluster_topo_reward_gt_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -63,7 +63,7 @@ if __name__=="__main__":
     args.success_distance = 1.0 
     args.max_steps = 500
 
-    args.is_vis = False # 录制视频
+    args.is_vis = True # 录制视频
 
     rl_args.score_top_k = 50
     if(args.is_llm==2):
@@ -88,7 +88,7 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_13_12_16_33_two_dim_12_factor_frontier_sector_gt"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_16_15_45_53_two_dim_12_factor_frontier_cluster_topo_reward_gt"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
@@ -107,8 +107,8 @@ if __name__=="__main__":
         object_goal = args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
 
-        if(index_in_episodes<600):
-            continue
+        # if(index_in_episodes<200):
+        #     continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
         habitat_metric = habitat_env.get_metrics()
@@ -152,11 +152,11 @@ if __name__=="__main__":
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
                 print("=====> real_action_selection <=====")
             else:
-                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, args.graph_train)
-                if(len(topo_graph.frontier_nodes)>0) and (ghost_patch_res=="ok"):
-                    rl_graph.update(topo_graph)
-                    polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
+                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, rl_graph)
+                rl_graph.update(topo_graph)
+                if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
                     print("=====> ghost_patch <=====")
+                    polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
                 else:
                     # action_space为空，结束当前episode
                     print("========> empty_action_space <========")
@@ -168,6 +168,10 @@ if __name__=="__main__":
                         achieved_result = "exceed"
                     Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes)
                     break
+
+            # 用于录制视频
+            if(args.is_vis==True):
+                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
             action_node = rl_graph.all_nodes[polict_action]
             if(args.is_vis==True):

@@ -100,6 +100,24 @@ class SubgoalReach:
 
         return False
 
+    # @staticmethod
+    # def achieved_remove_action_node(topo_graph, action_node, habitat_env):
+    #     """
+    #         When the robot achieves the sub-goal, delete the action node in the topo-graph.
+    #         :param topo_graph
+    #         :param action_node
+    #     """
+    #     if(action_node in topo_graph.all_nodes):
+    #         action_parent_node = action_node.parent_node
+    #         if(action_node.node_type=="frontier_node"):
+    #             action_parent_node.sub_frontiers.remove(action_node)
+    #             topo_graph.frontier_nodes.remove(action_node)
+    #             topo_graph.all_nodes.remove(action_node)
+    #         else:
+    #             action_parent_node.sub_intentions.remove(action_node)
+    #             topo_graph.intention_nodes.remove(action_node)
+    #             topo_graph.all_nodes.remove(action_node)
+
     @staticmethod
     def achieved_remove_action_node(topo_graph, action_node, habitat_env):
         """
@@ -107,36 +125,25 @@ class SubgoalReach:
             :param topo_graph
             :param action_node
         """
-        if(action_node in topo_graph.all_nodes):
-            action_parent_node = action_node.parent_node
-            if(action_node.node_type=="frontier_node"):
-                action_parent_node.sub_frontiers.remove(action_node)
-                topo_graph.frontier_nodes.remove(action_node)
-                topo_graph.all_nodes.remove(action_node)
+        if(action_node.node_type=="frontier_node"):
+            # rl_step中实际行走步数为0的frontier
+            if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
+                topo_graph.deleted_cluster_frontier_ls.append(action_node)
+        else:
+            # rl_step中实际行走步数为0的intention
+            if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
+                topo_graph.deleted_intention_ls.append(action_node)
 
-                # rl_step中实际行走步数为0的frontier
-                if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
-                    action_parent_node.deleted_frontiers.append(action_node)
-
-            else:
+            if(action_node in topo_graph.all_nodes):
+                action_parent_node = action_node.parent_node
                 action_parent_node.sub_intentions.remove(action_node)
                 topo_graph.intention_nodes.remove(action_node)
                 topo_graph.all_nodes.remove(action_node)
-
-                # rl_step中实际行走步数为0的intention
-                if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
-                    action_parent_node.deleted_intentions.append(action_node)
 
 
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
             if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
-
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                if(now_action_dis>=1.0):
-                    topo_graph.sub_deleted_frontiers.remove(action_node)
-
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             else:
@@ -148,7 +155,7 @@ class SubgoalReach:
                     return "exceed"
 
         else: # 处于测试阶段
-            if(action_node.node_type=="intention_node"):
+            if(action_node.node_type=="intention_node" and candidate_achieved_result=="achieved"): # 多加了“achieved”的条件，即如果intention卡住或intention规划失败，还有重新选择一次的机会
                 if not habitat_env.episode_over:
                     habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
                     observations = habitat_env.step(habitat_action)
@@ -156,11 +163,6 @@ class SubgoalReach:
                 else:
                     return "exceed"
             else:
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                if(now_action_dis>=1.0):
-                    topo_graph.sub_deleted_frontiers.remove(action_node)
-
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             return candidate_achieved_result 
@@ -176,8 +178,6 @@ class SubgoalReach:
             :param habitat_env
             :param object_goal
         """
-        topo_graph.sub_deleted_frontiers.append(action_node)
-
         topo_planner = TopoPlanner(topo_graph, action_node)
         SubgoalReach.reset(habitat_env, topo_graph)
         while True:
@@ -221,41 +221,6 @@ class SubgoalReach:
                         detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
                         topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
-                        # depth = fix_depth(observations["depth"])
-                        # depth[np.where((depth<lower_bound)|(depth>upper_bound))] = 0
-
-
-                        # np.save("new_depth_save/depth_{}.npy".format(HabitatAction.count_steps), depth*5)
-
-                        # depth_for_show = cv2.resize(depth.astype(np.float64), None, fx=1, fy=1)
-                        # depth_for_show = (depth_for_show*255).astype(np.uint8)
-                        # cv2.imwrite("new_depth_save/depth_{}.jpg".format(HabitatAction.count_steps), depth_for_show)
-
-                        # occu_for_show = cv2.resize(topo_graph.current_node.occupancy_map.astype(np.float64), None, fx=1, fy=1)
-                        # occu_for_show = (occu_for_show*255).astype(np.uint8)
-                        # cv2.imwrite("new_depth_save/occu_{}.jpg".format(HabitatAction.count_steps), occu_for_show)
-
-
-                        # if len(depth.shape) == 3:
-                        #     depth = depth[:,:,0]
-                        # split_h = (int)(480/2+1)
-                        # intrinsic = perception_args.intrinsic_matrix
-                        # filter_z,filter_x = np.where(depth>-10) # 原始depth中大于0的位置
-                        # depth_values_array = depth*perception_args.depth_scale # meter
-                        # filter_z_array = filter_z.reshape(perception_args.depth_height, perception_args.depth_width) # 行号矩阵    
-                        # pixel_z = (depth.shape[0] - 1 - filter_z_array - intrinsic[1][2]) * depth_values_array / intrinsic[1][1]
-                        # filter_x_array = filter_x.reshape(perception_args.depth_height, perception_args.depth_width) # 列号矩阵
-                        # pixel_x = (filter_x_array - intrinsic[0][2])*depth_values_array / intrinsic[0][0]
-                        # pixel_y = depth_values_array
-
-                        # pixel_x = pixel_x[split_h:, :]
-                        # pixel_y = pixel_y[split_h:, :]
-                        # pixel_z = pixel_z[split_h:, :]
-
-                        # real_laser = np.concatenate((pixel_y.flatten().reshape(-1, 1), pixel_z.flatten().reshape(-1, 1), pixel_x.flatten().reshape(-1, 1)), axis=1)
-                        # np.save("new_depth_save/laser_{}.npy".format(HabitatAction.count_steps), real_laser)
-
-
                         # 底层仿真器动作执行
                         habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
                         if not habitat_env.episode_over:
@@ -268,7 +233,6 @@ class SubgoalReach:
                         if(env_args.is_vis==True):
                             save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
 
-
                 else:
                     depth = fix_depth(observations["depth"])
                     topo_graph.get_laser_result(depth)
@@ -278,8 +242,6 @@ class SubgoalReach:
                     rgb_image_ls = get_rgb_image_ls(habitat_env)
                     gt_image_ls = get_gt_image_ls(habitat_env)
                     # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                        
-
                     # ===========================
                     if(SubgoalReach.next_action=="f"):
                         SubgoalReach.false_front_step += 1
@@ -292,8 +254,8 @@ class SubgoalReach:
                         is_fake_intention = False
 
                     detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
-                    topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
                     # ===========================
+                    topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
 
                 

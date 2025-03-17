@@ -51,6 +51,8 @@ class GraphMap(object):
         self.all_nodes = []
 
         # self.determine_loc_ls = []
+        self.deleted_cluster_frontier_ls = []
+        self.deleted_intention_ls = []
 
         self.current_node = None
         self.current_rotate_node = None
@@ -68,10 +70,6 @@ class GraphMap(object):
 
         self.obs = None
 
-        self.sub_deleted_frontiers = [] # 到达后删除的frontier
-        self.sub_continue_frontiers = []
-
-
     def set_current_pos(self, rela_cx, rela_cy, rela_turn):
         self.rela_cx = rela_cx
         self.rela_cy = rela_cy
@@ -84,31 +82,10 @@ class GraphMap(object):
     
     
     def frontier_delete(self):
-        show_ghost_map = copy.deepcopy(self.current_node.occupancy_map)
-        show_ghost_map[show_ghost_map>=args.ghost_map_thre] = 1
-        show_ghost_map[show_ghost_map<args.ghost_map_thre] = 0
-
         current_map = self.current_node.occupancy_map
-
         for temp_node in self.explored_nodes:            
             sub_frontiers_for_index = copy.deepcopy(temp_node.sub_frontiers)
-            for temp_frontier in sub_frontiers_for_index:
-                
-
-                # 先删除使得rl_step中实际行走的step为0的frontier
-                # ===================================
-                need_delete_flag = False
-                for temp_delete_frontier in temp_node.deleted_frontiers:
-                    if ((temp_delete_frontier.rela_cx-temp_frontier.rela_cx)**2+(temp_delete_frontier.rela_cy-temp_frontier.rela_cy)**2)**0.5<0.2:
-                        need_delete_flag = True
-                        break
-                if(need_delete_flag == True):
-                    temp_node.sub_frontiers.remove(temp_frontier)
-                    self.frontier_nodes.remove(temp_frontier)
-                    self.all_nodes.remove(temp_frontier)
-                    continue
-                # ===================================
-                
+            for temp_frontier in sub_frontiers_for_index: # 遍历所有的frontier
                 if temp_node.name != self.current_node.name:
                     n_in_current_node = self.current_node.all_other_nodes_loc[temp_node.name] # 将node中的ghost坐标位置转换到当前node下
                     g_ref_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
@@ -116,15 +93,9 @@ class GraphMap(object):
                     g_ref_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
                 gx = (int)(half_len-g_ref_loc[0]/args.resolution)
                 gy = (int)(half_len+g_ref_loc[1]/args.resolution)
-                
-
-                temp_dis = ((g_ref_loc[0]-self.rela_cx)**2 + (g_ref_loc[1]-self.rela_cy)**2)**0.5
 
                 if gx>=1 and gx<=(2*half_len-1) and gy>=1 and gy<=(2*half_len-1):
-                    temp_val = show_ghost_map[gx,gy,0]
-                    show_ghost_map[gx,gy,0] = args.ghost_map_g_val
                     dis = ((g_ref_loc[0]-self.rela_cx)**2 + (g_ref_loc[1]-self.rela_cy)**2)**0.5
-                    
                     around = np.array([current_map[gx-1, gy-1, 0], current_map[gx-1, gy-0, 0], current_map[gx-1, gy+1, 0], current_map[gx-0, gy-1, 0], \
                                     current_map[gx-0, gy+1, 0], current_map[gx+1, gy-1, 0], current_map[gx+1, gy-0, 0], current_map[gx+1, gy+1, 0], current_map[gx, gy, 0]])
                     diff = np.absolute(around-args.ghost_map_g_val)
@@ -133,19 +104,11 @@ class GraphMap(object):
                         temp_node.sub_frontiers.remove(temp_frontier)
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
-                        show_ghost_map[gx,gy,0] = temp_val
-
                     elif dis <= args.thre_for_blacklist_delete:
                         temp_node.sub_frontiers.remove(temp_frontier)
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
-                        clear_fake_frontier(self.current_node, gx, gy)
                 
-                # else: # 直接remove
-                #     temp_node.sub_frontiers.remove(temp_frontier)
-                #     self.frontier_nodes.remove(temp_frontier)
-                #     self.all_nodes.remove(temp_frontier)
-
 
     def multi_check_frontier(self, candidate_frontier_arr):
         res_frontier_pos_arr = []
@@ -160,30 +123,17 @@ class GraphMap(object):
             limit1 = min(center_point_d1-0, 2*half_len-center_point_d1)
             limit2 = min(center_point_d2-0, 2*half_len-center_point_d2)
 
-            first_flag = False
-            second_flag = False
-            if r <= limit1-1 and r <= limit2-1:
+            if r <= limit1-1 and r <= limit2-1: # 基于栅格状态的frontier_check
                 gx, gy, second_flag = second_check(center_point_d1, center_point_d2, self.current_node.occupancy_map, r)
-            if second_flag == False:
-                continue
-            else:
+                if second_flag == False:
+                    continue
+
                 mx = -(gx - half_len) * args.resolution
                 my = (gy - half_len) * args.resolution
                 middle = np.array([mx, my]) # in ref frame (meter)
-                third_flag = third_check(middle, self.current_node)
-
-            if third_flag == False:
-                continue
-            else:
                 forth_flag = forth_check(middle, self.current_node, self.explored_nodes)
-            if forth_flag == True:
-                first_flag = True
-
-            if first_flag == True:
-                res_frontier_pos_arr.append([middle[0], middle[1]])
-
-                
-
+                if forth_flag == True:
+                    res_frontier_pos_arr.append([middle[0], middle[1]])
         return np.array(res_frontier_pos_arr)
 
     def select_see_ghost(self, res_frontier_pos_arr):
@@ -238,224 +188,14 @@ class GraphMap(object):
                 final_frontier_pos_arr.append(res_frontier_pos_arr[index])
         return np.array(final_frontier_pos_arr)
 
-    # newest(扇形)
+
     def add_ghost(self, final_frontier_pos_arr):
         for index in range(len(final_frontier_pos_arr)):
             res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-            if((final_frontier_pos_arr[index][0]**2+final_frontier_pos_arr[index][1]**2)**0.5>6.5):
-                self.sub_continue_frontiers.append((final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node, res_loc_in_real_world[0], res_loc_in_real_world[1]))
-                continue
-            # =====> 基于ETPNAV的frontier聚类 <=====
-            min_frontier_angle = 10000
-            new_frontier_dis = (final_frontier_pos_arr[index][0]**2+final_frontier_pos_arr[index][1]**2)**0.5
-            new_frontier_angle = (np.arctan2(final_frontier_pos_arr[index][1], final_frontier_pos_arr[index][0]))*180/np.pi+180
-            
-            current_node_all_sub_frontiers = self.frontier_nodes+self.sub_deleted_frontiers
-            for temp_frontier_node in current_node_all_sub_frontiers:
-                if(temp_frontier_node.parent_node.name==self.current_node.name):
-                    temp_frontier_rela_cx, temp_frontier_rela_cy = temp_frontier_node.rela_cx, temp_frontier_node.rela_cy
-                else:
-                    temp_in_current_node = self.current_node.all_other_nodes_loc[temp_frontier_node.parent_node.name]
-                    temp_frontier_rela_loc = get_absolute_pos(np.array([temp_frontier_node.rela_cx, temp_frontier_node.rela_cy]), temp_in_current_node[:2], temp_in_current_node[2])
-                    temp_frontier_rela_cx, temp_frontier_rela_cy = temp_frontier_rela_loc[0], temp_frontier_rela_loc[1]
-
-                temp_frontier_angle = (np.arctan2(temp_frontier_rela_cy, temp_frontier_rela_cx))*180/np.pi+180
-                delta_frontier_angle = abs(temp_frontier_angle-new_frontier_angle)
-                if(delta_frontier_angle>180):
-                    delta_frontier_angle = 360-delta_frontier_angle
-                if(delta_frontier_angle<min_frontier_angle):
-                    min_frontier_angle = delta_frontier_angle
-                    min_frontier_dis = (temp_frontier_rela_cx**2+temp_frontier_rela_cy**2)**0.5
-            
-            if(min_frontier_angle<30) and ((min_frontier_dis-new_frontier_dis)>-1.0):
-                self.sub_continue_frontiers.append((final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node, res_loc_in_real_world[0], res_loc_in_real_world[1]))
-                continue
-            else:
-                new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
-                self.current_node.sub_frontiers.append(new_frontier)
-                self.frontier_nodes.append(new_frontier)
-                self.all_nodes.append(new_frontier)
-            
-
-    # # sceond_revise
-    # def add_ghost(self, final_frontier_pos_arr):
-    #     for index in range(len(final_frontier_pos_arr)):
-    #         res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-    #         # =====> 基于ETPNAV的frontier聚类 <=====
-    #         min_explored_dis = 10000
-    #         for temp_explored_node in self.explored_nodes:
-    #             if(temp_explored_node.name==self.current_node.name): # 允许当前节点的短距离intention_node
-    #                 continue
-    #             temp_explored_dis = ((temp_explored_node.world_cx-res_loc_in_real_world[0])**2+(temp_explored_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #             if(temp_explored_dis<min_explored_dis):
-    #                 min_explored_dis = temp_explored_dis
-    #         if(min_explored_dis<=args.explored_cluster_dis):
-    #             continue
-    #         else:            
-    #             min_frontier_dis = 10000
-    #             min_frontier_node = None
-    #             for temp_frontier_node in self.current_node.sub_frontiers:
-    #                 temp_frontier_dis = ((temp_frontier_node.world_cx-res_loc_in_real_world[0])**2+(temp_frontier_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #                 if(temp_frontier_dis<min_frontier_dis):
-    #                     min_frontier_dis = temp_frontier_dis
-    #                     min_frontier_node = temp_frontier_node
-    #             if(min_frontier_dis<=args.frontier_cluster_dis): # 满足第一个大前提条件
-    #                 min_frontier_angle = (np.arctan2(min_frontier_node.rela_cy, min_frontier_node.rela_cx))*180/np.pi+180
-    #                 new_frontier_angle = (np.arctan2(final_frontier_pos_arr[index][1], final_frontier_pos_arr[index][0]))*180/np.pi+180
-                    
-    #                 delta_frontier_angle = abs(min_frontier_angle-new_frontier_angle)
-    #                 if(delta_frontier_angle>180):
-    #                     delta_frontier_angle = 360-delta_frontier_angle
-
-    #                 if(delta_frontier_angle<=args.frontier_cluster_angle): # 满足第二个角度条件
-    #                     min_frontier_node.rela_cx = (min_frontier_node.rela_cx+final_frontier_pos_arr[index][0])/2
-    #                     min_frontier_node.rela_cy = (min_frontier_node.rela_cy+final_frontier_pos_arr[index][1])/2 
-    #                     min_frontier_node.world_cx = (min_frontier_node.world_cx+res_loc_in_real_world[0])/2
-    #                     min_frontier_node.world_cy = (min_frontier_node.world_cy+res_loc_in_real_world[1])/2
-    #                 else:  # 由于角度原因而无法聚类的frontier
-    #                     min_dis = 10000
-    #                     for temp_frontier_node in self.frontier_nodes:
-    #                         if(temp_frontier_node.parent_node.name==self.current_node.name):
-    #                             continue
-    #                         temp_dis = ((temp_frontier_node.world_cx-res_loc_in_real_world[0])**2+(temp_frontier_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #                         if(temp_dis<min_dis):
-    #                             min_dis = temp_dis
-    #                     if(min_dis<args.other_node_frontier_dis):
-    #                         continue
-    #                     else:
-    #                         min_frontier_angle = 10000
-    #                         min_frontier_dis = 10000
-    #                         new_frontier_angle = (np.arctan2(final_frontier_pos_arr[index][1], final_frontier_pos_arr[index][0]))*180/np.pi+180
-    #                         new_frontier_dis = (final_frontier_pos_arr[index][0]**2+final_frontier_pos_arr[index][1]**2)**0.5
-                            
-    #                         current_node_all_sub_frontiers = self.current_node.sub_frontiers+self.current_node.sub_deleted_frontiers
-                            
-    #                         for temp_now_node_frontier in current_node_all_sub_frontiers:
-    #                             temp_now_node_frontier_angle = (np.arctan2(temp_now_node_frontier.rela_cy, temp_now_node_frontier.rela_cx))*180/np.pi+180
-    #                             delta_frontier_angle = abs(temp_now_node_frontier_angle-new_frontier_angle)
-    #                             if(delta_frontier_angle>180):
-    #                                 delta_frontier_angle = 360-delta_frontier_angle
-    #                             if(delta_frontier_angle<min_frontier_angle):
-    #                                 min_frontier_angle = delta_frontier_angle
-    #                                 min_frontier_dis = (temp_now_node_frontier.rela_cx**2+temp_now_node_frontier.rela_cy**2)**0.5
-    #                         if(min_frontier_angle<=args.frontier_cluster_angle and (min_frontier_dis-new_frontier_dis)>-0.5):
-    #                             continue
-    #                         else:
-    #                             new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
-    #                             self.current_node.sub_frontiers.append(new_frontier)
-    #                             self.frontier_nodes.append(new_frontier)
-    #                             self.all_nodes.append(new_frontier)
-
-    #             else: # 由于不满足距离条件而无法聚类
-    #                 min_dis = 10000
-    #                 for temp_frontier_node in self.frontier_nodes:
-    #                     if(temp_frontier_node.parent_node.name==self.current_node.name):
-    #                         continue
-    #                     temp_dis = ((temp_frontier_node.world_cx-res_loc_in_real_world[0])**2+(temp_frontier_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #                     if(temp_dis<min_dis):
-    #                         min_dis = temp_dis
-    #                 if(min_dis<args.other_node_frontier_dis):
-    #                     continue
-    #                 else:
-    #                     min_frontier_angle = 10000
-    #                     min_frontier_dis = 10000
-    #                     new_frontier_angle = (np.arctan2(final_frontier_pos_arr[index][1], final_frontier_pos_arr[index][0]))*180/np.pi+180
-    #                     new_frontier_dis = (final_frontier_pos_arr[index][0]**2+final_frontier_pos_arr[index][1]**2)**0.5
-                        
-    #                     current_node_all_sub_frontiers = self.current_node.sub_frontiers+self.current_node.sub_deleted_frontiers
-                        
-    #                     for temp_now_node_frontier in current_node_all_sub_frontiers:
-    #                         temp_now_node_frontier_angle = (np.arctan2(temp_now_node_frontier.rela_cy, temp_now_node_frontier.rela_cx))*180/np.pi+180
-    #                         delta_frontier_angle = abs(temp_now_node_frontier_angle-new_frontier_angle)
-    #                         if(delta_frontier_angle>180):
-    #                             delta_frontier_angle = 360-delta_frontier_angle
-    #                         if(delta_frontier_angle<min_frontier_angle):
-    #                             min_frontier_angle = delta_frontier_angle
-    #                             min_frontier_dis = (temp_now_node_frontier.rela_cx**2+temp_now_node_frontier.rela_cy**2)**0.5
-    #                     if(min_frontier_angle<=args.frontier_cluster_angle and (min_frontier_dis-new_frontier_dis)>-0.5):
-    #                         continue
-    #                     else:
-    #                         new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
-    #                         self.current_node.sub_frontiers.append(new_frontier)
-    #                         self.frontier_nodes.append(new_frontier)
-    #                         self.all_nodes.append(new_frontier)
-
-    # origin_revise
-    # def add_ghost(self, final_frontier_pos_arr):
-    #     for index in range(len(final_frontier_pos_arr)):
-    #         res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-    #         # =====> 基于ETPNAV的frontier聚类 <=====
-    #         min_explored_dis = 10000
-    #         for temp_explored_node in self.explored_nodes:
-    #             if(temp_explored_node.name==self.current_node.name): # 允许当前节点的短距离intention_node
-    #                 continue
-    #             temp_explored_dis = ((temp_explored_node.world_cx-res_loc_in_real_world[0])**2+(temp_explored_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #             if(temp_explored_dis<min_explored_dis):
-    #                 min_explored_dis = temp_explored_dis
-    #         if(min_explored_dis<=args.explored_cluster_dis):
-    #             continue
-    #         else:            
-    #             min_frontier_dis = 10000
-    #             min_frontier_node = None
-    #             for temp_frontier_node in self.current_node.sub_frontiers:
-    #                 temp_frontier_dis = ((temp_frontier_node.world_cx-res_loc_in_real_world[0])**2+(temp_frontier_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #                 if(temp_frontier_dis<min_frontier_dis):
-    #                     min_frontier_dis = temp_frontier_dis
-    #                     min_frontier_node = temp_frontier_node
-    #             if(min_frontier_dis<=args.frontier_cluster_dis): # 满足第一个大前提条件
-    #                 min_frontier_angle = (np.arctan2(min_frontier_node.rela_cy, min_frontier_node.rela_cx))*180/np.pi+180
-    #                 new_frontier_angle = (np.arctan2(final_frontier_pos_arr[index][1], final_frontier_pos_arr[index][0]))*180/np.pi+180
-                    
-    #                 delta_frontier_angle = abs(min_frontier_angle-new_frontier_angle)
-    #                 if(delta_frontier_angle>180):
-    #                     delta_frontier_angle = 360-delta_frontier_angle
-
-    #                 if(delta_frontier_angle<=args.frontier_cluster_angle): # 满足第二个角度条件
-    #                     min_frontier_node.rela_cx = (min_frontier_node.rela_cx+final_frontier_pos_arr[index][0])/2
-    #                     min_frontier_node.rela_cy = (min_frontier_node.rela_cy+final_frontier_pos_arr[index][1])/2 
-    #                     min_frontier_node.world_cx = (min_frontier_node.world_cx+res_loc_in_real_world[0])/2
-    #                     min_frontier_node.world_cy = (min_frontier_node.world_cy+res_loc_in_real_world[1])/2
-    #                 else:  # 由于角度原因而无法聚类的frontier
-    #                     min_dis = 10000
-    #                     for temp_frontier_node in self.frontier_nodes:
-    #                         if(temp_frontier_node.parent_node.name==self.current_node.name):
-    #                             continue
-    #                         temp_dis = ((temp_frontier_node.world_cx-res_loc_in_real_world[0])**2+(temp_frontier_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #                         if(temp_dis<min_dis):
-    #                             min_dis = temp_dis
-    #                     if(min_dis<args.other_node_frontier_dis):
-    #                         continue
-    #                     else:
-    #                         new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
-    #                         self.current_node.sub_frontiers.append(new_frontier)
-    #                         self.frontier_nodes.append(new_frontier)
-    #                         self.all_nodes.append(new_frontier)
-
-
-    #             else: # 由于不满足距离条件而无法聚类
-    #                 min_dis = 10000
-    #                 for temp_frontier_node in self.frontier_nodes:
-    #                     if(temp_frontier_node.parent_node.name==self.current_node.name):
-    #                         continue
-    #                     temp_dis = ((temp_frontier_node.world_cx-res_loc_in_real_world[0])**2+(temp_frontier_node.world_cy-res_loc_in_real_world[1])**2)**0.5
-    #                     if(temp_dis<min_dis):
-    #                         min_dis = temp_dis
-    #                 if(min_dis<args.other_node_frontier_dis):
-    #                     continue
-    #                 else:
-    #                     new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
-    #                     self.current_node.sub_frontiers.append(new_frontier)
-    #                     self.frontier_nodes.append(new_frontier)
-    #                     self.all_nodes.append(new_frontier)
-
-
-    # def add_ghost(self, final_frontier_pos_arr):
-    #     for index in range(len(final_frontier_pos_arr)):
-    #         res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-    #         new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
-    #         self.current_node.sub_frontiers.append(new_frontier)
-    #         self.frontier_nodes.append(new_frontier)
-    #         self.all_nodes.append(new_frontier)
+            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
+            self.current_node.sub_frontiers.append(new_frontier)
+            self.frontier_nodes.append(new_frontier)
+            self.all_nodes.append(new_frontier)
     
     
     # def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text):
@@ -584,8 +324,6 @@ class GraphMap(object):
         self.laser_2d_filtered_angle = laser_2d_filtered_angle
     
     def update(self):
-        # flag, predict_node, [final_theta, final_t], [theta_to_current, t_to_current], ratio = \
-        # find_current_node(self.explored_nodes, self.current_node, point_for_close_loop_detection, self.rela_turn, np.array([self.rela_cx, self.rela_cy]))
         flag, predict_node, final_t, final_theta = find_current_node_world(self.explored_nodes, self.habitat_env, self.current_node)
 
         # update explored node
@@ -634,59 +372,30 @@ class GraphMap(object):
         return flag
 
 
-        # update frontier node
-        # candidate_frontier_arr = predict_frontier(args.init_predict_ghost_thre1, laser_2d_filtered, laser_2d_filtered_angle)
-        # res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-        # final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
-        # self.add_ghost(final_frontier_pos_arr)
-        # self.frontier_delete()
-
-        # # update intention node
-        # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_text)
-        # self.add_intention(detect_res_pos_dict, rgb_image_ls, object_text)
-
-
     def update_graph_frontier(self):
         candidate_frontier_arr = predict_frontier(args.init_predict_ghost_thre1, self.laser_2d_filtered, self.laser_2d_filtered_angle)
-        
         res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-        final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
-        self.add_ghost(final_frontier_pos_arr)
+        self.add_ghost(res_frontier_pos_arr)
         self.frontier_delete()
-
-
 
     
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
-    def ghost_patch(self, habitat_env, object_goal, graph_train):
-        if(graph_train==False and len(self.sub_continue_frontiers)!=0):
-            for temp_tuple in self.sub_continue_frontiers:
-                new_frontier = Node(node_type="frontier_node", rela_cx=temp_tuple[0], rela_cy=temp_tuple[1], parent_node=temp_tuple[2], world_cx=temp_tuple[3], world_cy=temp_tuple[4])
-                temp_tuple[2].sub_frontiers.append(new_frontier)
-                self.frontier_nodes.append(new_frontier)
-                self.all_nodes.append(new_frontier)
-
-            self.frontier_delete()
-            if(len(self.frontier_nodes)>0):
-                return "ok"
-
+    def ghost_patch(self, habitat_env, object_goal, rl_graph):
         depth = fix_depth(self.obs["depth"])
         self.get_laser_result(depth)
-
         predict_ghost_thre1 = args.init_predict_ghost_thre1
         while predict_ghost_thre1>=0:
             candidate_frontier_arr = predict_frontier(predict_ghost_thre1, self.laser_2d_filtered, self.laser_2d_filtered_angle)
             res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-            final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
-
-            self.add_ghost(final_frontier_pos_arr)
+            self.add_ghost(res_frontier_pos_arr)
             self.frontier_delete()
-            if(len(self.frontier_nodes)>0):
+            frontier_clustered_res_ls = rl_graph.get_clustered_frontier(self)
+            if(len(frontier_clustered_res_ls)>0):
                 break
             else:
                 predict_ghost_thre1 -= 0.1
 
-        if(len(self.frontier_nodes)>0):
+        if(len(frontier_clustered_res_ls)>0):
             return "ok" # 表示没有超过最大步数
         else: # 如果用当前点云进行阈值缩小后仍然没有找到合适的点云，则转圈
             for i in range(12):
@@ -697,21 +406,22 @@ class GraphMap(object):
                     depth = fix_depth(observations["depth"])
                     self.get_laser_result(depth)
                     self.current_node.update_occupancy(self.laser_2d_filtered, self.laser_2d_filtered_angle, np.array([self.rela_cx, self.rela_cy]), self.rela_turn)
-
                     predict_ghost_thre2 = args.init_predict_ghost_thre1
+                    
+                    have_frontier_flag = False
                     while predict_ghost_thre2>=0:
                         candidate_frontier_arr = predict_frontier(predict_ghost_thre2, self.laser_2d_filtered, self.laser_2d_filtered_angle)
                         res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-                        final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
-
-                        self.add_ghost(final_frontier_pos_arr)
+                        self.add_ghost(res_frontier_pos_arr)
                         self.frontier_delete()
-
-                        if(len(self.frontier_nodes)>0):
+                        frontier_clustered_res_ls = rl_graph.get_clustered_frontier(self)
+                        if(len(frontier_clustered_res_ls)>0):
+                            have_frontier_flag = True
                             break
                         else:
                             predict_ghost_thre2 -= 0.1
-
+                    if(have_frontier_flag==True):
+                        return "ok"
                     rgb_image_ls = get_rgb_image_ls(habitat_env)
                     gt_image_ls = get_gt_image_ls(habitat_env)
                     # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
@@ -719,7 +429,6 @@ class GraphMap(object):
                     self.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
                 else:
                     return "exceed"
-
             return "ok" # 表示没有超过最大步数             
 
 

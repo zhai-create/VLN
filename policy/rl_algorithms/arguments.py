@@ -5,20 +5,7 @@ import numpy as np
 def get_args():
     parser = argparse.ArgumentParser(description="rl-revelent")
 
-    # # 0109_add
-    # parser.add_argument("--is_see_grid_delta", type=int, default=10)
-    # # 0109_add
-    # closer_revise
     parser.add_argument("--is_see_grid_delta", type=int, default=5)
-    # closer_revise
-    # # new_recheck
-    # parser.add_argument("--is_see_grid_delta", type=int, default=10)
-    # # new_recheck
-    # 暂时关闭
-    # new_recheck_train
-    # parser.add_argument("--is_see_grid_delta", type=int, default=10)
-    # new_recheck_train
-    # 暂时关闭
     parser.add_argument("--score_top_k", type=int, default=50)
 
     parser.add_argument("--discount", type=float, default=0.99)

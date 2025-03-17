@@ -63,12 +63,7 @@ def fig2data(fig):
     image = image[:,:,:3]
     return image
 
-def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
-    # if(action_node.node_type=="intention_node"):
-    #     print("node_name:", action_node.name)
-    #     print("action_node_pos:", (action_node.rela_cx, action_node.rela_cy))
-    #     breakpoint()
-    
+def plot_topomap_on_global_map(habitat_env, topo_graph, action_node):    
     label_figure = plt.figure(2, figsize=(3, 5))
     plt.clf()
     ax = plt.gca()
@@ -86,11 +81,9 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
 
 
-    label_action_ls_index = 0
     label_temp_edge_index = 0
     label_new_edge_dict = {}
     graph_num_action_padding = 500
-    selected_intention_node_ls = rl_graph.select_intention(topo_graph)
     
     for temp_node in topo_graph.all_nodes:
         if(temp_node.node_type=="explored_node"):
@@ -114,8 +107,6 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
             # plt.text(ty, tx - 35, "{}".format(temp_node.name), fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
 
         elif(temp_node.node_type=="frontier_node"): # frontier
-            if(label_action_ls_index>=graph_num_action_padding):
-                continue
             res_loc_in_real_world = get_absolute_pos_world(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.world_cx, temp_node.parent_node.world_cy, temp_node.parent_node.world_turn)
             tx, ty = maps.to_grid(
                 res_loc_in_real_world[0],
@@ -124,25 +115,24 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
                 sim=habitat_env.sim,
             )
             
-            if(action_node is not None):
-                if(action_node.name==temp_node.name):
-                    circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-                else:
-                    circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
-            else:
-                circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
+            # if(action_node is not None):
+            #     if(action_node.name==temp_node.name):
+            #         circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            #     else:
+            #         circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
+            # else:
+            #     circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
+
+            circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
             
             ax.add_patch(circle)
             G.add_node(temp_node.name, pos=(ty, tx))
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
             label_temp_edge_index += 1
-            label_action_ls_index += 1
 
             # plt.text(ty, tx - 35, "{}".format(temp_node.name), fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
             
-        elif(temp_node.node_type=="intention_node" and ((temp_node in selected_intention_node_ls))): 
-            if(label_action_ls_index>=graph_num_action_padding):
-                continue
+        elif(temp_node.node_type=="intention_node"): 
             res_loc_in_real_world = get_absolute_pos_world(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.world_cx, temp_node.parent_node.world_cy, temp_node.parent_node.world_turn)
             tx, ty = maps.to_grid(
                 res_loc_in_real_world[0],
@@ -151,27 +141,17 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
                 sim=habitat_env.sim,
             )
 
-            if(action_node is not None):
-                if(action_node.name==temp_node.name):
-                    circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-                else:
-                    circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-            else:
-                circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-            
-            # # 添加 score 文字标注
-            # if(-1 in temp_node.score_ls):
-            #     score_index = temp_node.score_ls.index(-1)
-            #     temp_node_score = temp_node.score_ls[score_index-1]
+            # if(action_node is not None):
+            #     if(action_node.name==temp_node.name):
+            #         circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            #     else:
+            #         circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
             # else:
-            #     temp_node_score = temp_node.score_ls[-1]
-            # plt.text(ty, tx - 35, f"{temp_node_score:.2f}", fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
-            # # 添加 score 文字标注
-
+            #     circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
 
             ax.add_patch(circle)
             G.add_node(temp_node.name, pos=(ty, tx))
-            label_action_ls_index += 1
             label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
             label_temp_edge_index += 1
 
@@ -209,6 +189,138 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node):
 
     pos = nx.get_node_attributes(G, "pos")
     nx.draw_networkx_edges(G, pos, ax=ax, edge_color=(95/255, 95/255, 95/255))
+
+    # 设置坐标轴不可见
+    ax.set_axis_off()
+
+    # 将plt转化为numpy数据
+    canvas = fig2data(label_figure)
+    return canvas
+
+
+def plot_rl_graph(habitat_env, rl_graph, action_node):    
+    label_figure = plt.figure(2, figsize=(3, 5))
+    plt.clf()
+    ax = plt.gca()
+    # 加载背景图片
+    background_image = mpimg.imread("{}/top_down_map.png".format(args.pre_path)) 
+    # 绘制背景图片
+    ax.imshow(background_image)
+    ax.set_xlim(0, background_image.shape[1])  # 设置x轴范围为0到图像宽度
+    ax.set_ylim(background_image.shape[0], 0)
+
+    G = nx.Graph()
+    pos = {}
+    color = {}
+
+    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+
+    label_temp_edge_index = 0
+    label_new_edge_dict = {}
+    graph_num_action_padding = 500
+    
+
+    rl_all_node_name_ls = [temp_rl_node.name for temp_rl_node in rl_graph.all_nodes]
+    for temp_node in rl_graph.all_nodes:
+        if(temp_node.node_type=="explored_node"):
+            tx, ty = maps.to_grid(
+                temp_node.world_cx,
+                temp_node.world_cy,
+                (background_image.shape[0], background_image.shape[1]),
+                sim=habitat_env.sim,
+            )
+
+            circle = plt.Circle((ty, tx), radius=30, color=(142/255,165/255,200/255), zorder=2)  # 设置圆圈的大小、颜色等
+
+            ax.add_patch(circle)
+            G.add_node(temp_node.name, pos=(ty, tx))
+            label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
+            label_temp_edge_index += 1
+
+            # plt.text(ty, tx - 35, "{}".format(temp_node.name), fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+
+        elif(temp_node.node_type=="frontier_node"): # frontier
+            res_loc_in_real_world = get_absolute_pos_world(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.world_cx, temp_node.parent_node.world_cy, temp_node.parent_node.world_turn)
+            tx, ty = maps.to_grid(
+                res_loc_in_real_world[0],
+                res_loc_in_real_world[1],
+                (background_image.shape[0], background_image.shape[1]),
+                sim=habitat_env.sim,
+            )
+            
+            if(action_node is not None):
+                if(action_node.name==temp_node.name):
+                    circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+                else:
+                    circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
+            else:
+                circle = plt.Circle((ty, tx), radius=20, color=(161/255,125/255,180/255), zorder=2)  # 设置圆圈的大小、颜色等
+
+            ax.add_patch(circle)
+            G.add_node(temp_node.name, pos=(ty, tx))
+            label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
+            label_temp_edge_index += 1
+
+            # plt.text(ty, tx - 35, "{}".format(temp_node.name), fontsize=10, color="black", ha="center", bbox=dict(facecolor='white', alpha=0.5, edgecolor='none'))
+            
+        elif(temp_node.node_type=="intention_node"): 
+            res_loc_in_real_world = get_absolute_pos_world(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.world_cx, temp_node.parent_node.world_cy, temp_node.parent_node.world_turn)
+            tx, ty = maps.to_grid(
+                res_loc_in_real_world[0],
+                res_loc_in_real_world[1],
+                (background_image.shape[0], background_image.shape[1]),
+                sim=habitat_env.sim,
+            )
+
+            if(action_node is not None):
+                if(action_node.name==temp_node.name):
+                    circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+                else:
+                    circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            else:
+                circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+
+            ax.add_patch(circle)
+            G.add_node(temp_node.name, pos=(ty, tx))
+            label_new_edge_dict.update({temp_node.name: label_temp_edge_index})
+            label_temp_edge_index += 1    
+    
+    for temp_node in rl_graph.all_nodes:
+        if(temp_node.name in label_new_edge_dict):
+            if(temp_node.node_type=="explored_node"):
+                for temp_neighbor_name in temp_node.neighbor:
+                    if(temp_neighbor_name in rl_all_node_name_ls):
+                        G.add_edge(temp_neighbor_name, temp_node.name)
+            else:
+                G.add_edge(temp_node.parent_node.name, temp_node.name)
+        else:
+            continue
+
+    current_tx, current_ty = maps.to_grid(
+            world_cx,
+            world_cy,
+            (background_image.shape[0], background_image.shape[1]),
+            sim=habitat_env.sim,
+        )
+
+    circle = plt.Circle((current_ty, current_tx), radius=30, color=(235/255,161/255,51/255), zorder=2)  # 设置圆圈的大小、颜色等
+    ax.add_patch(circle)
+
+    if(action_node is not None):
+        sub_goal_absolute_pos = get_absolute_pos_world(action_node.rela_cx, action_node.rela_cy, action_node.parent_node.world_cx, action_node.parent_node.world_cy, action_node.parent_node.world_turn)
+        sub_goal_tx, sub_goal_ty = maps.to_grid(
+            sub_goal_absolute_pos[0],
+            sub_goal_absolute_pos[1],
+            (background_image.shape[0], background_image.shape[1]),
+            sim=habitat_env.sim,
+        )
+
+        circle = plt.Circle((sub_goal_ty, sub_goal_tx), radius=30, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+        ax.add_patch(circle)
+
+    pos = nx.get_node_attributes(G, "pos")
+    nx.draw_networkx_edges(G, pos, ax=ax, edge_color=(95/255, 95/255, 95/255))
+
 
     # 设置坐标轴不可见
     ax.set_axis_off()
@@ -272,7 +384,10 @@ def init_mp4(pre_model, episode_index):
 
 
 def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=None, vln_sim=None):
-    plt_topo_map = plot_topomap_on_global_map(habitat_env, topo_graph, rl_graph, action_node)
+    plt_topo_map = plot_topomap_on_global_map(habitat_env, topo_graph, action_node)
+    plt_rl_graph_map = plot_rl_graph(habitat_env, rl_graph, action_node)
+    plt_topo_map = np.concatenate((plt_topo_map, plt_rl_graph_map), axis=1)
+
 
     rgb_image_ls = get_rgb_image_ls(habitat_env) # [1, 2, 3, 4]
     video_image = rgb_image_ls[0][..., ::-1]

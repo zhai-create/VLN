@@ -77,12 +77,8 @@ def forth_check(middle, current_node, nodes_list):
                     for temp2_j in range(max(gy-1 ,0), min(gy+2, temp_map.shape[1])):
                         around_ls.append(temp_map[temp2_i, temp2_j, 0])
                 around = np.array(around_ls)
-                
                 diff = np.absolute(around-args.ghost_map_g_val)
                 diff = np.sort(diff)
                 if diff[args.thre_for_delete] >= args.ghost_diff_thre or max(around) >= args.ghost_map_thre:
-                # # laser_revise
-                # if diff[args.thre_for_delete] >= args.ghost_diff_thre:
-                # # laser_revise
                     return False
     return True

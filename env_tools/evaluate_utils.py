@@ -134,8 +134,8 @@ class Evaluate:
                 if(action_node.node_type=="frontier_node"):
                     topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
 
-                    # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
-                    reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
+                    reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
+                    # reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
 
                     rl_graph.data['arrive'] = False
                     HabitatAction.reward_per_episode += reward_per_rl_step
@@ -145,11 +145,11 @@ class Evaluate:
                     topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
                     
                     if(distance_to_goal<=1.0):
-                        # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+40
-                        reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+40
+                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+40
+                        # reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+40
                     else:
-                        # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5
-                        reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5
+                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5
+                        # reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5
                     
                     rl_graph.data['arrive'] = True
                     HabitatAction.reward_per_episode += reward_per_rl_step
@@ -228,8 +228,8 @@ class Evaluate:
                 
                 topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
                 
-                # reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
-                reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
+                reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
+                # reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
 
             
                 rl_graph.data['arrive'] = False
