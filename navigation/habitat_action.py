@@ -5,6 +5,8 @@ from habitat.sims.habitat_simulator.actions import HabitatSimActions
 from navigation.arguments import args
 from env_tools.arguments import args as env_args
 from graph.tools import get_absolute_pos
+from graph.arguments import args as graph_args
+from perception.arguments import args as perception_args
 
 class HabitatAction:
     """
@@ -30,6 +32,11 @@ class HabitatAction:
 
     scene_file_dict = {}
     object_id_num_ls = []
+
+    init_all_map_loc = np.array([[500, 500]]) # size: (1001, 1001)
+    init_intention_num = 0
+
+    name_val = 0
 
     @staticmethod
     def get_current_scene_dict(habitat_env, graph_train):
@@ -74,7 +81,7 @@ class HabitatAction:
 
         elif(object_text=="tv_monitor"):
             for temp_object_name in scene_file_dict:
-                if(temp_object_name==object_text) or (temp_object_name=="tv"):
+                if(temp_object_name==object_text) or (temp_object_name=="tv") or (temp_object_name=="monitor") or (temp_object_name=="tv "):
                     object_id_num_ls += scene_file_dict[temp_object_name]
 
         else:
@@ -102,6 +109,37 @@ class HabitatAction:
         HabitatAction.scene_file_dict = HabitatAction.get_current_scene_dict(habitat_env, graph_train)
         HabitatAction.object_id_num_ls = HabitatAction.get_object_num_ls(HabitatAction.scene_file_dict, object_text)
 
+        HabitatAction.init_all_map_loc = np.array([[500, 500]]) # size: (1001, 1001)
+        HabitatAction.init_intention_num = 0
+
+        HabitatAction.name_val = 0
+
+    @staticmethod
+    def get_all_map_loc(topo_graph):
+        for temp_node in topo_graph.explored_nodes:
+            if(temp_node.name == '0'):
+                origin_row_col_indices = np.argwhere(temp_node.occupancy_map[:, :, 0] != graph_args.unknown_val)+400
+                HabitatAction.init_all_map_loc = np.concatenate((HabitatAction.init_all_map_loc, origin_row_col_indices))
+            else:
+                zero_name_node = topo_graph.get_node("0")   
+                temp_node_in_zero_node = zero_name_node.all_other_nodes_loc[temp_node.name]
+                origin_row_col_indices = np.argwhere(temp_node.occupancy_map[:, :, 0] != graph_args.unknown_val)
+                
+                res_row_col_indices = []
+                for temp_row_col_index in range(origin_row_col_indices.shape[0]):
+                    row_index, column_index = origin_row_col_indices[temp_row_col_index][0], origin_row_col_indices[temp_row_col_index][1] 
+                    rela_row_column_loc = get_absolute_pos(np.array([perception_args.graid_map_scale-graph_args.resolution*row_index, graph_args.resolution*column_index-perception_args.graid_map_scale]), temp_node_in_zero_node[:2], temp_node_in_zero_node[2])
+                    row_column_t2 = rela_row_column_loc/graph_args.resolution
+                    row_column_p2 = np.array([-row_column_t2[0], row_column_t2[1]])
+                    row_column_loc = row_column_p2+np.array([500, 500])
+
+                    new_row_index = round(row_column_loc[0])
+                    new_column_index = round(row_column_loc[1])
+                    res_row_col_indices.append([new_row_index, new_column_index])
+                res_row_col_indices = np.array(res_row_col_indices)
+                if(len(res_row_col_indices)>0):
+                    HabitatAction.init_all_map_loc = np.concatenate((HabitatAction.init_all_map_loc, res_row_col_indices))
+        HabitatAction.init_all_map_loc = np.unique(HabitatAction.init_all_map_loc, axis = 0)
 
     @staticmethod
     def set_habitat_action(action_name, topo_graph):

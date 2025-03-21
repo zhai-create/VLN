@@ -50,10 +50,6 @@ class GraphMap(object):
         self.intention_nodes = []
         self.all_nodes = []
 
-        # self.determine_loc_ls = []
-        self.deleted_cluster_frontier_ls = []
-        self.deleted_intention_ls = []
-
         self.current_node = None
         self.current_rotate_node = None
 
@@ -65,6 +61,7 @@ class GraphMap(object):
         self.point_for_close_loop_detection=None
         self.laser_2d_filtered=None
         self.laser_2d_filtered_angle=None
+        self.pixel_y_2d_filtered = None
         
         self.habitat_env = habitat_env
 
@@ -86,6 +83,20 @@ class GraphMap(object):
         for temp_node in self.explored_nodes:            
             sub_frontiers_for_index = copy.deepcopy(temp_node.sub_frontiers)
             for temp_frontier in sub_frontiers_for_index: # 遍历所有的frontier
+                # 先删除使得rl_step中实际行走的step为0的frontier
+                # ===================================
+                need_delete_flag = False
+                for temp_delete_frontier in temp_node.deleted_frontiers:
+                    if ((temp_delete_frontier.rela_cx-temp_frontier.rela_cx)**2+(temp_delete_frontier.rela_cy-temp_frontier.rela_cy)**2)**0.5<0.2:
+                        need_delete_flag = True
+                        break
+                if(need_delete_flag == True):
+                    temp_node.sub_frontiers.remove(temp_frontier)
+                    self.frontier_nodes.remove(temp_frontier)
+                    self.all_nodes.remove(temp_frontier)
+                    continue
+                # ===================================
+
                 if temp_node.name != self.current_node.name:
                     n_in_current_node = self.current_node.all_other_nodes_loc[temp_node.name] # 将node中的ghost坐标位置转换到当前node下
                     g_ref_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
@@ -104,11 +115,12 @@ class GraphMap(object):
                         temp_node.sub_frontiers.remove(temp_frontier)
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
+
                     elif dis <= args.thre_for_blacklist_delete:
                         temp_node.sub_frontiers.remove(temp_frontier)
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
-                
+                        clear_fake_frontier(self.current_node, gx, gy)
 
     def multi_check_frontier(self, candidate_frontier_arr):
         res_frontier_pos_arr = []
@@ -131,10 +143,22 @@ class GraphMap(object):
                 mx = -(gx - half_len) * args.resolution
                 my = (gy - half_len) * args.resolution
                 middle = np.array([mx, my]) # in ref frame (meter)
+                third_flag = third_check(middle, self.current_node)
+                if third_flag == False:
+                    continue
                 forth_flag = forth_check(middle, self.current_node, self.explored_nodes)
                 if forth_flag == True:
                     res_frontier_pos_arr.append([middle[0], middle[1]])
+
         return np.array(res_frontier_pos_arr)
+
+    # def multi_check_frontier_temp(self, candidate_frontier_arr):
+    #     res_frontier_pos_arr = []
+    #     r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
+    #     for index in range(candidate_frontier_arr.shape[0]):
+    #         center_loc_in_ref = np.dot(r_matrix, candidate_frontier_arr[index]) + np.array([self.rela_cx, self.rela_cy])
+    #         res_frontier_pos_arr.append([center_loc_in_ref[0], center_loc_in_ref[1]])
+    #     return np.array(res_frontier_pos_arr)
 
     def select_see_ghost(self, res_frontier_pos_arr):
         final_frontier_pos_arr = []
@@ -192,11 +216,18 @@ class GraphMap(object):
     def add_ghost(self, final_frontier_pos_arr):
         for index in range(len(final_frontier_pos_arr)):
             res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
+            
+            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+            res_rela_loc = get_relative_pos_world(res_loc_in_real_world[0], res_loc_in_real_world[1], world_cx, world_cy, world_turn)
+            laser_direct = (np.arctan2(res_rela_loc[1], res_rela_loc[0]))*180/np.pi
+
+            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], laser_direct=laser_direct) 
             self.current_node.sub_frontiers.append(new_frontier)
             self.frontier_nodes.append(new_frontier)
             self.all_nodes.append(new_frontier)
-    
+
+
+
     
     # def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text):
     #     rela_loc = np.array([self.rela_cx, self.rela_cy])
@@ -316,12 +347,13 @@ class GraphMap(object):
 
 
     def get_laser_result(self, depth):
-        laser_2d_filtered, laser_2d_filtered_angle = \
+        laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered = \
         get_laser_point(depth)
 
         # 表示最新的laser感知信息
         self.laser_2d_filtered = laser_2d_filtered
         self.laser_2d_filtered_angle = laser_2d_filtered_angle
+        self.pixel_y_2d_filtered = pixel_y_2d_filtered
     
     def update(self):
         flag, predict_node, final_t, final_theta = find_current_node_world(self.explored_nodes, self.habitat_env, self.current_node)
@@ -375,27 +407,29 @@ class GraphMap(object):
     def update_graph_frontier(self):
         candidate_frontier_arr = predict_frontier(args.init_predict_ghost_thre1, self.laser_2d_filtered, self.laser_2d_filtered_angle)
         res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-        self.add_ghost(res_frontier_pos_arr)
+        final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
+        self.add_ghost(final_frontier_pos_arr)
         self.frontier_delete()
+
 
     
     # 在决策之前，先判断action_pace是否为空？若为空，才进行该操作
-    def ghost_patch(self, habitat_env, object_goal, rl_graph):
+    def ghost_patch(self, habitat_env, object_goal):
         depth = fix_depth(self.obs["depth"])
         self.get_laser_result(depth)
         predict_ghost_thre1 = args.init_predict_ghost_thre1
         while predict_ghost_thre1>=0:
             candidate_frontier_arr = predict_frontier(predict_ghost_thre1, self.laser_2d_filtered, self.laser_2d_filtered_angle)
             res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-            self.add_ghost(res_frontier_pos_arr)
+            final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
+            self.add_ghost(final_frontier_pos_arr)
             self.frontier_delete()
-            frontier_clustered_res_ls = rl_graph.get_clustered_frontier(self)
-            if(len(frontier_clustered_res_ls)>0):
+            if(len(self.frontier_nodes)>0):
                 break
             else:
                 predict_ghost_thre1 -= 0.1
 
-        if(len(frontier_clustered_res_ls)>0):
+        if(len(self.frontier_nodes)>0):
             return "ok" # 表示没有超过最大步数
         else: # 如果用当前点云进行阈值缩小后仍然没有找到合适的点云，则转圈
             for i in range(12):
@@ -405,23 +439,21 @@ class GraphMap(object):
                     print("======> patch <=====")
                     depth = fix_depth(observations["depth"])
                     self.get_laser_result(depth)
-                    self.current_node.update_occupancy(self.laser_2d_filtered, self.laser_2d_filtered_angle, np.array([self.rela_cx, self.rela_cy]), self.rela_turn)
+                    self.current_node.update_occupancy(self.laser_2d_filtered, self.laser_2d_filtered_angle, self.pixel_y_2d_filtered, np.array([self.rela_cx, self.rela_cy]), self.rela_turn)
                     predict_ghost_thre2 = args.init_predict_ghost_thre1
                     
-                    have_frontier_flag = False
                     while predict_ghost_thre2>=0:
                         candidate_frontier_arr = predict_frontier(predict_ghost_thre2, self.laser_2d_filtered, self.laser_2d_filtered_angle)
                         res_frontier_pos_arr = self.multi_check_frontier(candidate_frontier_arr)
-                        self.add_ghost(res_frontier_pos_arr)
+                        final_frontier_pos_arr = self.select_see_ghost(res_frontier_pos_arr)
+                        self.add_ghost(final_frontier_pos_arr)
                         self.frontier_delete()
-                        frontier_clustered_res_ls = rl_graph.get_clustered_frontier(self)
-                        if(len(frontier_clustered_res_ls)>0):
-                            have_frontier_flag = True
+
+                        if(len(self.frontier_nodes)>0):
                             break
                         else:
                             predict_ghost_thre2 -= 0.1
-                    if(have_frontier_flag==True):
-                        return "ok"
+
                     rgb_image_ls = get_rgb_image_ls(habitat_env)
                     gt_image_ls = get_gt_image_ls(habitat_env)
                     # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)

@@ -2,6 +2,7 @@ import numpy as np
 from graph.tools import fix_size, inverse_scanner, get_absolute_pos, find_node_path
 from perception.arguments import args as perception_args
 from graph.arguments import args
+from navigation.habitat_action import HabitatAction
 
 
 
@@ -9,12 +10,10 @@ half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 class Node(object):
 
-    name_val = 0
-
-    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None):
+    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None, laser_direct=None):
         self.node_type = node_type # 直接赋值, str
-        self.name = str(Node.name_val) # 在graph update时赋值, str
-        Node.name_val += 1
+        self.name = str(HabitatAction.name_val) # 在graph update时赋值, str
+        HabitatAction.name_val += 1
 
         self.rela_cx = rela_cx # explored用默认值，其他结点需要赋值, float
         self.rela_cy = rela_cy # frontiet的cx和cy分别为ghost.middle[0]和middle[1], float
@@ -27,6 +26,8 @@ class Node(object):
         self.bounding_box_embedding = bounding_box_embedding
 
         self.dis = (rela_cx**2+rela_cy**2)**0.5 # float
+
+        self.laser_direct = laser_direct
 
         self.is_see = False # bool
 
@@ -71,6 +72,9 @@ class Node(object):
 
         self.pc = pc
 
+        self.deleted_frontiers = [] # rl_step中实际行走步数为0的frontier
+        self.deleted_intentions = [] # rl_step中实际行走步数为0的intention
+
     def __eq__(self, other):
         if isinstance(other, Node):
             return self.name == other.name
@@ -106,7 +110,7 @@ class Node(object):
 
 
     
-    def update_occupancy(self, laser_2d_filtered, laser_2d_filtered_angle, relative_loc, relative_turn):
+    def update_occupancy(self, laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered, relative_loc, relative_turn):
         laser_2d_filtered, laser_2d_filtered_angle = fix_size(laser_2d_filtered, laser_2d_filtered_angle)
         
         # =====> bug_revise <=====
@@ -114,7 +118,7 @@ class Node(object):
             return
         # =====> bug_revise <=====
         
-        sub_map = inverse_scanner(laser_2d_filtered, laser_2d_filtered_angle, relative_loc, relative_turn)
+        sub_map = inverse_scanner(laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered, relative_loc, relative_turn)
 
         temp_map = np.subtract(1.0, self.occupancy_map)
         temp_map = np.divide(self.occupancy_map, temp_map)

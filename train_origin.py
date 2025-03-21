@@ -49,7 +49,7 @@ if __name__=="__main__":
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
         # train_note = "_two_dim_12_factor_frontier_sector_gt" # 注释当前训练处于什么阶段
-        train_note = "_two_dim_12_factor_frontier_cluster_gt" # 注释当前训练处于什么阶段
+        train_note = "_12_factor_frontier_cluster_seg_reward_gt_train" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -107,8 +107,8 @@ if __name__=="__main__":
     # =====> select episodes <=====
     id_dict = {
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00669-DNWbUAJYsPy/DNWbUAJYsPy.basis.glb":["tv_monitor", "bed", "sofa", "chair", "toilet"],
-        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00166-RaYrxWt5pR1/RaYrxWt5pR1.basis.glb":["tv_monitor", "toilet", "chair", "plant", "sofa"],
-        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00404-QN2dRqwd84J/QN2dRqwd84J.basis.glb":["sofa", "bed", "plant", "tv_monitor", "toilet"],
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00166-RaYrxWt5pR1/RaYrxWt5pR1.basis.glb":["tv_monitor", "toilet", "chair", "plant", "sofa"], 
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00404-QN2dRqwd84J/QN2dRqwd84J.basis.glb":["sofa", "bed", "plant", "tv_monitor", "toilet"], 
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00706-YHmAkqgwe2p/YHmAkqgwe2p.basis.glb":["bed", "toilet", "chair", "sofa"],
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00324-DoSbsoo4EAg/DoSbsoo4EAg.basis.glb":["bed", "tv_monitor"],
 
@@ -123,6 +123,28 @@ if __name__=="__main__":
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00323-yHLr6bvWsVm/yHLr6bvWsVm.basis.glb":["bed", "tv_monitor", "toilet"],
         "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00327-xgLmjqzoAzF/xgLmjqzoAzF.basis.glb":["bed", "toilet", "chair"],
     }
+
+    area_dict = {
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00669-DNWbUAJYsPy/DNWbUAJYsPy.basis.glb": 129.99,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00166-RaYrxWt5pR1/RaYrxWt5pR1.basis.glb": 220.18,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00404-QN2dRqwd84J/QN2dRqwd84J.basis.glb": 171.28,  
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00706-YHmAkqgwe2p/YHmAkqgwe2p.basis.glb": 110.49 ,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00324-DoSbsoo4EAg/DoSbsoo4EAg.basis.glb": 259.68,
+
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00017-oEPjPNSPmzL/oEPjPNSPmzL.basis.glb": 212.73,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00031-Wo6kuutE9i7/Wo6kuutE9i7.basis.glb": 120.95,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00099-226REUyJh2K/226REUyJh2K.basis.glb": 420.58,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00105-xWvSkKiWQpC/xWvSkKiWQpC.basis.glb": 451.53,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00250-U3oQjwTuMX8/U3oQjwTuMX8.basis.glb": 881.54,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00251-wsAYBFtQaL7/wsAYBFtQaL7.basis.glb": 312.67,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00254-YMNvYDhK8mB/YMNvYDhK8mB.basis.glb": 225.5,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00255-NGyoyh91xXJ/NGyoyh91xXJ.basis.glb": 179.34,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00323-yHLr6bvWsVm/yHLr6bvWsVm.basis.glb": 142.1,
+        "./dependencies/habitat-lab/data/scene_datasets/hm3d_v0.2/train/00327-xgLmjqzoAzF/xgLmjqzoAzF.basis.glb": 1059.28,
+    }
+
+
+
     selected_episodes = []
     for index, temp_episode in enumerate(habitat_env.episodes):
         if(temp_episode.scene_id in id_dict.keys()):
@@ -175,7 +197,7 @@ if __name__=="__main__":
             # get sensor data: depth, 2d_laser
             depth = fix_depth(observations["depth"])
             topo_graph.get_laser_result(depth)
-            topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
+            topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
             topo_graph.update_graph_frontier()
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
@@ -194,6 +216,9 @@ if __name__=="__main__":
             if(env_args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
+        # 获得初始all_map_loc和初始intention_node的个数
+        HabitatAction.get_all_map_loc(topo_graph)
+        HabitatAction.init_intention_num = len(topo_graph.intention_nodes)
 
         # rl_graph_update
         rl_graph.update(topo_graph)
@@ -211,7 +236,7 @@ if __name__=="__main__":
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
                 print("=====> real_action_selection <=====")
             else:
-                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, rl_graph)
+                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
                 rl_graph.update(topo_graph)
                 if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
                     print("=====> ghost_patch <=====")
@@ -225,7 +250,7 @@ if __name__=="__main__":
                         achieved_result = "empty"
                     else:
                         achieved_result = "exceed"
-                    Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph)
+                    Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph, scene_area=area_dict[habitat_env.current_episode.scene_id])
                     break
             action_node = rl_graph.all_nodes[polict_action]
             achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
@@ -238,7 +263,7 @@ if __name__=="__main__":
             print("======> achieved_result <=====", achieved_result)
             print("=====> action_node_type <=====", action_node.node_type)
 
-            evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph)
+            evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph, scene_area=area_dict[habitat_env.current_episode.scene_id])
             if(achieved_result=="block" or achieved_result=="Failed_Plan" or achieved_result=="exceed"):
                 break
 

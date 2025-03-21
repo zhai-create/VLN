@@ -26,17 +26,24 @@ from habitat_sim.utils.common import d3_40_colors_rgb
 
 import time
 
+from habitat.utils.visualizations.utils import (
+    images_to_video,
+    observations_to_image,
+    overlay_frame,
+)
 
-def get_top_down_map(habitat_env):
-    top_down_map = maps.get_topdown_map_from_sim(
-        cast("HabitatSim", habitat_env.sim), map_resolution=1024
-    )
-    recolor_map = np.array(
-        [[255, 255, 255], [200, 200, 200], [0, 0, 0]], dtype=np.uint8
-    )
-    top_down_map = recolor_map[top_down_map]
+
+def get_top_down_map(habitat_env, observations):
+    # top_down_map = maps.get_topdown_map_from_sim(cast("HabitatSim", habitat_env.sim), map_resolution=1024)
+    # recolor_map = np.array(
+    #     [[255, 255, 255], [200, 200, 200], [0, 0, 0]], dtype=np.uint8
+    # )
+    # top_down_map = recolor_map[top_down_map]
+    # cv2.imwrite("{}/top_down_map.png".format(args.pre_path), top_down_map)
+
+    info = habitat_env.get_metrics()
+    top_down_map = maps.colorize_draw_agent_and_fit_to_height(info["top_down_map"], 1024)
     cv2.imwrite("{}/top_down_map.png".format(args.pre_path), top_down_map)
-
 
 
 def fig2data(fig):
@@ -411,15 +418,12 @@ def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo
     occu_for_show = (occu_for_show*255).astype(np.uint8)
     
 
-    # # 临时添加
-    # for temp_frontier in topo_graph.current_node.sub_frontiers:
-    #     if(temp_frontier.name=="18"):
-    #         center_point_g1 = (int)(100-temp_frontier.rela_cx/0.1)
-    #         center_point_g2 = (int)(100+temp_frontier.rela_cy/0.1)
-    #         cv2.circle(occu_for_show, (center_point_g2, center_point_g1), 2, (0, 0, 0), 2)
-    #         cv2.imwrite("occu_for_show.jpg", occu_for_show)
-    #         breakpoint()
-    # # 临时添加
+    # 临时添加
+    for temp_frontier in topo_graph.current_node.sub_frontiers:
+        center_point_g1 = (int)(100-temp_frontier.rela_cx/0.1)
+        center_point_g2 = (int)(100+temp_frontier.rela_cy/0.1)
+        cv2.circle(occu_for_show, (center_point_g2, center_point_g1), 2, (0, 0, 0), 2)
+    # 临时添加
 
     # cv2.putText(occu_for_show, "{}".format(HabitatAction.count_steps-1), args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
     cv2.putText(occu_for_show, "{}".format(topo_graph.current_node.name), args.font_pos2, cv2.FONT_HERSHEY_SIMPLEX, args.font_size, (255, 255, 255), args.font_width)
@@ -433,6 +437,11 @@ def save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo
     semantic_img.putdata((gt_image_ls[0].flatten() % 40).astype(np.uint8))
     gt_image = np.array(semantic_img.convert("RGB"))
     gt_writer.append_data(gt_image)
+
+
+    # np.save('save_middle_res/{}_origin.npy'.format(HabitatAction.count_steps), gt_image_ls[0])
+    # cv2.imwrite('save_middle_res/{}.jpg'.format(HabitatAction.count_steps), gt_image)
+    # np.save('save_middle_res/{}_rgb.npy'.format(HabitatAction.count_steps), gt_image)
 
     
 

@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '1'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import cv2
 import habitat
 import time
@@ -48,7 +48,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_train_val"
     else:
-        val_note = "_two_dim_12_factor_frontier_cluster_gt_train_val"
+        val_note = "_12_factor_frontier_cluster_seg_reward_gt_train_val"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -78,11 +78,11 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
 
-    for temp_pre_model in range(35, 80000, 10):
+    for temp_pre_model in range(30, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_16_15_49_26_two_dim_12_factor_frontier_cluster_gt"
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_20_14_15_56_12_factor_frontier_cluster_seg_reward_gt_train"
         
         while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
@@ -131,7 +131,7 @@ if __name__=="__main__":
                 # get sensor data: depth, 2d_laser
                 depth = fix_depth(observations["depth"])
                 topo_graph.get_laser_result(depth)
-                topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
+                topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
                 topo_graph.update_graph_frontier()
 
                 rgb_image_ls = get_rgb_image_ls(habitat_env)
@@ -157,7 +157,7 @@ if __name__=="__main__":
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
                     print("=====> real_action_selection <=====")
                 else:
-                    ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, rl_graph)
+                    ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
                     rl_graph.update(topo_graph)
                     if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
                         print("=====> ghost_patch <=====")

@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '2'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '2'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import cv2
 import habitat
 import habitat_sim
@@ -46,7 +46,7 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 285
+    args.graph_pre_model = 170
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
@@ -63,7 +63,7 @@ if __name__=="__main__":
     args.success_distance = 1.0 
     args.max_steps = 500
 
-    args.is_vis = True # 录制视频
+    args.is_vis = False # 录制视频
 
     rl_args.score_top_k = 50
     if(args.is_llm==2):
@@ -88,26 +88,34 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_16_15_45_53_two_dim_12_factor_frontier_cluster_topo_reward_gt"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_20_14_15_56_12_factor_frontier_cluster_seg_reward_gt_train"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
+    # false_index_ls = [1, 17, 18, 19, 28, 41, 42, 50, 51, 53, 54, 62, 67, 80, 81, 89, 90, 94, 99]
+    # false_index_ls = [67]
+
     for index_in_episodes in tqdm(range(args.graph_episode_num)):   
-        # 用于录制视频
-        if(args.is_vis==True):
-            occu_writer, video_writer, map_writer, gt_writer = init_mp4(pre_model=args.graph_pre_model, episode_index=index_in_episodes+1)
-            get_top_down_map(habitat_env)
-        
         # rl_graph_init
         rl_graph = RL_Graph()
         # haitat_episode_init
         print("=====> scene_id <=====", habitat_env.current_episode.scene_id)
 
         observations = habitat_env.reset()
+
+        # 用于录制视频
+        if(args.is_vis==True):
+            occu_writer, video_writer, map_writer, gt_writer = init_mp4(pre_model=args.graph_pre_model, episode_index=index_in_episodes+1)
+            get_top_down_map(habitat_env, observations)
+
+
         object_goal = args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
 
-        # if(index_in_episodes<200):
+        # if((index_in_episodes+1) not in false_index_ls):
+        #     continue
+
+        # if(index_in_episodes<4):
         #     continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
@@ -126,7 +134,7 @@ if __name__=="__main__":
             # get sensor data: depth, 2d_laser
             depth = fix_depth(observations["depth"])
             topo_graph.get_laser_result(depth)
-            topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
+            topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
             topo_graph.update_graph_frontier()
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
@@ -152,7 +160,7 @@ if __name__=="__main__":
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
                 print("=====> real_action_selection <=====")
             else:
-                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal, rl_graph)
+                ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
                 rl_graph.update(topo_graph)
                 if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
                     print("=====> ghost_patch <=====")

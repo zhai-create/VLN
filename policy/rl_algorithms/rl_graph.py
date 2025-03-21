@@ -95,13 +95,14 @@ class RL_Graph(object):
         for temp_intention_node in topo_graph.intention_nodes:
             # 先删除使得rl_step中实际行走的step为0的intention
             # ===================================
+            temp_intention_parent_node = temp_intention_node.parent_node
             need_delete_flag = False
-            for temp_delete_intention in topo_graph.deleted_intention_ls:
-                if ((temp_delete_intention.world_cx-temp_intention_node.world_cx)**2+(temp_delete_intention.world_cy-temp_intention_node.world_cy)**2)**0.5<0.2:
+            for temp_delete_intention in temp_intention_parent_node.deleted_intentions:
+                if ((temp_delete_intention.rela_cx-temp_intention_node.rela_cx)**2+(temp_delete_intention.rela_cy-temp_intention_node.rela_cy)**2)**0.5<0.2:
                     need_delete_flag = True
                     break
-            if(need_delete_flag == True):
-                continue
+                if(need_delete_flag == True):
+                    continue
             # ===================================
 
             if(temp_intention_node.is_see==True):
@@ -113,11 +114,11 @@ class RL_Graph(object):
                 else:
                     temp_intention_node.is_see = False
 
-        # object_score_ls = sorted(object_score_ls, key=lambda node: node.score, reverse=True)
-        # if(len(object_score_ls)>args.score_top_k):
-        #     object_score_ls = object_score_ls[0:args.score_top_k]
-        # else:
-        #     object_score_ls = object_score_ls[:]
+        object_score_ls = sorted(object_score_ls, key=lambda node: node.score, reverse=True)
+        if(len(object_score_ls)>args.score_top_k):
+            object_score_ls = object_score_ls[0:args.score_top_k]
+        else:
+            object_score_ls = object_score_ls[:]
         return object_score_ls
     
     def get_clustered_frontier(self, topo_graph):
@@ -137,36 +138,25 @@ class RL_Graph(object):
             else:
                 cluster_res_dict[all_frontier_labels[temp_index]].append(topo_graph.frontier_nodes[temp_index])
 
-
         frontier_clustered_res_ls = []
         for temp_key in cluster_res_dict:
             cluster_node_ls = cluster_res_dict[temp_key]
-            cluster_node_parent_name_ls = [temp_node.parent_node.name for temp_node in cluster_node_ls]
-            counter = Counter(cluster_node_parent_name_ls)
-            # 找到最大出现次数
-            max_count = max(counter.values())
-            # 得到出现次数最多的父节点的名字
-            max_cnt_parent_name = [item for item, count in counter.items() if count == max_count][0]
-            max_cnt_parent_node = topo_graph.get_node(max_cnt_parent_name)
-
-            cluster_node_parent_name_ls = np.array([[temp_node.world_cx, temp_node.world_cy] for temp_node in cluster_node_ls])
-            cluster_mean_world_loc = np.mean(cluster_node_parent_name_ls, axis=0)
-            cluster_world_cx, cluster_world_cy = cluster_mean_world_loc[0], cluster_mean_world_loc[1]
-            cluster_rela_pos = get_relative_pos_world(cluster_world_cx, cluster_world_cy, max_cnt_parent_node.world_cx, max_cnt_parent_node.world_cy, max_cnt_parent_node.world_turn)
             
-            # 先删除使得rl_step中实际行走的step为0的frontier
-            # ===================================
-            need_delete_flag = False
-            for temp_delete_frontier in topo_graph.deleted_cluster_frontier_ls:
-                if ((temp_delete_frontier.world_cx-cluster_world_cx)**2+(temp_delete_frontier.world_cy-cluster_world_cy)**2)**0.5<0.2:
-                    need_delete_flag = True
-                    break
-            if(need_delete_flag == True):
-                continue
-            # ===================================
+            min_dis = 10000
+            min_node = None
+            for temp_node_in_cluster in cluster_node_ls:
+                if temp_node_in_cluster.parent_node.name != topo_graph.current_node.name:
+                    n_in_current_node = topo_graph.current_node.all_other_nodes_loc[temp_node_in_cluster.parent_node.name] # 将node中的ghost坐标位置转换到当前node下
+                    g_ref_loc = get_absolute_pos(np.array([temp_node_in_cluster.rela_cx, temp_node_in_cluster.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+                else:
+                    g_ref_loc = np.array([temp_node_in_cluster.rela_cx, temp_node_in_cluster.rela_cy])
 
-            new_frontier = Node(node_type="frontier_node", rela_cx=cluster_rela_pos[0], rela_cy=cluster_rela_pos[1], parent_node=max_cnt_parent_node, world_cx=cluster_world_cx, world_cy=cluster_world_cy)
-            frontier_clustered_res_ls.append(new_frontier)
+                temp_dis = ((g_ref_loc[0]-topo_graph.rela_cx)**2+(g_ref_loc[1]-topo_graph.rela_cy)**2)**0.5
+                if temp_dis<min_dis:
+                    min_dis = temp_dis
+                    min_node = temp_node_in_cluster
+            
+            frontier_clustered_res_ls.append(min_node)
         return frontier_clustered_res_ls
 
 

@@ -35,7 +35,7 @@ free_val = args.free_val
 obstacle_dis = args.obstacle_dis
 
 @jit(nopython=True)
-def inverse_scanner(laser_2d_filtered, laser_2d_filtered_angle, relative_loc, relative_turn):
+def inverse_scanner(laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered, relative_loc, relative_turn):
     size = 2*half_len+1
     sub_map = np.ones((size, size, 1))/2
     x, y = (int)(half_len-relative_loc[0]/RESOLUTION), (int)(half_len+relative_loc[1]/RESOLUTION)
@@ -59,10 +59,14 @@ def inverse_scanner(laser_2d_filtered, laser_2d_filtered_angle, relative_loc, re
                 else:
                     k = k2
                     diff = difference2[k2]
+
                 if (r > laser_2d_filtered[k]*DEPTH_SCALE+alpha) or (diff > beta):
                     sub_map[i,j,0] = unknown_val
                 elif np.abs(r-laser_2d_filtered[k]*DEPTH_SCALE) < alpha and laser_2d_filtered[k]*DEPTH_SCALE>obstacle_dis:
-                    sub_map[i,j,0] = obstacle_val               
+                    if(abs(pixel_y_2d_filtered[k]*DEPTH_SCALE-5)<=1e-3):
+                        sub_map[i,j,0] = free_val    
+                    else:
+                        sub_map[i,j,0] = obstacle_val                 
                 elif r < laser_2d_filtered[k]*DEPTH_SCALE:
                     sub_map[i,j,0] = free_val
     return sub_map
@@ -76,8 +80,9 @@ def clear_fake_frontier(current_node, gx, gy):
     current_map = current_node.occupancy_map
     for i in range(args.clear_fake_lower, args.clear_fake_upper):
         for j in range(args.clear_fake_lower, args.clear_fake_upper):
-            if np.absolute(current_map[gx+i, gy+j, 0] - args.ghost_map_g_val) <= args.ghost_map_delta:
-                current_map[gx+i, gy+j, 0] = args.free_val
+            if((gx+i)>=0 and (gx+i)<current_map.shape[0]) and ((gy+j)>=0 and (gy+j)<current_map.shape[1]):
+                if np.absolute(current_map[gx+i, gy+j, 0] - args.ghost_map_g_val) <= args.ghost_map_delta:
+                    current_map[gx+i, gy+j, 0] = args.free_val
 
 
 def get_relative_pos_world(real_world_cx, real_world_cy, world_cx, world_cy, world_turn):

@@ -2,7 +2,7 @@ import numpy as np
 from perception.arguments import args
 
 
-def laser_filter(laser_2d):
+def laser_filter(laser_2d, pixel_y_2d):
     """
     Filter the 2d-laser and get corresponding angle
     :param laser_2d: original laser
@@ -11,6 +11,7 @@ def laser_filter(laser_2d):
     """
     laser_2d_filtered = []
     laser_2d_filtered_angle = []
+    pixel_y_2d_filtered = []
 
     laser_len = len(laser_2d)
     for i in range(laser_len):
@@ -22,24 +23,21 @@ def laser_filter(laser_2d):
                             + np.absolute(laser_2d[(i+3+laser_len)%laser_len]-laser_2d[(i+4+laser_len)%laser_len])*args.depth_scale) / 3  
 
 
-        if (np.absolute(laser_2d[i]-laser_2d[(i-1+laser_len)%laser_len]) * args.depth_scale < min(args.filter_thre, 2.5*left_ave_depth_dif) \
-        or np.absolute(laser_2d[i]-laser_2d[(i+1+laser_len)%laser_len]) * args.depth_scale < min(args.filter_thre, 2.5*right_ave_depth_dif)) \
+        if (np.absolute(laser_2d[i]-laser_2d[(i-1+laser_len)%laser_len]) * args.depth_scale <= min(args.filter_thre, 2.5*left_ave_depth_dif) \
+        or np.absolute(laser_2d[i]-laser_2d[(i+1+laser_len)%laser_len]) * args.depth_scale <= min(args.filter_thre, 2.5*right_ave_depth_dif)) \
         or laser_2d[i]*args.depth_scale < 0.01: 
 
-            # # =====> laser_revise <=====    
-            # if(laser_2d[i]>0.5): # 超过5m的激光进行mask
-            #     laser_2d[i] = 0.01/args.depth_scale
-            # # =====> laser_revise <=====   
-
             laser_2d_filtered.append(laser_2d[i])
-            # temp_angle = 1.5 * np.pi - i / laser_len * 2 * np.pi
+            pixel_y_2d_filtered.append(pixel_y_2d[i])
+
             temp_angle = 129.5*np.pi/180-(i/laser_len)*79*np.pi/180
-            # if temp_angle >= np.pi:
-            #     temp_angle = temp_angle - 2*np.pi
             laser_2d_filtered_angle.append(temp_angle)
+
     laser_2d_filtered = np.array(laser_2d_filtered)
     laser_2d_filtered_angle = np.array(laser_2d_filtered_angle)
-    return laser_2d_filtered, laser_2d_filtered_angle
+    pixel_y_2d_filtered = np.array(pixel_y_2d_filtered)
+
+    return laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered
 
 
 def get_laser_point(depth):
@@ -55,7 +53,7 @@ def get_laser_point(depth):
     split_h = (int)(args.depth_height/2+1)
     intrinsic = args.intrinsic_matrix
 
-    filter_z,filter_x = np.where(depth>-10) # 原始depth中大于0的位置
+    filter_z,filter_x = np.where(depth>-10) # 原始depth中所有位置
     depth_values_array = depth*args.depth_scale # meter
     
     filter_z_array = filter_z.reshape(args.depth_height, args.depth_width) # 行号矩阵    
@@ -74,20 +72,21 @@ def get_laser_point(depth):
     pixel_z_array = np.expand_dims(pixel_z, axis=-1) # 全是负数
 
     laser_dis = (pixel_x**2+pixel_y**2)**0.5
+    normal_laser_index_bool = np.where(pixel_y==5)
+    laser_dis[normal_laser_index_bool] = 5
     laser_dis_array = np.expand_dims(laser_dis, axis=-1)
-
+    # laser_dis_array = np.expand_dims(pixel_y, axis=-1)
+    pixel_y_array = np.expand_dims(pixel_y, axis=-1)
     laser_points_for_noise_filter = np.concatenate((laser_dis_array, -pixel_z_array), axis = 2)
 
 
     laser_points_for_noise_filter[laser_points_for_noise_filter[:,:,1]>=args.camera_height+0.13-args.height_thre-0.3, 0] = 20.0
     laser_points_for_noise_filter[laser_points_for_noise_filter[:,:,1]<0.01, 0] = 20.0
-
-
-    
     
     laser_row = np.argmin(laser_points_for_noise_filter[:,:,0], axis=0)
     laser_2d = laser_dis_array[laser_row, np.arange(args.depth_width), 0] / args.depth_scale # 0--1
-    laser_2d_filtered, laser_2d_filtered_angle = laser_filter(laser_2d)
+    pixel_y_2d = pixel_y_array[laser_row, np.arange(args.depth_width), 0] / args.depth_scale # 0--1
+    laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered = laser_filter(laser_2d, pixel_y_2d)
 
     
     # real_laser = np.concatenate((pixel_y.flatten().reshape(-1, 1), pixel_z.flatten().reshape(-1, 1), pixel_x.flatten().reshape(-1, 1)), axis=1)
@@ -95,7 +94,7 @@ def get_laser_point(depth):
 
 
     # breakpoint()
-    return laser_2d_filtered, laser_2d_filtered_angle
+    return laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered
 
 
 

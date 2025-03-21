@@ -7,8 +7,7 @@ def get_args():
 
     # General Arguments
     parser.add_argument("--inflation_distance", type=float, default=0.5)
-    # parser.add_argument("--large_dis_thre", type=int, default=10)
-    parser.add_argument("--large_dis_thre", type=int, default=15)
+    parser.add_argument("--large_dis_thre", type=int, default=10)
     parser.add_argument("--small_dis_thre", type=int, default=5)
     parser.add_argument("--kernel_size", type=int, default=2)
 

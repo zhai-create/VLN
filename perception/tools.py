@@ -1,4 +1,5 @@
 import cv2
+import copy
 import time
 import numpy as np
 import quaternion
@@ -20,7 +21,7 @@ def fix_depth(depth, lower_bound:float=0.1/args.depth_scale, upper_bound:float=4
     :return depth: depth with real dis
     """
 
-    depth[np.where((depth<lower_bound)|(depth>upper_bound))] = 0
+    # depth[np.where((depth<lower_bound)|(depth>upper_bound))] = 0
     return depth
 
 def resize_matrix(matrix, new_shape):
@@ -81,7 +82,9 @@ def depth_estimation_object_loc(new_mask, depth):
 
     intrinsic = args.intrinsic_matrix 
     filter_z,filter_x = np.where(depth>-10) # 原始depth中大于0的位置
-    depth_values_array = depth*args.depth_scale # meter
+    depth_values_array = copy.deepcopy(depth*args.depth_scale) # meter
+    depth_values_array[np.where(depth_values_array>4.9)] = 0
+
 
     filter_z_array = filter_z.reshape(args.depth_height, args.depth_width) # 行号矩阵    
     pixel_z = (depth.shape[0] - 1 - filter_z_array - intrinsic[1][2]) * depth_values_array / intrinsic[1][1] # 上面正，下面负
