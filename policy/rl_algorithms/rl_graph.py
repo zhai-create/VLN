@@ -15,6 +15,8 @@ from collections import Counter
 from navigation.tools import get_relative_pos_world
 from graph.node_utils import Node
 
+from navigation.habitat_action import HabitatAction
+
 
 half_len = (int)(perception_args.graid_map_scale/graph_args.resolution)
 dbscan = DBSCAN(eps=1.5, min_samples=1)
@@ -25,6 +27,7 @@ class RL_Graph(object):
         self.now_node_index = 0 # 在rl_graph中当前node的index
         self.all_nodes = []
         self.all_action_nodes = []
+
 
     def reset(self):
         self.data = {}
@@ -46,6 +49,7 @@ class RL_Graph(object):
         edge_attr_ls = torch.Tensor([]) # 存储edge特征
         new_pyg_graph = Data(x=node_attr_ls, edge_index=edge_index_ls, edge_attr=edge_attr_ls)
         self.data['state'].update({"pyg_graph": new_pyg_graph}) 
+
 
     
     def is_object_see(self, temp_intention_node):

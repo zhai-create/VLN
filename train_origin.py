@@ -3,12 +3,16 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import random
+random.seed(456)
+
 import cv2
 import copy
 import habitat
 import argparse
 import datetime
 import numpy as np
+np.random.seed(456)
+
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
@@ -48,8 +52,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        # train_note = "_two_dim_12_factor_frontier_sector_gt" # 注释当前训练处于什么阶段
-        train_note = "_12_factor_frontier_cluster_seg_reward_gt_train" # 注释当前训练处于什么阶段
+        train_note = "_12_factor_frontier_cluster_seg_reward_fake_intention_gt_train" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -86,7 +89,7 @@ if __name__=="__main__":
     # rl_args.graph_lr_actor = 0.5e-4
     # rl_args.graph_lr_critic = 0.5e-4
     rl_args.random_exploration_length = 400
-    random.seed(456)
+    
 
     # only_train
     rl_args.save_buffer_data_path = "buffer_data/{}/".format(date_time)
@@ -216,13 +219,14 @@ if __name__=="__main__":
             if(env_args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
-        # 获得初始all_map_loc和初始intention_node的个数
-        HabitatAction.get_all_map_loc(topo_graph)
-        HabitatAction.init_intention_num = len(topo_graph.intention_nodes)
-
+        
         # rl_graph_update
         rl_graph.update(topo_graph)
         current_state = copy.deepcopy(rl_graph.data['state'])
+
+        # 获得初始all_map_loc和初始intention_node的个数
+        HabitatAction.get_all_map_loc(topo_graph)
+        HabitatAction.get_all_see_intention(topo_graph, rl_graph)
 
         # 用于手动调试
         if(env_args.is_auto==False):
@@ -242,6 +246,11 @@ if __name__=="__main__":
                     print("=====> ghost_patch <=====")
                     current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
+                
+                    # 获得初始all_map_loc和初始intention_node的个数
+                    HabitatAction.get_all_map_loc(topo_graph)
+                    HabitatAction.get_all_see_intention(topo_graph, rl_graph)
+                
                 else:
                     # action_space为空，结束当前episode
                     if not habitat_env.episode_over: # 没有超过1w步的最大步长

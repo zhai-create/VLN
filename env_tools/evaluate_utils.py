@@ -139,13 +139,13 @@ class Evaluate:
                     now_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
                     delta_area_percentage = ((now_all_map_loc_num-init_all_map_loc_num)/100)/scene_area
 
-                    init_intention_num = HabitatAction.init_intention_num
-                    HabitatAction.init_intention_num = len(topo_graph.intention_nodes)
+                    init_intention_num = len(HabitatAction.real_intention_nodes)
+                    HabitatAction.get_all_see_intention(topo_graph, rl_graph)
 
-                    if(len(topo_graph.intention_nodes)==0): # 没有看到intention_node
+                    if(len(HabitatAction.real_intention_nodes)==0): # 没有看到真正的intention_node
                         reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+delta_area_percentage*20
-                    else: # 看到了intention
-                        if(init_intention_num==0): # 表示第一次看到frontier
+                    else: # 看到了真正的intention
+                        if(init_intention_num==0): # 表示第一次看到真正的intention
                             reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10
                         else:
                             reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
@@ -156,19 +156,28 @@ class Evaluate:
                 elif(action_node.node_type=="intention_node"):
                     topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
 
-                    init_intention_num = HabitatAction.init_intention_num
-                    HabitatAction.init_intention_num = len(topo_graph.intention_nodes)
+                    init_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
+                    HabitatAction.get_all_map_loc(topo_graph)
+                    now_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
+                    delta_area_percentage = ((now_all_map_loc_num-init_all_map_loc_num)/100)/scene_area
+
+                    init_intention_num = len(HabitatAction.real_intention_nodes)
+                    HabitatAction.get_all_see_intention(topo_graph, rl_graph)
+
                     
-                    if(distance_to_goal<=1.0):
-                        if(init_intention_num==0):      
+                    if(distance_to_goal<=1.0): # 如果最终成功，则认为一定看到了真正的intention_node
+                        if(init_intention_num==0): 
                             reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10+40
                         else:
                             reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+40
-                    else:
-                        if(init_intention_num==0):      
-                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10
-                        else:
-                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5
+                    else: # 如果最终失败，则不一定看到真正的intention_node
+                        if(len(HabitatAction.real_intention_nodes)==0): # 没有看到真正的intention_node
+                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+delta_area_percentage*20
+                        else:   
+                            if(init_intention_num==0):      
+                                reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10
+                            else:
+                                reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
                     
                     rl_graph.data['arrive'] = True
                     HabitatAction.reward_per_episode += reward_per_rl_step
@@ -251,13 +260,13 @@ class Evaluate:
                 now_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
                 delta_area_percentage = ((now_all_map_loc_num-init_all_map_loc_num)/100)/scene_area
 
-                init_intention_num = HabitatAction.init_intention_num
-                HabitatAction.init_intention_num = len(topo_graph.intention_nodes)
+                init_intention_num = len(HabitatAction.real_intention_nodes)
+                HabitatAction.get_all_see_intention(topo_graph, rl_graph)
 
-                if(len(topo_graph.intention_nodes)==0): # 没有看到intention_node
+                if(len(HabitatAction.real_intention_nodes)==0): # 没有看到intention_node
                     reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+delta_area_percentage*20
-                else: # 看到了intention
-                    if(init_intention_num==0): # 表示第一次看到frontier
+                else: # 看到了真正的intention
+                    if(init_intention_num==0): # 表示第一次看到了真正的intention
                         reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10
                     else:
                         reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
@@ -345,7 +354,6 @@ class Evaluate:
                 Evaluate.ne_ls.append(Evaluate.ne_per_episode)
                 Evaluate.ne_mean = np.mean(Evaluate.ne_ls)
                 
-                writer.add_scalar('Result/intention_one_cnt', HabitatAction.intention_one_cnt, index_in_episodes+1)
                 writer.add_scalar('Result/episode_state', Evaluate.state_dict[achieved_result], index_in_episodes+1)
                 writer.add_scalar('Result/walk_path_meter', HabitatAction.walk_path_meter, index_in_episodes+1)
                 writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
@@ -410,7 +418,6 @@ class Evaluate:
                     Evaluate.ne_ls.append(Evaluate.ne_per_episode)
                     Evaluate.ne_mean = np.mean(Evaluate.ne_ls)
 
-                    writer.add_scalar('Result/intention_one_cnt', HabitatAction.intention_one_cnt, index_in_episodes+1)
                     writer.add_scalar('Result/episode_state', Evaluate.state_dict[achieved_result], index_in_episodes+1)
                     writer.add_scalar('Result/walk_path_meter', HabitatAction.walk_path_meter, index_in_episodes+1)
                     writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)

@@ -7,7 +7,9 @@ import habitat
 import habitat_sim
 import datetime
 import random
+
 import numpy as np
+
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
 
@@ -46,14 +48,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 170
+    args.graph_pre_model = 440
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_two_dim_12_factor_frontier_cluster_topo_reward_gt_val_"+str(args.graph_pre_model)
+        val_note = "_12_factor_frontier_cluster_seg_reward_fake_intention_gt_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -88,7 +90,7 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_20_14_15_56_12_factor_frontier_cluster_seg_reward_gt_train"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_21_10_39_11_12_factor_frontier_cluster_seg_reward_fake_intention_gt_train"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
@@ -115,7 +117,7 @@ if __name__=="__main__":
         # if((index_in_episodes+1) not in false_index_ls):
         #     continue
 
-        # if(index_in_episodes<4):
+        # if(index_in_episodes<2):
         #     continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 

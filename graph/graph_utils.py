@@ -48,6 +48,7 @@ class GraphMap(object):
         self.explored_rotate_nodes = []
         self.frontier_nodes = []
         self.intention_nodes = []
+
         self.all_nodes = []
 
         self.current_node = None
@@ -297,12 +298,13 @@ class GraphMap(object):
     
         for temp_score in detect_res_pos_dict:
             for temp_rela_pos in detect_res_pos_dict[temp_score]:
-                tx, ty = temp_rela_pos[0], temp_rela_pos[1]                
+                tx, ty = temp_rela_pos[0], temp_rela_pos[1]
+                is_real_intention = temp_rela_pos[2]              
                 center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
 
                 # cluster_revise
                 res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
+                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
                 # correct_recheck
                 world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
                 new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5

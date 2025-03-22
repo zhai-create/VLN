@@ -8,6 +8,46 @@ from graph.tools import get_absolute_pos
 from graph.arguments import args as graph_args
 from perception.arguments import args as perception_args
 
+
+import random
+import numpy as np
+
+class RandomGenerator:
+    def __init__(self, seed):
+        """
+        初始化随机数生成器，设置随机数种子。
+        """
+        self.seed = seed
+        random.seed(seed)  # 设置 Python random 模块的种子
+        np.random.seed(seed)  # 设置 numpy 的随机数种子
+
+    def random(self):
+        """生成一个 [0, 1) 之间的随机浮点数。"""
+        return random.random()
+
+    def randint(self, low, high):
+        """生成一个 [low, high] 之间的随机整数。"""
+        return random.randint(low, high)
+
+    def randn(self):
+        """生成一个标准正态分布的随机数。"""
+        return np.random.randn()
+
+    def uniform(self, low, high):
+        """生成一个 [low, high) 之间的均匀分布随机浮点数。"""
+        return np.random.uniform(low, high)
+
+    def reset(self, seed=None):
+        """
+        重置随机数种子。
+        如果未提供 seed，则使用初始化时的种子。
+        """
+        if seed is not None:
+            self.seed = seed
+        random.seed(self.seed)
+        np.random.seed(self.seed)
+
+
 class HabitatAction:
     """
         static class for habitat action process.
@@ -26,17 +66,17 @@ class HabitatAction:
     # train
     reward_per_episode = 0
 
-    intention_one_cnt = 0
-
     episode_train_step = 0
 
     scene_file_dict = {}
     object_id_num_ls = []
 
     init_all_map_loc = np.array([[500, 500]]) # size: (1001, 1001)
-    init_intention_num = 0
 
     name_val = 0
+    real_intention_nodes = []
+
+    random_gen = None
 
     @staticmethod
     def get_current_scene_dict(habitat_env, graph_train):
@@ -104,15 +144,16 @@ class HabitatAction:
         HabitatAction.this_episode_short_dis = habitat_env.get_metrics()['distance_to_goal']
         
         HabitatAction.reward_per_episode = 0
-        HabitatAction.intention_one_cnt = 0
         HabitatAction.episode_train_step = 0
         HabitatAction.scene_file_dict = HabitatAction.get_current_scene_dict(habitat_env, graph_train)
         HabitatAction.object_id_num_ls = HabitatAction.get_object_num_ls(HabitatAction.scene_file_dict, object_text)
 
-        HabitatAction.init_all_map_loc = np.array([[500, 500]]) # size: (1001, 1001)
-        HabitatAction.init_intention_num = 0
+        HabitatAction.init_all_map_loc = np.array([[500, 500]]) # size: (1001, 1001)s
 
         HabitatAction.name_val = 0
+        HabitatAction.real_intention_nodes = []
+
+        HabitatAction.random_gen = RandomGenerator(456)
 
     @staticmethod
     def get_all_map_loc(topo_graph):
@@ -140,6 +181,13 @@ class HabitatAction:
                 if(len(res_row_col_indices)>0):
                     HabitatAction.init_all_map_loc = np.concatenate((HabitatAction.init_all_map_loc, res_row_col_indices))
         HabitatAction.init_all_map_loc = np.unique(HabitatAction.init_all_map_loc, axis = 0)
+
+    @staticmethod
+    def get_all_see_intention(topo_graph, rl_graph):
+        selected_intention_node_ls = rl_graph.select_intention(topo_graph)
+        for temp_node in selected_intention_node_ls:
+            if(temp_node.is_real_intention==True) and (temp_node not in HabitatAction.real_intention_nodes):
+                HabitatAction.real_intention_nodes.append(temp_node)
 
     @staticmethod
     def set_habitat_action(action_name, topo_graph):
