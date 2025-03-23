@@ -52,7 +52,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_12_factor_frontier_cluster_seg_reward_multi_check_gt_train" # 注释当前训练处于什么阶段
+        train_note = "_12_factor_frontier_cluster_seg_reward_fake_intention_gt_train" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -76,7 +76,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 161
+        rl_args.graph_node_feature_dim = 2
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -265,7 +265,7 @@ if __name__=="__main__":
             achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
 
             # new_recheck_train
-            if(HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved") or (HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and action_node.intention_type!=2 and achieved_result=="achieved"):
+            if(HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved"):
                 achieved_result = "EXCEED_RL" # 超过RL最大次数 
             # new_recheck_train
 
@@ -273,17 +273,6 @@ if __name__=="__main__":
             print("=====> action_node_type <=====", action_node.node_type)
 
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph, scene_area=area_dict[habitat_env.current_episode.scene_id])
-            
-            # node_type_revise
-            if(action_node.node_type=="intention_node"):
-                for temp_intention_node in topo_graph.intention_nodes:
-                    if(temp_intention_node.intention_type==1):
-                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-                        if(temp_dis<1.0):
-                            temp_intention_node.intention_type = 2
-            # node_type_revise
-            
-            
             if(achieved_result=="block" or achieved_result=="Failed_Plan" or achieved_result=="exceed"):
                 break
 

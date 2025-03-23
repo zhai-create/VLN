@@ -36,7 +36,6 @@ class Node(object):
 
         self.is_real_intention = is_real_intention
 
-        self.intention_type_two_init_score_ls = []
 
         if(node_type=="explored_node"):
             self.rela_angle_parent_center = 0
@@ -49,15 +48,14 @@ class Node(object):
 
         self.score = score # float, 只有intention需要，其他两种node均为0
         # correct_recheck
-        self.score_ls = [score] + [-1 for i in range(79)]
+        self.score_ls = [score, -1, -1, -1, -1, -1, -1, -1, -1, -1]
         # closer_revise
-        self.dis_ls = [-2 for i in range(80)]
+        self.dis_ls = [-2, -2, -2, -2, -2, -2, -2, -2, -2, -2]
         # closer_revise
         # # no_closer_revise
         # self.dis_ls = [-1, -1, -1, -1, -1, -1, -1, -1, -1, -1]
         # # no_closer_revise
         self.robot_intention_dis = -1
-        self.intention_type = 1
         # correct_recheck
         self.parent_node = parent_node
 
@@ -80,7 +78,6 @@ class Node(object):
 
         self.deleted_frontiers = [] # rl_step中实际行走步数为0的frontier
         self.deleted_intentions = [] # rl_step中实际行走步数为0的intention
-
 
     def __eq__(self, other):
         if isinstance(other, Node):
