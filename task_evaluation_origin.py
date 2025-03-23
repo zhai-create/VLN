@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '1'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '1'
 import cv2
 import habitat
 import habitat_sim
@@ -48,14 +48,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 440
+    args.graph_pre_model = 620
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_12_factor_frontier_cluster_seg_reward_fake_intention_gt_val_"+str(args.graph_pre_model)
+        val_note = "_12_factor_frontier_cluster_seg_reward_multi_check_gt_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -73,7 +73,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 2
+        rl_args.graph_node_feature_dim = 161
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -90,7 +90,7 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_21_10_39_11_12_factor_frontier_cluster_seg_reward_fake_intention_gt_train"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_22_16_52_48_12_factor_frontier_cluster_seg_reward_multi_check_gt_train"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
@@ -194,6 +194,16 @@ if __name__=="__main__":
             
             
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
+
+            # node_type_revise
+            if(action_node.node_type=="intention_node"):
+                for temp_intention_node in topo_graph.intention_nodes:
+                    if(temp_intention_node.intention_type==1):
+                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
+                        if(temp_dis<1.0):
+                            temp_intention_node.intention_type = 2
+            # node_type_revise
+
 
             if(evaluate_res=="episode_stop"):
                 # =====> new_add_evaluate <=====

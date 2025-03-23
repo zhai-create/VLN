@@ -24,6 +24,7 @@ from graph.tools import get_current_world_pos
 from perception.arguments import args as perception_args
 
 import time
+import copy
 
 class SubgoalReach:
     """
@@ -147,7 +148,7 @@ class SubgoalReach:
 
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
-            if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
+            if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved") or (action_node.node_type=="intention_node" and action_node.intention_type!=2 and candidate_achieved_result=="achieved"):
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             else:
@@ -160,12 +161,16 @@ class SubgoalReach:
 
         else: # 处于测试阶段
             if(action_node.node_type=="intention_node"):
-                if not habitat_env.episode_over:
-                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                    observations = habitat_env.step(habitat_action)
+                if(action_node.intention_type!=2):
+                    SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                     return candidate_achieved_result
                 else:
-                    return "exceed"
+                    if not habitat_env.episode_over:
+                        habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                        observations = habitat_env.step(habitat_action)
+                        return candidate_achieved_result
+                    else:
+                        return "exceed"
             else:
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
@@ -182,6 +187,10 @@ class SubgoalReach:
             :param habitat_env
             :param object_goal
         """
+        if(action_node.node_type=="intention_node" and action_node.intention_type==2):
+            action_node.intention_type_two_init_score_ls = copy.deepcopy(action_node.score_ls)
+                
+
         topo_planner = TopoPlanner(topo_graph, action_node)
         SubgoalReach.reset(habitat_env, topo_graph)
         while True:

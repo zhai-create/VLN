@@ -131,7 +131,7 @@ class Evaluate:
                 # =============> reward_revise <=============
                 
                 
-                if(action_node.node_type=="frontier_node"):
+                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type!=2):
                     topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
                     
                     init_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
@@ -153,7 +153,7 @@ class Evaluate:
                     rl_graph.data['arrive'] = False
                     HabitatAction.reward_per_episode += reward_per_rl_step
 
-                elif(action_node.node_type=="intention_node"):
+                elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
                     topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
 
                     init_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
@@ -232,9 +232,9 @@ class Evaluate:
                 writer.add_scalar('Result/exceed_rl_num', Evaluate.exceed_rl_num, index_in_episodes+1)
                 writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
                 
-                if(action_node.node_type=="frontier_node"):
+                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type!=2):
                     return "next_rl_step"
-                elif(action_node.node_type=="intention_node"):
+                elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
                     return "episode_stop"
             
             elif(achieved_result=="EXCEED_RL"):
@@ -362,14 +362,42 @@ class Evaluate:
                 writer.add_scalar('Result/spl_mean', Evaluate.spl_mean, index_in_episodes+1)
                 writer.add_scalar('Result/ne_per_episode', Evaluate.ne_per_episode, index_in_episodes+1)
                 writer.add_scalar('Result/ne_mean', Evaluate.ne_mean, index_in_episodes+1)
+
+                writer.add_scalar('Result/fake_intention_check_flag', HabitatAction.fake_intention_check_flag, index_in_episodes+1)
+                writer.add_scalar('Result/real_intention_check_flag', HabitatAction.real_intention_check_flag, index_in_episodes+1)
                 return "episode_stop" # 结束当前episode, 开始下一个episode
                 
             elif(achieved_result=="achieved" or achieved_result=="block" or achieved_result=="Failed_Plan"):
-                if(action_node.node_type=="frontier_node"):
+                if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type!=2):
+                    
+                    if(action_node.node_type=="intention_node" and action_node.intention_type!=2):
+                        HabitatAction.selected_intention_type_one_ls.append(action_node)
+                    
                     return "next_rl_step" # 继续选择下一个action
     
 
-                elif(action_node.node_type=="intention_node"):
+                elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
+                    
+                    if(action_node.is_real_intention==True):
+                        # 统计“fake_intention走近了看发现不对，之后又走了的”
+                        for temp_node in HabitatAction.selected_intention_type_one_ls:
+                            if(temp_node.is_real_intention==False):
+                                HabitatAction.fake_intention_check_flag = 1
+                                break
+                    
+                        # 统计“real_intention”远看不对但近看对了的
+                        for temp_node in HabitatAction.selected_intention_type_one_ls:
+                            temp_dis = ((temp_node.world_cx-action_node.world_cx)**2+(temp_node.world_cy-action_node.world_cy)**2)**0.5
+                            if(temp_node.is_real_intention==True and temp_dis<=1):
+                                is_break_flag = False
+                                for temp_action_score in action_node.intention_type_two_init_score_ls:
+                                    if(temp_node.score<temp_action_score):
+                                        is_break_flag = True
+                                        break
+                                if(is_break_flag==True):
+                                    HabitatAction.real_intention_check_flag = 1
+                                    break
+                    
                     if(habitat_metric['success']>0):
                         Evaluate.success_num += 1
                         writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)
@@ -426,4 +454,8 @@ class Evaluate:
                     writer.add_scalar('Result/spl_mean', Evaluate.spl_mean, index_in_episodes+1)
                     writer.add_scalar('Result/ne_per_episode', Evaluate.ne_per_episode, index_in_episodes+1)
                     writer.add_scalar('Result/ne_mean', Evaluate.ne_mean, index_in_episodes+1)
+                    
+                    writer.add_scalar('Result/fake_intention_check_flag', HabitatAction.fake_intention_check_flag, index_in_episodes+1)
+                    writer.add_scalar('Result/real_intention_check_flag', HabitatAction.real_intention_check_flag, index_in_episodes+1)
+                    
                     return "episode_stop" # 结束当前episode, 开始下一个episode

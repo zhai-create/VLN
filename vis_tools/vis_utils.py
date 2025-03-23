@@ -155,7 +155,12 @@ def plot_topomap_on_global_map(habitat_env, topo_graph, action_node):
             #         circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
             # else:
             #     circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-            circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            
+            if(temp_node.is_real_intention==True):
+                circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            else:
+                circle = plt.Circle((ty, tx), radius=20, color=(0/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+
 
             ax.add_patch(circle)
             G.add_node(temp_node.name, pos=(ty, tx))
@@ -279,13 +284,18 @@ def plot_rl_graph(habitat_env, rl_graph, action_node):
                 sim=habitat_env.sim,
             )
 
-            if(action_node is not None):
-                if(action_node.name==temp_node.name):
-                    circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-                else:
-                    circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
-            else:
+            # if(action_node is not None):
+            #     if(action_node.name==temp_node.name):
+            #         circle = plt.Circle((ty, tx), radius=25, color=(255/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            #     else:
+            #         circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            # else:
+            #     circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+
+            if(temp_node.is_real_intention==True):
                 circle = plt.Circle((ty, tx), radius=20, color=(0/255,255/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
+            else:
+                circle = plt.Circle((ty, tx), radius=20, color=(0/255,0/255,0/255), zorder=2)  # 设置圆圈的大小、颜色等
 
             ax.add_patch(circle)
             G.add_node(temp_node.name, pos=(ty, tx))

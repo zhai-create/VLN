@@ -37,6 +37,9 @@ class RandomGenerator:
         """生成一个 [low, high) 之间的均匀分布随机浮点数。"""
         return np.random.uniform(low, high)
 
+    def normal(self, mean_val, std_val):
+        return np.random.normal(loc=mean_val, scale=std_val)
+
     def reset(self, seed=None):
         """
         重置随机数种子。
@@ -77,6 +80,10 @@ class HabitatAction:
     real_intention_nodes = []
 
     random_gen = None
+
+    fake_intention_check_flag = 0
+    real_intention_check_flag = 0
+    selected_intention_type_one_ls = []
 
     @staticmethod
     def get_current_scene_dict(habitat_env, graph_train):
@@ -154,6 +161,10 @@ class HabitatAction:
         HabitatAction.real_intention_nodes = []
 
         HabitatAction.random_gen = RandomGenerator(456)
+
+        HabitatAction.fake_intention_check_flag = 0
+        HabitatAction.real_intention_check_flag = 0
+        HabitatAction.selected_intention_type_one_ls = []
 
     @staticmethod
     def get_all_map_loc(topo_graph):
