@@ -296,17 +296,21 @@ class GraphMap(object):
         rela_loc = np.array([self.rela_cx, self.rela_cy])
         r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
     
+        new_intention_ls = []
+        new_intention_name_ls = []
+        
+        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+
         for temp_score in detect_res_pos_dict:
             for temp_rela_pos in detect_res_pos_dict[temp_score]:
                 tx, ty = temp_rela_pos[0], temp_rela_pos[1]
-                is_real_intention = temp_rela_pos[2]              
+                is_real_intention = temp_rela_pos[2] 
                 center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
 
                 # cluster_revise
                 res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
                 new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
                 # correct_recheck
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
                 new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
                 new_intention.dis_ls[0] = new_intention.robot_intention_dis
                 # correct_recheck
@@ -314,6 +318,61 @@ class GraphMap(object):
                 self.current_node.sub_intentions.append(new_intention)
                 self.intention_nodes.append(new_intention)
                 self.all_nodes.append(new_intention)
+
+                new_intention_ls.append(new_intention)
+                new_intention_name_ls.append(new_intention.name)
+
+        # correct_recheck
+        for temp_intention_node in self.intention_nodes:
+            if(temp_intention_node.name in new_intention_name_ls):
+                continue
+                
+            min_dis = 10000
+            min_node = None
+            for temp_new_intention_node in new_intention_ls:
+                temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    min_node = temp_new_intention_node
+            if(min_dis<=0.5):
+                if(-1 not in temp_intention_node.score_ls):
+                    temp_intention_node.score_ls.append(min_node.score)
+                    temp_intention_node.score_ls.pop(0)
+
+                    temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
+                    temp_intention_node.dis_ls.pop(0)
+                else:
+                    score_index = temp_intention_node.score_ls.index(-1)
+                    temp_intention_node.score_ls[score_index] = min_node.score
+
+                    temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
+        # correct_recheck
+
+        # if(action_node is not None) and (is_front_step==True):
+        #     if(action_node.node_type=="intention_node" and action_node.is_real_intention==False):
+        #         if(-1 in action_node.score_ls):
+        #             init_score = action_node.score_ls[action_node.score_ls.index(-1)-1]
+        #             action_node.score_ls[action_node.score_ls.index(-1)-1] = init_score-HabitatAction.random_gen.uniform(0.05, 0.1)
+        #             if(action_node.score_ls[action_node.score_ls.index(-1)-1]<0.6):
+        #                 action_node.score_ls[action_node.score_ls.index(-1)-1] = 0.6
+        #         else:
+        #             init_score = action_node.score_ls[-1]
+        #             action_node.score_ls[-1] = init_score-HabitatAction.random_gen.uniform(0.05, 0.1)
+        #             if(action_node.score_ls[-1]<0.6):
+        #                 action_node.score_ls[-1] = 0.6
+
+        #     elif(action_node.node_type=="intention_node" and action_node.is_real_intention==True):
+        #         if(-1 in action_node.score_ls):
+        #             init_score = action_node.score_ls[action_node.score_ls.index(-1)-1]
+        #             action_node.score_ls[action_node.score_ls.index(-1)-1] = init_score+HabitatAction.random_gen.uniform(0.05, 0.1)
+        #             if(action_node.score_ls[action_node.score_ls.index(-1)-1]>1):
+        #                 action_node.score_ls[action_node.score_ls.index(-1)-1] = 1
+        #         else:
+        #             init_score = action_node.score_ls[-1]
+        #             action_node.score_ls[-1] = init_score+HabitatAction.random_gen.uniform(0.05, 0.1)
+        #             if(action_node.score_ls[-1]>1):
+        #                 action_node.score_ls[-1] = 1
+
 
     def add_request_feature_three(self, detect_res_pos_dict, rgb_image_ls, object_text):
         image_index_ls = []

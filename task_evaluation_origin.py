@@ -7,7 +7,6 @@ import habitat
 import habitat_sim
 import datetime
 import random
-import copy
 
 import numpy as np
 
@@ -49,14 +48,14 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 440
+    args.graph_pre_model = 190
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_12_factor_frontier_cluster_seg_reward_fake_intention_gt_val_show_"+str(args.graph_pre_model)
+        val_note = "_12_factor_frontier_cluster_seg_reward_multi_check_gt_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -74,7 +73,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 2
+        rl_args.graph_node_feature_dim = 161
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -91,11 +90,12 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_21_10_39_11_12_factor_frontier_cluster_seg_reward_fake_intention_gt_train"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_24_14_55_52_12_factor_frontier_cluster_seg_reward_multi_check_gt_train"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
-    selected_episode_index = [35, 62]
+    # false_index_ls = [1, 17, 18, 19, 28, 41, 42, 50, 51, 53, 54, 62, 67, 80, 81, 89, 90, 94, 99]
+    false_index_ls = [31, 32, 68, 96, 98]
 
     for index_in_episodes in tqdm(range(args.graph_episode_num)):   
         # rl_graph_init
@@ -114,10 +114,10 @@ if __name__=="__main__":
         object_goal = args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
 
-        if((index_in_episodes+1) not in selected_episode_index):
+        if((index_in_episodes+1) not in false_index_ls):
             continue
 
-        # if(index_in_episodes<2):
+        # if(index_in_episodes<1):
         #     continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
@@ -142,6 +142,8 @@ if __name__=="__main__":
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
             # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            
+            
             detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
             topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
@@ -184,10 +186,6 @@ if __name__=="__main__":
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
             action_node = rl_graph.all_nodes[polict_action]
-            
-            if(action_node.node_type=="intention_node"):
-                HabitatAction.init_all_node_ls = copy.deepcopy(rl_graph.all_nodes)
-            
             if(args.is_vis==True):
                 achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
             else:
@@ -198,6 +196,16 @@ if __name__=="__main__":
             
             
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
+
+            # node_type_revise
+            if(action_node.node_type=="intention_node"):
+                for temp_intention_node in topo_graph.intention_nodes:
+                    if(temp_intention_node.intention_type==1):
+                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
+                        if(temp_dis<1.0):
+                            temp_intention_node.intention_type = 2
+            # node_type_revise
+
 
             if(evaluate_res=="episode_stop"):
                 # =====> new_add_evaluate <=====
