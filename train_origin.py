@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
 import random
 random.seed(456)
 
@@ -52,7 +52,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_12_factor_frontier_cluster_seg_reward_multi_check_gt_train" # 注释当前训练处于什么阶段
+        train_note = "_multi_check_new_replan_new_topo_gt_train" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -89,6 +89,7 @@ if __name__=="__main__":
     # rl_args.graph_lr_actor = 0.5e-4
     # rl_args.graph_lr_critic = 0.5e-4
     rl_args.random_exploration_length = 400
+    # rl_args.random_exploration_length = 0
     
 
     # only_train
@@ -274,16 +275,6 @@ if __name__=="__main__":
             print("=====> action_node_type <=====", action_node.node_type)
 
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph, scene_area=area_dict[habitat_env.current_episode.scene_id])
-            
-            # node_type_revise
-            if(action_node.node_type=="intention_node"):
-                for temp_intention_node in topo_graph.intention_nodes:
-                    if(temp_intention_node.intention_type==1):
-                        temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-                        if(temp_dis<1.0):
-                            temp_intention_node.intention_type = 2
-            # node_type_revise
-            
             
             if(achieved_result=="block" or achieved_result=="Failed_Plan" or achieved_result=="exceed"):
                 break

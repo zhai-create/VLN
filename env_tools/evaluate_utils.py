@@ -25,7 +25,6 @@ class Evaluate:
     # val
     all_front_steps = 0
     all_count_steps = 0
-    all_dis_shape = 0
 
     # train
     real_episode_num_in_train = 1
@@ -65,21 +64,6 @@ class Evaluate:
 
         Evaluate.all_front_steps = 0
         Evaluate.all_count_steps = 0
-        Evaluate.all_dis_shape = 0
-
-    @staticmethod
-    def get_topo_walk_dis(action_node, topo_graph):
-        topo_walk_dis = 0
-        start_explored_node = SubgoalReach.init_explored_node
-        end_explored_node = action_node.parent_node
-        start_end_node_path = find_node_path(start_explored_node, end_explored_node, topo_graph.explored_nodes)
-        for temp_index, temp_node in enumerate(start_end_node_path):
-            if(temp_index==0):
-                continue
-            topo_walk_dis += ((start_end_node_path[temp_index].world_cx-start_end_node_path[temp_index-1].world_cx)**2+(start_end_node_path[temp_index].world_cy-start_end_node_path[temp_index-1].world_cy)**2)**0.5
-        topo_walk_dis += (SubgoalReach.init_rela_cx**2+SubgoalReach.init_rela_cy**2)**0.5
-        topo_walk_dis += (action_node.rela_cx**2+action_node.rela_cy**2)**0.5
-        return topo_walk_dis
 
 
     @staticmethod
@@ -93,7 +77,6 @@ class Evaluate:
         
         habitat_metric = habitat_env.get_metrics()
         print("habitat_metric:", habitat_metric)
-        
         
         if(graph_train==True):
             distance_to_goal = habitat_metric['distance_to_goal']
@@ -119,7 +102,7 @@ class Evaluate:
                 # =============> reward_revise <=============
                 world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
                 now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                if(now_action_dis>1) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0 and (action_node.node_type=="frontier_node")):                    
+                if(now_action_dis>1 and ((action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type==2))) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0):                    
                     Evaluate.reward_false_num += 1
                     writer.add_scalar('Result/episode_state', -6, index_in_episodes+1)
                     writer.add_scalar('Result/empty_num', Evaluate.empty_num, index_in_episodes+1)
@@ -132,10 +115,7 @@ class Evaluate:
                     return "false_reward"
                 # =============> reward_revise <=============
                 
-                
                 if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type!=2):
-                    topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
-                    
                     init_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
                     HabitatAction.get_all_map_loc(topo_graph)
                     now_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
@@ -145,19 +125,17 @@ class Evaluate:
                     HabitatAction.get_all_see_intention(topo_graph, rl_graph)
 
                     if(len(HabitatAction.real_intention_nodes)==0): # 没有看到真正的intention_node
-                        reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+delta_area_percentage*20
+                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+delta_area_percentage*20
                     else: # 看到了真正的intention
                         if(init_intention_num==0): # 表示第一次看到真正的intention
-                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10
+                            reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+10
                         else:
-                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
+                            reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
 
                     rl_graph.data['arrive'] = False
                     HabitatAction.reward_per_episode += reward_per_rl_step
 
                 elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
-                    topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
-
                     init_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
                     HabitatAction.get_all_map_loc(topo_graph)
                     now_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
@@ -169,17 +147,17 @@ class Evaluate:
                     
                     if(distance_to_goal<=1.0): # 如果最终成功，则认为一定看到了真正的intention_node
                         if(init_intention_num==0): 
-                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10+40
+                            reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+10+40
                         else:
-                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+40
+                            reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+40
                     else: # 如果最终失败，则不一定看到真正的intention_node
                         if(len(HabitatAction.real_intention_nodes)==0): # 没有看到真正的intention_node
-                            reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+delta_area_percentage*20
+                            reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+delta_area_percentage*20
                         else:   
                             if(init_intention_num==0):      
-                                reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10
+                                reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+10
                             else:
-                                reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
+                                reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
                     
                     rl_graph.data['arrive'] = True
                     HabitatAction.reward_per_episode += reward_per_rl_step
@@ -221,8 +199,6 @@ class Evaluate:
 
                 rl_graph.data['reward'] = reward_per_rl_step
                 writer.add_scalar('Result/reward_per_rl_step', reward_per_rl_step, policy.train_step+1)
-
-                writer.add_scalar('Result/topo_walk_dis', topo_walk_dis, policy.train_step+1)
                 writer.add_scalar('Result/real_walk_dis', (HabitatAction.front_steps-SubgoalReach.init_front_steps)*0.25, policy.train_step+1)
                 
                 writer.add_scalar('Result/episode_state', Evaluate.state_dict[achieved_result], index_in_episodes+1)
@@ -243,7 +219,7 @@ class Evaluate:
                 # =============> reward_revise <=============
                 world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
                 now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                if(now_action_dis>1) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0 and (action_node.node_type=="frontier_node")):                    
+                if(now_action_dis>1 and ((action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type==2))) or ((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0):                    
                     Evaluate.reward_false_num += 1
                     writer.add_scalar('Result/episode_state', -6, index_in_episodes+1)
                     writer.add_scalar('Result/empty_num', Evaluate.empty_num, index_in_episodes+1)
@@ -255,8 +231,6 @@ class Evaluate:
                     writer.add_scalar('Result/this_episode_short_dis', HabitatAction.this_episode_short_dis, index_in_episodes+1)
                     return "false_reward"
                 # =============> reward_revise <=============
-                topo_walk_dis = Evaluate.get_topo_walk_dis(action_node, topo_graph)
-                    
                 init_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
                 HabitatAction.get_all_map_loc(topo_graph)
                 now_all_map_loc_num = HabitatAction.init_all_map_loc.shape[0]
@@ -266,12 +240,12 @@ class Evaluate:
                 HabitatAction.get_all_see_intention(topo_graph, rl_graph)
 
                 if(len(HabitatAction.real_intention_nodes)==0): # 没有看到intention_node
-                    reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+delta_area_percentage*20
+                    reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+delta_area_percentage*20
                 else: # 看到了真正的intention
                     if(init_intention_num==0): # 表示第一次看到了真正的intention
-                        reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+10
+                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+10
                     else:
-                        reward_per_rl_step = (topo_walk_dis/0.25)*(-1)/12.5+0
+                        reward_per_rl_step = (HabitatAction.front_steps-SubgoalReach.init_front_steps)*(-1)/12.5+0
                 
                 rl_graph.data['arrive'] = False
                 HabitatAction.reward_per_episode += reward_per_rl_step
@@ -307,8 +281,6 @@ class Evaluate:
 
                 rl_graph.data['reward'] = reward_per_rl_step
                 writer.add_scalar('Result/reward_per_rl_step', reward_per_rl_step, policy.train_step+1)
-
-                writer.add_scalar('Result/topo_walk_dis', topo_walk_dis, policy.train_step+1)
                 writer.add_scalar('Result/real_walk_dis', (HabitatAction.front_steps-SubgoalReach.init_front_steps)*0.25, policy.train_step+1)
 
                 Evaluate.exceed_rl_num += 1
@@ -327,7 +299,6 @@ class Evaluate:
         else: # 处于测试阶段
             Evaluate.all_front_steps += HabitatAction.front_steps
             Evaluate.all_count_steps += HabitatAction.count_steps
-            Evaluate.all_dis_shape += (HabitatAction.this_episode_short_dis-habitat_metric['distance_to_goal'])
             if(achieved_result=="exceed" or achieved_result=="empty"):
                 if(habitat_metric['success']>0):
                     Evaluate.success_num += 1
@@ -337,18 +308,8 @@ class Evaluate:
                 elif(achieved_result=="empty"):
                     writer.add_scalar('Simulator/ratio_state', -3, index_in_episodes+1)
 
-                # # =================> evaluate_revise <=================
-                # if(achieved_result=="exceed"):
-                #     writer.add_scalar('Simulator/ratio_state', -1, index_in_episodes+1)
-                # elif(achieved_result=="empty"):
-                #     writer.add_scalar('Simulator/ratio_state', -3, index_in_episodes+1)
-                # # =================> evaluate_revise <=================
-
 
                 Evaluate.spl_per_episode = habitat_metric['spl']
-                # # =================> evaluate_revise <=================
-                # Evaluate.spl_per_episode = 0
-                # # =================> evaluate_revise <=================
                 Evaluate.spl_ls.append(Evaluate.spl_per_episode)
                 Evaluate.spl_mean = np.mean(Evaluate.spl_ls)
 
@@ -372,36 +333,9 @@ class Evaluate:
                 
             elif(achieved_result=="achieved" or achieved_result=="block" or achieved_result=="Failed_Plan"):
                 if(action_node.node_type=="frontier_node") or (action_node.node_type=="intention_node" and action_node.intention_type!=2):
-                    
-                    if(action_node.node_type=="intention_node" and action_node.intention_type!=2):
-                        HabitatAction.selected_intention_type_one_ls.append(action_node)
-                    
                     return "next_rl_step" # 继续选择下一个action
     
-
                 elif(action_node.node_type=="intention_node" and action_node.intention_type==2):
-                    
-                    if(action_node.is_real_intention==True):
-                        # 统计“fake_intention走近了看发现不对，之后又走了的”
-                        for temp_node in HabitatAction.selected_intention_type_one_ls:
-                            if(temp_node.is_real_intention==False):
-                                HabitatAction.fake_intention_check_flag = 1
-                                Evaluate.fake_intention_check_num += 1
-                                break
-                    
-                        # 统计“real_intention”远看不对但近看对了的
-                        for temp_node in HabitatAction.selected_intention_type_one_ls:
-                            temp_dis = ((temp_node.world_cx-action_node.world_cx)**2+(temp_node.world_cy-action_node.world_cy)**2)**0.5
-                            if(temp_node.is_real_intention==True and temp_dis<=1):
-                                is_break_flag = False
-                                for temp_action_score in action_node.intention_type_two_init_score_ls:
-                                    if(temp_node.score<temp_action_score):
-                                        is_break_flag = True
-                                        break
-                                if(is_break_flag==True):
-                                    HabitatAction.real_intention_check_flag = 1
-                                    break
-                    
                     if(habitat_metric['success']>0):
                         Evaluate.success_num += 1
                         writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)
@@ -412,34 +346,10 @@ class Evaluate:
                     else:
                         world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
                         now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                        
                         if(now_action_dis>1):
                             writer.add_scalar('Simulator/ratio_state', -5, index_in_episodes+1) # 底层控制器失败
                         else:
                             writer.add_scalar('Simulator/ratio_state', 0, index_in_episodes+1) # 到达错误的intention_node
-
-                    # # =================> evaluate_revise <=================
-                    # if(achieved_result=="block"):
-                    #     Evaluate.spl_per_episode = 0
-                    #     writer.add_scalar('Simulator/ratio_state', -4, index_in_episodes+1)
-                    # elif(achieved_result=="Failed_Plan"):
-                    #     Evaluate.spl_per_episode = 0
-                    #     writer.add_scalar('Simulator/ratio_state', -2, index_in_episodes+1)
-                    # else:
-                    #     if(habitat_metric['success']>0):
-                    #         Evaluate.success_num += 1
-                    #         Evaluate.spl_per_episode = habitat_metric['spl']
-                    #         writer.add_scalar('Simulator/ratio_state', 1, index_in_episodes+1)
-                    #     else:
-                    #         Evaluate.spl_per_episode = 0
-                    #         world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                    #         now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                            
-                    #         if(now_action_dis>1):
-                    #             writer.add_scalar('Simulator/ratio_state', -5, index_in_episodes+1) # 底层控制器失败
-                    #         else:
-                    #             writer.add_scalar('Simulator/ratio_state', 0, index_in_episodes+1) # 到达错误的intention_node
-                    # # =================> evaluate_revise <=================
 
 
                     Evaluate.spl_per_episode = habitat_metric['spl']

@@ -2,13 +2,13 @@ import numpy as np
 
 from perception.arguments import args as perception_args
 from graph.arguments import args
-from graph.tools import get_absolute_pos
+from graph.tools import get_absolute_pos, get_relative_pos_world
 
 
 half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 
-def second_check(cx, cy, map, r):
+def second_check(cx, cy, map, r): # 检查新frontier在新地图上是否应该存在
     ghost_exist = False
     frontier_exist = False
     flag = False
@@ -57,17 +57,33 @@ def third_check(middle, current_node):
             flag = False
     return flag
 
-def forth_check(middle, current_node, nodes_list):
+
+
+def forth_check(middle, current_node, nodes_list): # 检查新frontier在旧地图上是否应该存在
     for temp_node in nodes_list:
         if temp_node.name == current_node.name:
             continue
         else:
+            # temp_node在current_node下的相对坐标
+            if(temp_node.name in current_node.neighbor):
+                temp_node_rela_pos = get_relative_pos_world(temp_node.world_cx, temp_node.world_cy, current_node.world_cx, current_node.world_cy, current_node.world_turn)
+                middle_dis = (middle[0]**2+middle[1]**2)**0.5
+                temp_node_dis = (temp_node_rela_pos[0]**2+temp_node_rela_pos[1]**2)**0.5
+                # 以current_node为顶点，计算角度余弦
+                if ((middle[0]*temp_node_rela_pos[0]+middle[1]*temp_node_rela_pos[1])/(middle_dis*temp_node_dis))>=np.cos(40*np.pi/180):
+                    return False
+            # temp_node在current_node下的相对坐标
+
             if temp_node.name == current_node.name:
                 rela_loc = middle
             else:
                 current_node_in_n = temp_node.all_other_nodes_loc[current_node.name]
                 rela_loc = get_absolute_pos(middle, current_node_in_n[:2], current_node_in_n[2])
             
+            # # 新增：根据距离判断
+            # if((rela_loc[0]**2+rela_loc[1]**2)**0.5)<=0.25:
+            #     return False
+
             gx = (int)(half_len-rela_loc[0]/args.resolution)
             gy = (int)(half_len+rela_loc[1]/args.resolution)
             if gx>=1 and gx<=(2*half_len-1) and gy>=1 and gy<=(2*half_len-1):
@@ -81,4 +97,8 @@ def forth_check(middle, current_node, nodes_list):
                 diff = np.sort(diff)
                 if diff[args.thre_for_delete] >= args.ghost_diff_thre or max(around) >= args.ghost_map_thre:
                     return False
+    
+        # if(temp_node.name=='0' and abs(middle[0]+2.7)<1e-5 and abs(middle[1]-0.9)<1e-5):
+        #     breakpoint()
+    
     return True

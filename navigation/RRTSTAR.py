@@ -10,7 +10,7 @@ import copy
 import os
 
 from navigation.arguments import args
-from navigation.tools import plot_map
+# from navigation.tools import plot_map
 
 
 
@@ -138,13 +138,13 @@ class RRTStar:
                     print("plan success")
                     print("RRT STEP: ", i, len(self.nodes), count)
                     print("RRT PATH LENGTH: ", len(path))
-                    plot_map(self.obstacles, path, True)
+                    # plot_map(self.obstacles, path, True)
                     return path
        
 
         print("fail")        
         print("RRT STEP: ", i, len(self.nodes), count)
-        plot_map(self.obstacles, [(self.start.x, self.start.y), (self.goal.x, self.goal.y)], False)
+        # plot_map(self.obstacles, [(self.start.x, self.start.y), (self.goal.x, self.goal.y)], False)
         return None
 
     def inflation(self, map):

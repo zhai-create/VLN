@@ -11,7 +11,7 @@ half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 class Node(object):
 
-    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None, laser_direct=None, is_real_intention=None):
+    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None, is_real_intention=None, now_parent_dis=-1):
         self.node_type = node_type # 直接赋值, str
         self.name = str(HabitatAction.name_val) # 在graph update时赋值, str
         HabitatAction.name_val += 1
@@ -27,16 +27,13 @@ class Node(object):
         self.bounding_box_embedding = bounding_box_embedding
 
         self.dis = (rela_cx**2+rela_cy**2)**0.5 # float
-
-        self.laser_direct = laser_direct
-
         self.is_see = False # bool
 
         self.rl_node_index = -1 # int
 
         self.is_real_intention = is_real_intention
 
-        self.intention_type_two_init_score_ls = []
+        self.now_parent_dis = now_parent_dis
 
         if(node_type=="explored_node"):
             self.rela_angle_parent_center = 0
@@ -63,6 +60,7 @@ class Node(object):
 
         self.all_other_nodes_loc = {} # dict
         self.all_other_rotate_nodes_loc = {} # dict
+        self.neighbor_dis_dict = {}
 
         self.neighbor = []
         self.rotate_neighbor = []
@@ -79,6 +77,7 @@ class Node(object):
         self.pc = pc
 
         self.deleted_frontiers = [] # rl_step中实际行走步数为0的frontier
+        self.deleted_intentions = [] # rl_step中实际行走步数为0的intention
 
 
     def __eq__(self, other):
@@ -95,6 +94,7 @@ class Node(object):
         if neighbor.name not in self.neighbor:
             self.neighbor.append(neighbor.name)
             self.all_other_nodes_loc.update({neighbor.name: np.array([relative_loc[0], relative_loc[1], relative_turn])})
+
 
     def add_rotate_neighbor(self, neighbor, relative_loc, relative_turn): # 添加当前结点的rotate邻居结点，及其相对于当前结点的位置和角度
         if neighbor.name not in self.rotate_neighbor:

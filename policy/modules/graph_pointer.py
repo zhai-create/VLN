@@ -29,7 +29,7 @@ class GraphPointerPolicy(nn.Module):
             node_padding_mask : Batch, Num_Key
             edge_matrix : Batch, Num_Node, Num_Node
         
-        current_idx: Batch, 1
+        : Batch, 1
         action_idx : Batch, Num_Action
         action_mask : Batch, Num_Action
     Output:

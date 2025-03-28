@@ -83,8 +83,6 @@ class HabitatAction:
 
     fake_intention_check_flag = 0
     real_intention_check_flag = 0
-    selected_intention_type_one_ls = []
-    selected_action_node_ls = []
 
     cluster_intention_name_history = []
 
@@ -167,8 +165,6 @@ class HabitatAction:
 
         HabitatAction.fake_intention_check_flag = 0
         HabitatAction.real_intention_check_flag = 0
-        HabitatAction.selected_intention_type_one_ls = []
-        HabitatAction.selected_action_node_ls = []
 
         HabitatAction.cluster_intention_name_history = []
 

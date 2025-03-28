@@ -23,7 +23,6 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
             if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
                 continue
             
-
             rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
 
             if(rule_dis>=4):
@@ -34,7 +33,6 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
                 rule_score = HabitatAction.random_gen.uniform(0.8, 1.0)
             else:
                 rule_score = HabitatAction.random_gen.uniform(0.9, 1.0)
-
 
             if(rule_score>1):
                 rule_score = 1

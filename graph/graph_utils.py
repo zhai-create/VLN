@@ -12,7 +12,7 @@ from perception.intention_utils_gt import object_detect_gt
 from perception.intention_utils_resnet import is_close
 
 from env_tools.arguments import args as env_args
-from navigation.tools import get_absolute_pos_world, get_relative_pos_world
+from navigation.tools import get_absolute_pos_world, get_relative_pos_world, get_a_star_path, get_node_robot_dis
 
 if(env_args.is_llm==2):
     from perception.intention_utils_llava_easy_four_intention_tag import request_llm
@@ -78,8 +78,8 @@ class GraphMap(object):
             if(temp_node.name==name):
                 return temp_node
     
-    
-    def frontier_delete(self):
+
+    def frontier_delete(self): # 检查旧frontier在新地图上是否应该存在
         current_map = self.current_node.occupancy_map
         for temp_node in self.explored_nodes:            
             sub_frontiers_for_index = copy.deepcopy(temp_node.sub_frontiers)
@@ -122,6 +122,7 @@ class GraphMap(object):
                         self.frontier_nodes.remove(temp_frontier)
                         self.all_nodes.remove(temp_frontier)
                         clear_fake_frontier(self.current_node, gx, gy)
+
 
     def multi_check_frontier(self, candidate_frontier_arr):
         res_frontier_pos_arr = []
@@ -218,14 +219,19 @@ class GraphMap(object):
         for index in range(len(final_frontier_pos_arr)):
             res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
             
-            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
-            res_rela_loc = get_relative_pos_world(res_loc_in_real_world[0], res_loc_in_real_world[1], world_cx, world_cy, world_turn)
-            laser_direct = (np.arctan2(res_rela_loc[1], res_rela_loc[0]))*180/np.pi
+            if(abs(self.rela_cx)<1e-5 and abs(self.rela_cy)<1e-5):
+                now_parent_dis = (final_frontier_pos_arr[index][0]**2+final_frontier_pos_arr[index][1]**2)**0.5
+            else:
+                now_parent_dis = -1
 
-            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], laser_direct=laser_direct) 
+            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], now_parent_dis=now_parent_dis) 
             self.current_node.sub_frontiers.append(new_frontier)
             self.frontier_nodes.append(new_frontier)
             self.all_nodes.append(new_frontier)
+
+            # if(new_frontier.name=='69'):
+            #     breakpoint()
+
 
 
 
@@ -309,7 +315,26 @@ class GraphMap(object):
 
                 # cluster_revise
                 res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
+                
+                # 防止fake_intention生成在real_intention附近
+                if(is_real_intention==False):
+                    is_near_real_flag = False
+                    for temp_real_intention in self.intention_nodes:
+                        if(temp_real_intention.is_real_intention==True):
+                            if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<0.5:
+                                is_near_real_flag = True
+                                break
+                    if(is_near_real_flag==True):
+                        continue
+                # 防止fake_intention生成在real_intention附近
+
+                if(abs(self.rela_cx)<1e-5 and abs(self.rela_cy)<1e-5):
+                    now_parent_dis = (center_loc_in_ref[0]**2+center_loc_in_ref[1]**2)**0.5
+                else:
+                    now_parent_dis = -1
+                
+                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention, now_parent_dis=now_parent_dis)
+                
                 # correct_recheck
                 new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
                 new_intention.dis_ls[0] = new_intention.robot_intention_dis
@@ -334,7 +359,7 @@ class GraphMap(object):
                 if(temp_dis<min_dis):
                     min_dis = temp_dis
                     min_node = temp_new_intention_node
-            if(min_dis<=0.5):
+            if(min_dis<=1.0): # intention_node聚类距离修改
                 if(-1 not in temp_intention_node.score_ls):
                     temp_intention_node.score_ls.append(min_node.score)
                     temp_intention_node.score_ls.pop(0)
@@ -347,65 +372,6 @@ class GraphMap(object):
 
                     temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
         # correct_recheck
-
-        # if(action_node is not None) and (is_front_step==True):
-        #     if(action_node.node_type=="intention_node" and action_node.is_real_intention==False):
-        #         if(-1 in action_node.score_ls):
-        #             init_score = action_node.score_ls[action_node.score_ls.index(-1)-1]
-        #             action_node.score_ls[action_node.score_ls.index(-1)-1] = init_score-HabitatAction.random_gen.uniform(0.05, 0.1)
-        #             if(action_node.score_ls[action_node.score_ls.index(-1)-1]<0.6):
-        #                 action_node.score_ls[action_node.score_ls.index(-1)-1] = 0.6
-        #         else:
-        #             init_score = action_node.score_ls[-1]
-        #             action_node.score_ls[-1] = init_score-HabitatAction.random_gen.uniform(0.05, 0.1)
-        #             if(action_node.score_ls[-1]<0.6):
-        #                 action_node.score_ls[-1] = 0.6
-
-        #     elif(action_node.node_type=="intention_node" and action_node.is_real_intention==True):
-        #         if(-1 in action_node.score_ls):
-        #             init_score = action_node.score_ls[action_node.score_ls.index(-1)-1]
-        #             action_node.score_ls[action_node.score_ls.index(-1)-1] = init_score+HabitatAction.random_gen.uniform(0.05, 0.1)
-        #             if(action_node.score_ls[action_node.score_ls.index(-1)-1]>1):
-        #                 action_node.score_ls[action_node.score_ls.index(-1)-1] = 1
-        #         else:
-        #             init_score = action_node.score_ls[-1]
-        #             action_node.score_ls[-1] = init_score+HabitatAction.random_gen.uniform(0.05, 0.1)
-        #             if(action_node.score_ls[-1]>1):
-        #                 action_node.score_ls[-1] = 1
-
-
-    def add_request_feature_three(self, detect_res_pos_dict, rgb_image_ls, object_text):
-        image_index_ls = []
-        for temp_score in detect_res_pos_dict:
-            for temp_ls in detect_res_pos_dict[temp_score]:
-                image_index = temp_ls[2]
-                assert image_index==0
-                if(image_index not in image_index_ls):
-                    image_index_ls.append(image_index)
-        if(len(image_index_ls)==0):
-            room_score_ls = [0]
-        else:
-            answer_ls = request_llm(rgb_image_ls, object_text, image_index_ls)
-            room_score_ls = answer_ls[0]
-        return room_score_ls
-
-    def add_request_feature_four(self, detect_res_pos_dict, rgb_image_ls, object_text):
-        image_index_ls = []
-        for temp_score in detect_res_pos_dict:
-            for temp_ls in detect_res_pos_dict[temp_score]:
-                image_index = temp_ls[2]
-                assert image_index==0
-                if(image_index not in image_index_ls):
-                    image_index_ls.append(image_index)
-        if(len(image_index_ls)==0):
-            room_score_ls = [0]
-            object_score_ls = [0]
-        else:
-            answer_ls = request_llm(rgb_image_ls, object_text, image_index_ls)
-            room_score_ls = answer_ls[0]
-            object_score_ls = answer_ls[1]
-        return room_score_ls, object_score_ls
-
 
     def get_laser_result(self, depth):
         laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered = \
@@ -437,12 +403,17 @@ class GraphMap(object):
                 
                 current_node_in_last_node_loc = get_relative_pos_world(self.current_node.world_cx, self.current_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
                 current_node_in_last_node_turn = self.current_node.world_turn-last_node.world_turn
+                # node_robot_dis = get_node_robot_dis(current_node_in_last_node_loc[0], current_node_in_last_node_loc[1], last_node.occupancy_map, is_explored_node=True)
+
                 last_node.add_neighbor(self.current_node, current_node_in_last_node_loc, current_node_in_last_node_turn)
-                
+                # last_node.neighbor_dis_dict[self.current_node.name] = node_robot_dis
+
                 last_node_in_current_node_loc =  get_relative_pos_world(last_node.world_cx, last_node.world_cy, self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
                 last_node_in_current_node_turn = last_node.world_turn-self.current_node.world_turn
                 self.current_node.add_neighbor(last_node, last_node_in_current_node_loc, last_node_in_current_node_turn)
-                
+                # self.current_node.neighbor_dis_dict[last_node.name] = node_robot_dis
+
+
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
 
@@ -454,12 +425,15 @@ class GraphMap(object):
 
             predicted_t_in_last = get_relative_pos_world(predict_node.world_cx, predict_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
             predicted_theta_in_last = predict_node.world_turn-last_node.world_turn
-            last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last)
+            # node_robot_dis = get_node_robot_dis(predicted_t_in_last[0], predicted_t_in_last[1], last_node.occupancy_map, is_explored_node=True)
 
+            last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last)
+            # last_node.neighbor_dis_dict[self.current_node.name] = node_robot_dis
 
             last_t_in_predicted = get_relative_pos_world(last_node.world_cx, last_node.world_cy, predict_node.world_cx, predict_node.world_cy, predict_node.world_turn)
             last_theta_in_predicted = last_node.world_turn-predict_node.world_turn            
-            self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)            
+            self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)     
+            # self.current_node.neighbor_dis_dict[last_node.name] = node_robot_dis
         else:
             self.set_current_pos(final_t[0], final_t[1], final_theta)
         return flag

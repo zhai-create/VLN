@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '0'
+os.environ["CUDA_VISIBLE_DEVICES"] = '3'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
 import cv2
 import habitat
 import time
@@ -52,7 +52,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_train_val"
     else:
-        val_note = "_12_factor_frontier_cluster_seg_reward_multi_check_gt_train_val"
+        val_note = "_multi_check_new_replan_new_topo_gt_train_val"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -82,11 +82,11 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
 
-    for temp_pre_model in range(50, 80000, 10):
+    for temp_pre_model in range(70, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_24_14_55_52_12_factor_frontier_cluster_seg_reward_multi_check_gt_train"
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_27_15_41_13_multi_check_new_replan_new_topo_gt_train"
         
         while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
@@ -185,15 +185,6 @@ if __name__=="__main__":
                 print("=====> action_node_type <=====", action_node.node_type)
                 
                 evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
-                
-                # node_type_revise
-                if(action_node.node_type=="intention_node"):
-                    for temp_intention_node in topo_graph.intention_nodes:
-                        if(temp_intention_node.intention_type==1):
-                            temp_dis = ((temp_intention_node.world_cx-action_node.world_cx)**2+(temp_intention_node.world_cy-action_node.world_cy)**2)**0.5
-                            if(temp_dis<1.0):
-                                temp_intention_node.intention_type = 2
-                # node_type_revise
                 
                 if(evaluate_res=="episode_stop"):
                     break

@@ -43,8 +43,8 @@ def get_args():
     parser.add_argument("--turn_angle", type=float, default=30)
     # parser.add_argument("--turn_angle", type=float, default=10)
 
-    parser.add_argument("--path_block_ls_thre", type=int, default=4)
-    parser.add_argument("--path_block_meter_thre", type=float, default=0.5)
+    parser.add_argument("--path_block_ls_thre", type=int, default=3)
+    parser.add_argument("--path_block_meter_thre", type=float, default=0.25)
 
     parser.add_argument("--FINISH", type=str, default="f")
     parser.add_argument("--OTHER", type=str, default="o")

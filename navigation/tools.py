@@ -7,6 +7,8 @@ from navigation.arguments import args
 from graph.tools import get_absolute_pos
 
 from env_tools.arguments import args as env_args
+from navigation.RRTSTAR import RRTStar
+from navigation.ASTAR import *
 
 half_len = (int)(perception_args.graid_map_scale/graph_args.resolution)
 
@@ -202,3 +204,94 @@ def get_relative_pos_world(real_world_cx, real_world_cy, world_cx, world_cy, wor
     real_r_matrix = np.array([[np.cos(world_turn), -np.sin(world_turn)], [np.sin(world_turn), np.cos(world_turn)]])  
     rela_pos = np.dot(real_r_matrix, np.array([world_cx-real_world_cx, real_world_cy-world_cy]))
     return rela_pos
+
+def get_a_star_path(sub_map, start_point, end_point):
+    rrt = RRTStar(sub_map, start_point, end_point, inflation_distance=args.inflation_distance)
+    if not (int(end_point[0])>=0 and int(end_point[0])<rrt.obstacles.shape[0] and int(end_point[1])>=0 and int(end_point[1])<rrt.obstacles.shape[1] and rrt.obstacles[int(end_point[0])][int(end_point[1])]<graph_args.unknown_val):
+        # 如果在rrt地图中不能直接可见，则寻找其最近区域
+        min_rrt_x, min_rrt_y = get_nearest_grid(end_point, temp_ghost_obstacle_map=rrt.obstacles, action_category="intention_node")
+        if(min_rrt_x==-1): # 如果最近区域不可见
+            zero_rrt_x, zero_rrt_y = get_nearest_grid(end_point, temp_ghost_obstacle_map=sub_map, action_category="intention_node")
+            if(zero_rrt_x==-1):
+                zero_rrt_x, zero_rrt_y = get_nearest_grid(end_point, temp_ghost_obstacle_map=sub_map, action_category="frontier_node")   
+            if(zero_rrt_x!=-1): # 0311新加代码
+                end_point[0], end_point[1] = zero_rrt_x, zero_rrt_y
+            rrt = RRTStar(sub_map, start_point, end_point, inflation_distance=0) # 用膨胀因子为0的地图找
+        else: # 如果最近区域可见
+            end_point[0], end_point[1] = min_rrt_x, min_rrt_y
+            rrt = RRTStar(sub_map, start_point, end_point, inflation_distance=args.inflation_distance)
+
+    astar_map = Map(rrt.obstacles,int(start_point[0]),int(start_point[1]),int(end_point[0]),int(end_point[1]))
+    astar_path = astar(astar_map)
+    if(astar_path != None): # 使用astar规划出来了路径
+        local_path = astar_path
+    else: # 没有使用astar规划出来路径，则使用腐蚀后的astar地图规划路径
+        kernel = np.ones((args.kernel_size, args.kernel_size), np.uint8)
+        astar_map.data = cv2.erode(astar_map.data, kernel)
+        astar_path = astar(astar_map)
+        if(astar_path != None):
+            local_path = astar_path
+        else:
+            local_path = None
+    return local_path # 得到的local_path不包括起点
+
+
+def get_node_robot_dis(rela_cx, rela_cy, sub_map, is_explored_node):
+    near_dis = (rela_cx**2+rela_cy**2)**0.5
+    if(near_dis<0.5):
+        return near_dis
+    
+    # 使用A*算法计算实际路径长度
+    end_point_row = (int)(half_len-rela_cx/graph_args.resolution)
+    end_point_col = (int)(half_len+rela_cy/graph_args.resolution)
+    end_point = np.array([end_point_row, end_point_col])
+    start_point = np.array([int(half_len), int(half_len)])
+    a_star_path = get_a_star_path(sub_map, start_point, end_point)
+    if(a_star_path is not None):
+        node_robot_dis = 0
+        for temp_index, temp_loc in enumerate(a_star_path):
+            if(temp_index==0):
+                node_robot_dis += ((temp_loc[0]-start_point[0])**2+(temp_loc[1]-start_point[1])**2)**0.5
+            else:
+                node_robot_dis += ((temp_loc[0]-a_star_path[temp_index-1][0])**2+(temp_loc[1]-a_star_path[temp_index-1][1])**2)**0.5
+        node_robot_dis = node_robot_dis*0.1 # 转换为meter为单位
+    else:
+        if(is_explored_node==True):
+            node_robot_dis = ((rela_cx)**2+(rela_cy)**2)**0.5
+        else:
+            node_robot_dis = -1
+    return node_robot_dis
+    # 使用A*算法计算实际路径长度
+
+
+def get_action_robot_dis(action_rela_cx, action_rela_cy, robot_rela_cx, robot_rela_cy, sub_map):
+    if(abs(robot_rela_cx)<0.1 and abs(robot_rela_cy)<0.1):
+        return (action_rela_cx**2+action_rela_cy**2)**0.5
+    
+    near_dis = ((robot_rela_cx-action_rela_cx)**2+(robot_rela_cy-action_rela_cy)**2)**0.5
+    if(near_dis<0.5):
+        return near_dis
+    
+    
+    # 使用A*算法计算实际路径长度
+    end_point_row = (int)(half_len-action_rela_cx/graph_args.resolution)
+    end_point_col = (int)(half_len+action_rela_cy/graph_args.resolution)
+    end_point = np.array([end_point_row, end_point_col])
+
+    start_point_row = (int)(half_len-robot_rela_cx/graph_args.resolution)
+    start_point_col = (int)(half_len+robot_rela_cy/graph_args.resolution)
+    start_point = np.array([start_point_row, start_point_col])
+
+    a_star_path = get_a_star_path(sub_map, start_point, end_point)
+    if(a_star_path is not None):
+        node_robot_dis = 0
+        for temp_index, temp_loc in enumerate(a_star_path):
+            if(temp_index==0):
+                node_robot_dis += ((temp_loc[0]-start_point[0])**2+(temp_loc[1]-start_point[1])**2)**0.5
+            else:
+                node_robot_dis += ((temp_loc[0]-a_star_path[temp_index-1][0])**2+(temp_loc[1]-a_star_path[temp_index-1][1])**2)**0.5
+        node_robot_dis = node_robot_dis*0.1 # 转换为meter为单位
+    else:
+        node_robot_dis = ((robot_rela_cx-action_rela_cx)**2+(robot_rela_cy-action_rela_cy)**2)**0.5
+    return node_robot_dis
+    # 使用A*算法计算实际路径长度

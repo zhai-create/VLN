@@ -50,7 +50,9 @@ class SubgoalReach:
 
     init_dis_to_goal = 0
 
-    false_front_step = 0
+    false_front_step = 0 
+    delta_front_step = 0 # 用于记录每隔delta步进行一次“fake_intention的生成”和“重规划” (每隔4个front_step后重规划一次，即第5个front_step开始重规划)
+
 
 
     @staticmethod
@@ -71,6 +73,7 @@ class SubgoalReach:
         SubgoalReach.init_dis_to_goal = habitat_env.get_metrics()['distance_to_goal']
 
         SubgoalReach.false_front_step = 0
+        SubgoalReach.delta_front_step = 0
 
 
     @staticmethod
@@ -138,6 +141,15 @@ class SubgoalReach:
                 if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
                     action_parent_node.deleted_frontiers.append(action_node)
 
+            else: # 为intention_node
+                # rl_step中实际行走步数为0的intention
+                if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
+                    action_parent_node.sub_intentions.remove(action_node)
+                    topo_graph.intention_nodes.remove(action_node)
+                    topo_graph.all_nodes.remove(action_node)
+                    action_parent_node.deleted_intentions.append(action_node)
+
+    @staticmethod
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
             if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved") or (action_node.node_type=="intention_node" and action_node.intention_type!=2 and candidate_achieved_result=="achieved"):
@@ -168,6 +180,86 @@ class SubgoalReach:
                 return candidate_achieved_result 
             return candidate_achieved_result 
 
+    
+    
+    @staticmethod
+    def bottom_walk(habitat_action, topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=None, occu_writer=None, video_writer=None, map_writer=None, gt_writer=None):
+        # 需要在habitat_env.step(habitat_action)运行之前执行
+        if(SubgoalReach.next_action=="f" and action_node.node_type=="intention_node" and action_node.parent_node.name==topo_graph.current_node.name):
+            SubgoalReach.delta_front_step += 1
+            if(SubgoalReach.delta_front_step>=5):
+                achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
+                return achieved_result
+                
+        if not habitat_env.episode_over:
+            observations = habitat_env.step(habitat_action)
+            topo_graph.obs = observations
+        else:
+            return "exceed"
+
+        # 用于录制视频
+        if(env_args.is_vis==True):
+            save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
+        # ===========> 以下为new <=========
+        # 检查是否卡住
+        if(SubgoalReach.next_action=="f"):
+            if(SubgoalReach.is_block(habitat_env, graph_train)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
+                # "block" # new_patch1
+                achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block", graph_train=graph_train)
+                return achieved_result
+
+        graph_update_flag = topo_graph.update()
+        if(graph_update_flag==True): # 需要转圈
+            for i in range(12):
+                depth = fix_depth(observations["depth"])
+                topo_graph.get_laser_result(depth)
+                topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
+                topo_graph.update_graph_frontier()
+
+                rgb_image_ls = get_rgb_image_ls(habitat_env)
+                gt_image_ls = get_gt_image_ls(habitat_env)
+                # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+
+                detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+                topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+
+                # 底层仿真器动作执行
+                habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
+                if not habitat_env.episode_over:
+                    observations = habitat_env.step(habitat_action)
+                    topo_graph.obs = observations
+                else:
+                    return "exceed"
+
+                # 用于录制视频
+                if(env_args.is_vis==True):
+                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
+
+        else:
+            depth = fix_depth(observations["depth"])
+            topo_graph.get_laser_result(depth)
+            topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
+            topo_graph.update_graph_frontier()
+
+            rgb_image_ls = get_rgb_image_ls(habitat_env)
+            gt_image_ls = get_gt_image_ls(habitat_env)
+            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            # ===========================
+            if(SubgoalReach.next_action=="f"):
+                SubgoalReach.false_front_step += 1
+                if(SubgoalReach.false_front_step>=3):
+                    is_fake_intention = True
+                    SubgoalReach.false_front_step = 0
+                else:
+                    is_fake_intention = False
+            else:
+                is_fake_intention = False
+
+            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
+            # ===========================
+            topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+        return "go_on"
+
 
 
     @staticmethod
@@ -179,15 +271,11 @@ class SubgoalReach:
             :param habitat_env
             :param object_goal
         """
-        HabitatAction.selected_action_node_ls.append(action_node)
-        if(action_node.node_type=="intention_node" and action_node.intention_type==2):
-            action_node.intention_type_two_init_score_ls = copy.deepcopy(action_node.score_ls)
 
         # 用于录制视频
         if(env_args.is_vis==True):
             save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
                 
-
         topo_planner = TopoPlanner(topo_graph, action_node)
         SubgoalReach.reset(habitat_env, topo_graph)
         while True:
@@ -196,79 +284,11 @@ class SubgoalReach:
             
             # 底层仿真器动作执行
             habitat_action = HabitatAction.set_habitat_action(SubgoalReach.next_action, topo_graph)
-            if(habitat_action is None): # 手动调试时INVALID KEY
-                continue
 
             if (SubgoalReach.next_action=="f" or SubgoalReach.next_action=="l" or SubgoalReach.next_action=="r"):
-                if not habitat_env.episode_over:
-                    observations = habitat_env.step(habitat_action)
-                    topo_graph.obs = observations
-                else:
-                    return "exceed"
-
-                # 用于录制视频
-                if(env_args.is_vis==True):
-                    save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
-                # ===========> 以下为new <=========
-                # 检查是否卡住
-                if(SubgoalReach.next_action=="f"):
-                    if(SubgoalReach.is_block(habitat_env, graph_train)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
-                        # "block" # new_patch1
-                        achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block", graph_train=graph_train)
-                        return achieved_result
-                
-                graph_update_flag = topo_graph.update()
-                if(graph_update_flag==True): # 需要转圈
-                    for i in range(12):
-                        depth = fix_depth(observations["depth"])
-                        topo_graph.get_laser_result(depth)
-                        topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
-                        topo_graph.update_graph_frontier()
-
-                        rgb_image_ls = get_rgb_image_ls(habitat_env)
-                        gt_image_ls = get_gt_image_ls(habitat_env)
-                        # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-
-                        detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-                        topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
-
-                        # 底层仿真器动作执行
-                        habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
-                        if not habitat_env.episode_over:
-                            observations = habitat_env.step(habitat_action)
-                            topo_graph.obs = observations
-                        else:
-                            return "exceed"
-
-                        # 用于录制视频
-                        if(env_args.is_vis==True):
-                            save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
-
-                else:
-                    depth = fix_depth(observations["depth"])
-                    topo_graph.get_laser_result(depth)
-                    topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
-                    topo_graph.update_graph_frontier()
-
-                    rgb_image_ls = get_rgb_image_ls(habitat_env)
-                    gt_image_ls = get_gt_image_ls(habitat_env)
-                    # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                    # ===========================
-                    if(SubgoalReach.next_action=="f"):
-                        SubgoalReach.false_front_step += 1
-                        # if(SubgoalReach.false_front_step>=4):
-                        if(SubgoalReach.false_front_step>=3):
-                            is_fake_intention = True
-                            SubgoalReach.false_front_step = 0
-                        else:
-                            is_fake_intention = False
-                    else:
-                        is_fake_intention = False
-
-                    detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
-                    # ===========================
-                    topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
-
+                bottom_walk_res = SubgoalReach.bottom_walk(habitat_action, topo_graph, action_node, habitat_env, object_goal, graph_train=graph_train, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
+                if(bottom_walk_res!="go_on"):
+                    return bottom_walk_res
 
             elif (SubgoalReach.next_action == "suc" and topo_planner.state_flag=="finish"):
                 # "achieved"
@@ -308,81 +328,18 @@ class SubgoalReach:
                         # 底层仿真器动作执行
                         habitat_action = HabitatAction.set_habitat_action(SubgoalReach.next_action, topo_graph)
                         if (SubgoalReach.next_action=="f" or SubgoalReach.next_action=="l" or SubgoalReach.next_action=="r"):
-                            if not habitat_env.episode_over:
-                                observations = habitat_env.step(habitat_action)
-                                topo_graph.obs = observations
-                            else:
-                                return "exceed"
-
-                            # 用于录制视频
-                            if(env_args.is_vis==True):
-                                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
-
-                            graph_update_flag = topo_graph.update()
-                            if(graph_update_flag==True): # 需要转圈
-                                for i in range(12):
-                                    depth = fix_depth(observations["depth"])
-                                    topo_graph.get_laser_result(depth)
-                                    topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
-                                    topo_graph.update_graph_frontier()
-
-                                    rgb_image_ls = get_rgb_image_ls(habitat_env)
-                                    gt_image_ls = get_gt_image_ls(habitat_env)
-                                    # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-
-                                    detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-                                    topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
-
-                                    # 底层仿真器动作执行
-                                    habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
-                                    if not habitat_env.episode_over:
-                                        observations = habitat_env.step(habitat_action)
-                                        topo_graph.obs = observations
-                                    else:
-                                        return "exceed"
-
-                                    # 用于录制视频
-                                    if(env_args.is_vis==True):
-                                        save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
-
-                            else:
-                                depth = fix_depth(observations["depth"])
-                                topo_graph.get_laser_result(depth)
-                                topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
-                                topo_graph.update_graph_frontier()
-
-                                rgb_image_ls = get_rgb_image_ls(habitat_env)
-                                gt_image_ls = get_gt_image_ls(habitat_env)
-                                # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                                # ===========================
-                                if(SubgoalReach.next_action=="f"):
-                                    SubgoalReach.false_front_step += 1
-                                    # if(SubgoalReach.false_front_step>=4):
-                                    if(SubgoalReach.false_front_step>=3):
-                                        is_fake_intention = True
-                                        SubgoalReach.false_front_step = 0
-                                    else:
-                                        is_fake_intention = False
-                                else:
-                                    is_fake_intention = False
-                                detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
-                                # ===========================
-                                topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+                            bottom_walk_res = SubgoalReach.bottom_walk(habitat_action, topo_graph, action_node, habitat_env, object_goal, graph_train=graph_train, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
+                            if(bottom_walk_res!="go_on"):
+                                return bottom_walk_res
                         
                         if(SubgoalReach.next_action=="suc"):
                             break
                         faile_plan_cnt += 1
                 # ===================> Failed_control_revise <===================
+                if(action_node.node_type=="intention_node"):
+                    action_node.intention_type = 2
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
                 return achieved_result
-
-            elif(SubgoalReach.next_action == "new" and len(HabitatAction.selected_action_node_ls)>=2):
-                if(HabitatAction.selected_action_node_ls[-2].node_type=="intention_node" and action_node.node_type=="intention_node" and ((HabitatAction.selected_action_node_ls[-2].world_cx-action_node.world_cx)**2+(HabitatAction.selected_action_node_ls[-2].world_cy-action_node.world_cy)**2)**0.5<0.2):
-                    # "achieved"
-                    achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
-                    return achieved_result
-
-
 
             if(topo_planner.state_flag=="init" or (topo_planner.state_flag=="node_path" and SubgoalReach.next_action=="suc")):
                 start_point, end_point, stitching_map = topo_planner.get_start_end_point()
@@ -413,7 +370,6 @@ class SubgoalReach:
                                     pid_waypoint_0 = action_node.world_cy+world_cy_delta_ls[temp_j]
                                     pid_waypoint_1 = habitat_env._sim.get_agent_state(0).position[1]
                                     pid_waypoint_2 = action_node.world_cx+world_cx_delta_ls[temp_i]
-
                                     pid_waypoint = np.array([pid_waypoint_0, pid_waypoint_1, pid_waypoint_2]) # pid_waypoint: 下一个路径点在世界坐标系下的坐标
                                     habitat_act_num = local_planner.habitat_planner.get_next_action(pid_waypoint)
                                     SubgoalReach.next_action = act_num_str_map[habitat_act_num]
@@ -427,71 +383,12 @@ class SubgoalReach:
                         # 底层仿真器动作执行
                         habitat_action = HabitatAction.set_habitat_action(SubgoalReach.next_action, topo_graph)
                         if (SubgoalReach.next_action=="f" or SubgoalReach.next_action=="l" or SubgoalReach.next_action=="r"):
-                            if not habitat_env.episode_over:
-                                observations = habitat_env.step(habitat_action)
-                                topo_graph.obs = observations
-                            else:
-                                return "exceed"
-
-                            # 用于录制视频
-                            if(env_args.is_vis==True):
-                                save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
-
-                            graph_update_flag = topo_graph.update()
-                            if(graph_update_flag==True): # 需要转圈
-                                for i in range(12):
-                                    depth = fix_depth(observations["depth"])
-                                    topo_graph.get_laser_result(depth)
-                                    topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
-                                    topo_graph.update_graph_frontier()
-
-                                    rgb_image_ls = get_rgb_image_ls(habitat_env)
-                                    gt_image_ls = get_gt_image_ls(habitat_env)
-                                    # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-
-                                    detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-                                    topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
-
-                                    # 底层仿真器动作执行
-                                    habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
-                                    if not habitat_env.episode_over:
-                                        observations = habitat_env.step(habitat_action)
-                                        topo_graph.obs = observations
-                                    else:
-                                        return "exceed"
-
-                                    # 用于录制视频
-                                    if(env_args.is_vis==True):
-                                        save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
-
-                            else:
-                                depth = fix_depth(observations["depth"])
-                                topo_graph.get_laser_result(depth)
-                                topo_graph.current_node.update_occupancy(topo_graph.laser_2d_filtered, topo_graph.laser_2d_filtered_angle, topo_graph.pixel_y_2d_filtered, np.array([topo_graph.rela_cx, topo_graph.rela_cy]), topo_graph.rela_turn)
-                                topo_graph.update_graph_frontier()
-
-                                rgb_image_ls = get_rgb_image_ls(habitat_env)
-                                gt_image_ls = get_gt_image_ls(habitat_env)
-                                # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                                # ===========================
-                                if(SubgoalReach.next_action=="f"):
-                                    SubgoalReach.false_front_step += 1
-                                    # if(SubgoalReach.false_front_step>=4):
-                                    if(SubgoalReach.false_front_step>=3):
-                                        is_fake_intention = True
-                                        SubgoalReach.false_front_step = 0
-                                    else:
-                                        is_fake_intention = False
-                                else:
-                                    is_fake_intention = False
-
-                                detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
-                                # ===========================
-                                topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+                            bottom_walk_res = SubgoalReach.bottom_walk(habitat_action, topo_graph, action_node, habitat_env, object_goal, graph_train=graph_train, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
+                            if(bottom_walk_res!="go_on"):
+                                return bottom_walk_res
                         
                         if(SubgoalReach.next_action=="suc"):
                             break
-
                         faile_plan_cnt += 1
                         
                     if(faile_plan_cnt==0 and SubgoalReach.next_action=="suc"):

@@ -75,6 +75,10 @@ def get_absolute_pos(p_loc, r_loc, rr):
     r_matrix = np.array([[np.cos(rr), np.sin(rr)], [-np.sin(rr), np.cos(rr)]])
     return r_loc + np.dot(r_matrix, p_loc)
 
+def get_relative_pos(f_loc, b_loc, rr):
+    r_matrix = np.array([[np.cos(rr), -np.sin(rr)], [np.sin(rr), np.cos(rr)]])
+    return np.dot(r_matrix, (f_loc-b_loc))
+
 
 def clear_fake_frontier(current_node, gx, gy):
     current_map = current_node.occupancy_map
@@ -223,3 +227,4 @@ def get_current_world_pos(habitat_env):
     world_cz = habitat_env._sim.get_agent_state(0).position[1]
     world_turn = 2 * math.atan(habitat_env._sim.get_agent_state(0).rotation.y/habitat_env._sim.get_agent_state(0).rotation.w)
     return world_cx, world_cy, world_cz, world_turn
+
