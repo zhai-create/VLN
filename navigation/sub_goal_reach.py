@@ -95,33 +95,9 @@ class SubgoalReach:
             if(first_last_delta<=args.path_block_meter_thre):
                 return True
 
-        # ============> front_step_origin <==============
         if(graph_train==True and (HabitatAction.front_steps-SubgoalReach.init_front_steps)>200):
             return True
-        # ============> front_step_origin <==============
-
-        # if(graph_train==True and (HabitatAction.count_steps-SubgoalReach.init_count_steps)>500):
-        #     return True
-
         return False
-
-    # @staticmethod
-    # def achieved_remove_action_node(topo_graph, action_node, habitat_env):
-    #     """
-    #         When the robot achieves the sub-goal, delete the action node in the topo-graph.
-    #         :param topo_graph
-    #         :param action_node
-    #     """
-    #     if(action_node in topo_graph.all_nodes):
-    #         action_parent_node = action_node.parent_node
-    #         if(action_node.node_type=="frontier_node"):
-    #             action_parent_node.sub_frontiers.remove(action_node)
-    #             topo_graph.frontier_nodes.remove(action_node)
-    #             topo_graph.all_nodes.remove(action_node)
-    #         else:
-    #             action_parent_node.sub_intentions.remove(action_node)
-    #             topo_graph.intention_nodes.remove(action_node)
-    #             topo_graph.all_nodes.remove(action_node)
 
     @staticmethod
     def achieved_remove_action_node(topo_graph, action_node, habitat_env):
@@ -130,29 +106,30 @@ class SubgoalReach:
             :param topo_graph
             :param action_node
         """
-        if(action_node in topo_graph.all_nodes):
-            action_parent_node = action_node.parent_node
-            if(action_node.node_type=="frontier_node"):
+        action_parent_node = action_node.parent_node
+        if(action_node.node_type=="frontier_node"):
+            # rl_step中实际行走步数为0的frontier
+            if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
+                action_parent_node.deleted_frontiers.append(action_node)
+
+            if(action_node in topo_graph.all_nodes):
                 action_parent_node.sub_frontiers.remove(action_node)
                 topo_graph.frontier_nodes.remove(action_node)
                 topo_graph.all_nodes.remove(action_node)
-
-                # rl_step中实际行走步数为0的frontier
-                if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
-                    action_parent_node.deleted_frontiers.append(action_node)
-
-            else: # 为intention_node
-                # rl_step中实际行走步数为0的intention
-                if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
+        
+        else: # action_node为intention_node
+            # rl_step中实际行走步数为0的frontier
+            if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
+                action_parent_node.deleted_intentions.append(action_node)
+                if(action_node in topo_graph.all_nodes):
                     action_parent_node.sub_intentions.remove(action_node)
                     topo_graph.intention_nodes.remove(action_node)
                     topo_graph.all_nodes.remove(action_node)
-                    action_parent_node.deleted_intentions.append(action_node)
 
     @staticmethod
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
-            if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved") or (action_node.node_type=="intention_node" and action_node.intention_type!=2 and candidate_achieved_result=="achieved"):
+            if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved") or (action_node.node_type=="intention_node" and candidate_achieved_result=="achieved"):
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             else:
@@ -164,33 +141,13 @@ class SubgoalReach:
                     return "exceed"
 
         else: # 处于测试阶段
-            if(action_node.node_type=="intention_node"):
-                if(action_node.intention_type!=2):
-                    SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
-                    return candidate_achieved_result
-                else:
-                    if not habitat_env.episode_over:
-                        habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                        observations = habitat_env.step(habitat_action)
-                        return candidate_achieved_result
-                    else:
-                        return "exceed"
-            else:
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
-                return candidate_achieved_result 
+            SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
             return candidate_achieved_result 
 
     
     
     @staticmethod
-    def bottom_walk(habitat_action, topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=None, occu_writer=None, video_writer=None, map_writer=None, gt_writer=None):
-        # 需要在habitat_env.step(habitat_action)运行之前执行
-        if(SubgoalReach.next_action=="f" and action_node.node_type=="intention_node" and action_node.parent_node.name==topo_graph.current_node.name):
-            SubgoalReach.delta_front_step += 1
-            if(SubgoalReach.delta_front_step>=5):
-                achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
-                return achieved_result
-                
+    def bottom_walk(habitat_action, topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=None, occu_writer=None, video_writer=None, map_writer=None, gt_writer=None):                
         if not habitat_env.episode_over:
             observations = habitat_env.step(habitat_action)
             topo_graph.obs = observations
@@ -206,6 +163,11 @@ class SubgoalReach:
             if(SubgoalReach.is_block(habitat_env, graph_train)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
                 # "block" # new_patch1
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block", graph_train=graph_train)
+                if(action_node in topo_graph.all_nodes) and (action_node.node_type=="intention_node"): # 如果是intention_node卡住，则删除当前intention_node
+                    action_parent_node = action_node.parent_node
+                    action_parent_node.sub_intentions.remove(action_node)
+                    topo_graph.intention_nodes.remove(action_node)
+                    topo_graph.all_nodes.remove(action_node)
                 return achieved_result
 
         graph_update_flag = topo_graph.update()
@@ -336,9 +298,17 @@ class SubgoalReach:
                             break
                         faile_plan_cnt += 1
                 # ===================> Failed_control_revise <===================
-                if(action_node.node_type=="intention_node"):
-                    action_node.intention_type = 2
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
+                if(action_node.node_type=="intention_node"):
+                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                    now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                    if(now_action_dis>1) and (action_node in topo_graph.all_nodes):
+                        action_parent_node = action_node.parent_node
+                        action_parent_node.sub_intentions.remove(action_node)
+                        topo_graph.intention_nodes.remove(action_node)
+                        topo_graph.all_nodes.remove(action_node)
+                    # else:
+                    #     action_node.intention_type = 2
                 return achieved_result
 
             if(topo_planner.state_flag=="init" or (topo_planner.state_flag=="node_path" and SubgoalReach.next_action=="suc")):
@@ -396,6 +366,17 @@ class SubgoalReach:
                     else:
                         achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
                     # ===================> Failed_plan_revise <===================
+                    if(action_node.node_type=="intention_node"):
+                        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                        now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                        if(now_action_dis>1):
+                            if(action_node in topo_graph.all_nodes):
+                                action_parent_node = action_node.parent_node
+                                action_parent_node.sub_intentions.remove(action_node)
+                                topo_graph.intention_nodes.remove(action_node)
+                                topo_graph.all_nodes.remove(action_node)
+                        # else:
+                        #     action_node.intention_type = 2
                     return achieved_result
             
             SubgoalReach.next_action, local_path = local_planner.update_local_path(topo_planner, SubgoalReach.next_action, local_path)

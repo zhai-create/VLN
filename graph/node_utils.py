@@ -11,7 +11,7 @@ half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 class Node(object):
 
-    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None, is_real_intention=None, now_parent_dis=-1):
+    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None, is_real_intention=None):
         self.node_type = node_type # 直接赋值, str
         self.name = str(HabitatAction.name_val) # 在graph update时赋值, str
         HabitatAction.name_val += 1
@@ -33,7 +33,11 @@ class Node(object):
 
         self.is_real_intention = is_real_intention
 
-        self.now_parent_dis = now_parent_dis
+        # 新增人工分数序列判断
+        self.near_score_ls = []
+        self.init_dis = -2
+
+        self.action_in_space_index = None
 
         if(node_type=="explored_node"):
             self.rela_angle_parent_center = 0

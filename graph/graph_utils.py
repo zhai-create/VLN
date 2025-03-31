@@ -154,14 +154,6 @@ class GraphMap(object):
 
         return np.array(res_frontier_pos_arr)
 
-    # def multi_check_frontier_temp(self, candidate_frontier_arr):
-    #     res_frontier_pos_arr = []
-    #     r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
-    #     for index in range(candidate_frontier_arr.shape[0]):
-    #         center_loc_in_ref = np.dot(r_matrix, candidate_frontier_arr[index]) + np.array([self.rela_cx, self.rela_cy])
-    #         res_frontier_pos_arr.append([center_loc_in_ref[0], center_loc_in_ref[1]])
-    #     return np.array(res_frontier_pos_arr)
-
     def select_see_ghost(self, res_frontier_pos_arr):
         final_frontier_pos_arr = []
 
@@ -219,83 +211,11 @@ class GraphMap(object):
         for index in range(len(final_frontier_pos_arr)):
             res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
             
-            if(abs(self.rela_cx)<1e-5 and abs(self.rela_cy)<1e-5):
-                now_parent_dis = (final_frontier_pos_arr[index][0]**2+final_frontier_pos_arr[index][1]**2)**0.5
-            else:
-                now_parent_dis = -1
 
-            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], now_parent_dis=now_parent_dis) 
+            new_frontier = Node(node_type="frontier_node", rela_cx=final_frontier_pos_arr[index][0], rela_cy=final_frontier_pos_arr[index][1], parent_node=self.current_node, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1]) 
             self.current_node.sub_frontiers.append(new_frontier)
             self.frontier_nodes.append(new_frontier)
             self.all_nodes.append(new_frontier)
-
-            # if(new_frontier.name=='69'):
-            #     breakpoint()
-
-
-
-
-    
-    # def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text):
-    #     rela_loc = np.array([self.rela_cx, self.rela_cy])
-    #     r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
-        
-    #     # =====> request_llm <=====
-    #     if(env_args.is_llm==2):
-    #         room_score_ls, object_score_ls = self.add_request_feature_four(detect_res_pos_dict, rgb_image_ls, object_text)
-    #     elif(env_args.is_llm==1):
-    #         room_score_ls = self.add_request_feature_three(detect_res_pos_dict, rgb_image_ls, object_text)
-    #     # =====> request_llm <=====
-
-    #     new_intention_ls = []
-    #     new_intention_name_ls = []
-    
-    #     for temp_score in detect_res_pos_dict:
-    #         for temp_rela_pos in detect_res_pos_dict[temp_score]:
-    #             # ========> 检查是否为同一个intention_node <========
-    #             temp_bounding_box_embedding = temp_rela_pos[2]
-    #             wait_check_intention_ls = self.current_node.sub_intentions
-                
-    #             if(len(wait_check_intention_ls)==0):
-    #                 is_build_flag = True
-    #             else:
-    #                 all_box_embedding_arr = []
-    #                 for temp_check_intention in wait_check_intention_ls:
-    #                     all_box_embedding_arr.append(temp_check_intention.bounding_box_embedding)
-    #                 all_box_embedding_arr = np.array(all_box_embedding_arr)
-
-    #                 close_arr, logits_arr = is_close(all_box_embedding_arr, temp_bounding_box_embedding, return_prob=True, th=perception_args.objgraph_node_th)
-    #                 close_mem_indices = np.where(close_arr[:, 0] == 1)[0]    
-    #                 if(len(close_mem_indices)==0): # 没有匹配上
-    #                     is_build_flag = True
-    #                 else:
-    #                     is_build_flag = False # 已经匹配上，不需要建立新的intention_node
-
-    #                 to_update_dict = {}
-    #                 for m_i in close_mem_indices: # 依次遍历所有被匹配上的已有的intention_node
-    #                     if temp_score > wait_check_intention_ls[m_i].score: # 相似度矩阵对应位置为True，并且新检测的分数大于缘由分数，才更新
-    #                         to_update_dict[m_i] = True    
-    #                     else:
-    #                         to_update_dict[m_i] = False
-    #             # ========> 检查是否为同一个intention_node <========
-
-    #             tx, ty = temp_rela_pos[0], temp_rela_pos[1] 
-    #             center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
-    #             res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-    #             if(is_build_flag==True):
-    #                 new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], bounding_box_embedding=temp_bounding_box_embedding)
-    #                 self.current_node.sub_intentions.append(new_intention)
-    #                 self.intention_nodes.append(new_intention)
-    #                 self.all_nodes.append(new_intention)
-    #             else:
-    #                 for temp_wait_check_intention_id in to_update_dict:
-    #                     if(to_update_dict[temp_wait_check_intention_id]==True):
-    #                         wait_check_intention_ls[temp_wait_check_intention_id].rela_cx = center_loc_in_ref[0]
-    #                         wait_check_intention_ls[temp_wait_check_intention_id].rela_cy = center_loc_in_ref[1]
-                            
-    #                         wait_check_intention_ls[temp_wait_check_intention_id].score = temp_score
-    #                         wait_check_intention_ls[temp_wait_check_intention_id].world_cx = res_loc_in_real_world[0]
-    #                         wait_check_intention_ls[temp_wait_check_intention_id].world_cy = res_loc_in_real_world[1]
 
 
     def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text):
@@ -316,28 +236,24 @@ class GraphMap(object):
                 # cluster_revise
                 res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
                 
-                # 防止fake_intention生成在real_intention附近
+                # 防止fake_intention生成在real_intention附近(# intention_node聚类距离修改)
                 if(is_real_intention==False):
                     is_near_real_flag = False
                     for temp_real_intention in self.intention_nodes:
                         if(temp_real_intention.is_real_intention==True):
-                            if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<0.5:
+                            if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<1.0:
                                 is_near_real_flag = True
                                 break
                     if(is_near_real_flag==True):
                         continue
                 # 防止fake_intention生成在real_intention附近
 
-                if(abs(self.rela_cx)<1e-5 and abs(self.rela_cy)<1e-5):
-                    now_parent_dis = (center_loc_in_ref[0]**2+center_loc_in_ref[1]**2)**0.5
-                else:
-                    now_parent_dis = -1
-                
-                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention, now_parent_dis=now_parent_dis)
+                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
                 
                 # correct_recheck
                 new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
                 new_intention.dis_ls[0] = new_intention.robot_intention_dis
+                new_intention.init_dis = new_intention.robot_intention_dis
                 # correct_recheck
                 
                 self.current_node.sub_intentions.append(new_intention)
@@ -371,6 +287,11 @@ class GraphMap(object):
                     temp_intention_node.score_ls[score_index] = min_node.score
 
                     temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
+
+                # 新增人工分数序列判断
+                if(min_node.robot_intention_dis<temp_intention_node.init_dis):
+                    temp_intention_node.near_score_ls.append(min_node.score)
+
         # correct_recheck
 
     def get_laser_result(self, depth):

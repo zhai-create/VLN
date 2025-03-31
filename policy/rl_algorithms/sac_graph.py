@@ -120,6 +120,57 @@ class SAC(RL_Policy):
         return action, action_index # idx in padding
 
 
+    @torch.no_grad()
+    def greedy_select_action(self, rl_graph, world_cx, world_cy):
+        max_score = 0
+        max_score_node = None
+        candidate_intention_ls = []
+        for temp_node in rl_graph.all_intention_nodes:
+            if(temp_node.score>max_score):
+                max_score = temp_node.score
+                max_score_node = temp_node
+
+            if(len(temp_node.near_score_ls)>0):
+                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
+                    candidate_intention_ls.append(temp_node)
+                
+        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
+            min_dis = 10000
+            res_node = None
+            for temp_node in candidate_intention_ls:
+                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        else: # 没有“两次有效观察”的intention
+            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
+            if(max_score>0.8):
+                if(max_score_node.intention_type==1):
+                    return max_score_node
+            if(len(rl_graph.all_frontier_nodes)==0):
+                return max_score_node
+            min_dis = 10000
+            res_node = None
+            for temp_node in rl_graph.all_frontier_nodes:
+                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        return res_node
+                
+
+
+
+
+
+
+
+
+
+            
+
+
+
 
     def train(self, writer, train_index, batch_size=16):
         if(train_index==0):

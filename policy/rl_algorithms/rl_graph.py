@@ -29,6 +29,8 @@ class RL_Graph(object):
         self.now_node_index = 0 # 在rl_graph中当前node的index
         self.all_nodes = []
         self.all_action_nodes = []
+        self.all_intention_nodes = []
+        self.all_frontier_nodes = []
 
 
     def reset(self):
@@ -51,6 +53,9 @@ class RL_Graph(object):
         edge_attr_ls = torch.Tensor([]) # 存储edge特征
         new_pyg_graph = Data(x=node_attr_ls, edge_index=edge_index_ls, edge_attr=edge_attr_ls)
         self.data['state'].update({"pyg_graph": new_pyg_graph}) 
+
+        self.all_intention_nodes = []
+        self.all_frontier_nodes = []
 
 
     
@@ -210,7 +215,7 @@ class RL_Graph(object):
         # =======update node feature=======
         for temp_node in topo_graph.all_nodes:
             if(temp_node.node_type=="explored_node"):
-                feature_ls = [-1 for i in range(80)]+[-2 for i in range(80)]+[0]
+                feature_ls = [0, 0, 0]
                 self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
@@ -246,7 +251,7 @@ class RL_Graph(object):
                 continue
             # if(temp_node.now_parent_dis==-1):
             #     temp_node.now_parent_dis = get_node_robot_dis(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.occupancy_map, is_explored_node=True)
-            feature_ls = [-1 for i in range(80)]+[-2 for i in range(80)]+[0.5]
+            feature_ls = [0, 0, 0.5]
             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
             temp_node.rl_node_index = len(self.all_nodes)
             self.all_nodes.append(temp_node)
@@ -255,6 +260,9 @@ class RL_Graph(object):
             self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1 # 记录在当前result['state']['pyg_graph'].x中的index位置
             self.data['state']['action_mask'][0][action_ls_index] = 1.0
             self.all_action_nodes.append(temp_node)
+            self.all_frontier_nodes.append(temp_node)
+
+            temp_node.action_in_space_index = action_ls_index
                 
 
         intention_clustered_res_ls = self.get_clustered_intention(selected_intention_node_ls)
@@ -263,7 +271,12 @@ class RL_Graph(object):
                 continue
             # if(temp_node.now_parent_dis==-1):
             #     temp_node.now_parent_dis = get_node_robot_dis(temp_node.rela_cx, temp_node.rela_cy, temp_node.parent_node.occupancy_map, is_explored_node=True)
-            feature_ls = [temp_node.score_ls[i] for i in range(80)]+[temp_node.dis_ls[i] for i in range(80)]+[1]
+            
+            if(len(temp_node.near_score_ls)>0):
+                recheck_score = np.mean(temp_node.near_score_ls)
+            else:
+                recheck_score = 0
+            feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]
             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
             temp_node.rl_node_index = len(self.all_nodes)
             self.all_nodes.append(temp_node)
@@ -272,6 +285,9 @@ class RL_Graph(object):
             self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1
             self.data['state']['action_mask'][0][action_ls_index] = 1.0
             self.all_action_nodes.append(temp_node)
+            self.all_intention_nodes.append(temp_node)
+
+            temp_node.action_in_space_index = action_ls_index
         
         for temp_node in self.all_nodes:
             if(temp_node.node_type!="explored_node"):
@@ -298,7 +314,7 @@ class RL_Graph(object):
 
         # 添加当前机器人的位置node
         # node特征
-        feature_ls = [-1 for i in range(80)]+[-2 for i in range(80)]+[2]
+        feature_ls = [0, 0, 3]
         self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
 
         # edge特征

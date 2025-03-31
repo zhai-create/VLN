@@ -25,15 +25,16 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
             
             rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
 
-            if(rule_dis>=4):
-                rule_score = HabitatAction.random_gen.uniform(0.6, 1.0)
-            elif(rule_dis>=3 and rule_dis<4):
-                rule_score = HabitatAction.random_gen.uniform(0.7, 1.0)
-            elif(rule_dis>=2 and rule_dis<3):
-                rule_score = HabitatAction.random_gen.uniform(0.8, 1.0)
-            else:
-                rule_score = HabitatAction.random_gen.uniform(0.9, 1.0)
+            # if(rule_dis>=4):
+            #     rule_score = HabitatAction.random_gen.uniform(0.6, 1.0)
+            # elif(rule_dis>=3 and rule_dis<4):
+            #     rule_score = HabitatAction.random_gen.uniform(0.7, 1.0)
+            # elif(rule_dis>=2 and rule_dis<3):
+            #     rule_score = HabitatAction.random_gen.uniform(0.8, 1.0)
+            # else:
+            #     rule_score = HabitatAction.random_gen.uniform(0.9, 1.0)
 
+            rule_score = -0.08*rule_dis+1
             if(rule_score>1):
                 rule_score = 1
             elif(rule_score<0.6):
@@ -43,9 +44,6 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
                 detect_res_pos_dict[rule_score] = [[res_depth_2d_cx, res_depth_2d_cy, True]]
             else:
                 detect_res_pos_dict[rule_score].append([res_depth_2d_cx, res_depth_2d_cy, True])
-
-
-
 
     # ==============> fake_intention <==============
     if(HabitatAction.random_gen.uniform(0, 1)<0.4):
@@ -77,18 +75,17 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
                     if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
                         continue
 
-
                     rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
 
-                    if(rule_dis>=4):
-                        rule_score = HabitatAction.random_gen.uniform(0.6, 1.0)
-                    elif(rule_dis>=3 and rule_dis<4):
-                        rule_score = HabitatAction.random_gen.uniform(0.6, 0.9)
-                    elif(rule_dis>=2 and rule_dis<3):
-                        rule_score = HabitatAction.random_gen.uniform(0.6, 0.8)
-                    else:
-                        rule_score = HabitatAction.random_gen.uniform(0.6, 0.7)
-
+                    # if(rule_dis>=4):
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 1.0)
+                    # elif(rule_dis>=3 and rule_dis<4):
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 0.9)
+                    # elif(rule_dis>=2 and rule_dis<3):
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 0.8)
+                    # else:
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 0.7)
+                    rule_score = 0.07*rule_dis+0.6
                     if(rule_score>1):
                         rule_score = 1
                     elif(rule_score<0.6):
