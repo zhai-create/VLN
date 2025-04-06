@@ -120,8 +120,50 @@ class SAC(RL_Policy):
         return action, action_index # idx in padding
 
 
+    
+    # @torch.no_grad()
+    # def gt_greedy_select_action(self, rl_graph, world_cx, world_cy):
+    #     min_dis = 10000
+    #     res_node = None
+    #     for temp_node in rl_graph.all_intention_nodes:
+    #         temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+    #         if(temp_dis<min_dis):
+    #             min_dis = temp_dis
+    #             res_node = temp_node
+    #     if(res_node is None):
+    #         for temp_node in rl_graph.all_frontier_nodes:
+    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+    #             if(temp_dis<min_dis):
+    #                 min_dis = temp_dis
+    #                 res_node = temp_node
+    #     return res_node
+
     @torch.no_grad()
-    def greedy_select_action(self, rl_graph, world_cx, world_cy):
+    def gt_greedy_select_action(self, rl_graph, world_cx, world_cy):
+        min_dis = 10000
+        res_node = None
+        for temp_node in rl_graph.all_intention_nodes:
+            temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+            if(temp_dis<min_dis) and (temp_node.score>0.8):
+                min_dis = temp_dis
+                res_node = temp_node
+        if(res_node is None):
+            for temp_node in rl_graph.all_frontier_nodes:
+                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        if(res_node is None):
+            for temp_node in rl_graph.all_intention_nodes:
+                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        return res_node
+
+    
+    @torch.no_grad()
+    def multicheck_greedy_select_action(self, rl_graph, world_cx, world_cy):
         max_score = 0
         max_score_node = None
         candidate_intention_ls = []

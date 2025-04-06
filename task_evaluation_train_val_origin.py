@@ -1,7 +1,7 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import cv2
 import habitat
 import time
@@ -27,6 +27,7 @@ from policy.rl_algorithms.rl_graph import RL_Graph
 from perception.tools import fix_depth, get_rgb_image_ls, get_gt_image_ls
 from graph.graph_utils import GraphMap
 from graph.node_utils import Node
+from graph.tools import get_current_world_pos
 
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
@@ -52,7 +53,9 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_train_val"
     else:
-        val_note = "_multi_check_new_replan_new_topo_gt_train_val"
+        # val_note = "_multi_check_long_short_check_series_gt_train_val"
+        val_note = "_single_check_fake_intention_gt_train_val"
+
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -70,7 +73,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 161
+        rl_args.graph_node_feature_dim = 2
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -82,11 +85,11 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     habitat_config = hm3d_config(stage=args.task_stage, episodes=args.graph_episode_num, max_steps=args.max_steps)
 
-    for temp_pre_model in range(70, 80000, 10):
+    for temp_pre_model in range(100, 80000, 10):
         args.graph_pre_model = temp_pre_model
         # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
         #     '_'+ rl_args.graph_encoder
-        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_27_15_41_13_multi_check_new_replan_new_topo_gt_train"
+        experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_04_05_14_53_16_single_check_fake_intention_gt_train"
         
         while not os.path.exists("/home/zhaishichao/Data/VLN/{}/policy/{}/{}_critic".format(args.model_file_name, experiment_details, args.graph_pre_model)):
             print("not exists!!!")
@@ -178,14 +181,14 @@ if __name__=="__main__":
                         Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes)
                         break
 
-                action_node = rl_graph.all_nodes[polict_action]
-                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
-                
-                print("======> achieved_result <=====", achieved_result)
-                print("=====> action_node_type <=====", action_node.node_type)
-                
+                action_node = rl_graph.all_nodes[polict_action]                
+                if(args.is_vis==True):
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
+                else:
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
+            
                 evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
-                
+
                 if(evaluate_res=="episode_stop"):
                     break
 
@@ -193,8 +196,3 @@ if __name__=="__main__":
         writer.add_scalar('Val_Result/spl_mean', Evaluate.spl_mean, temp_pre_model)
         writer.add_scalar('Val_Result/reward', (Evaluate.success_num*40+(-1)*Evaluate.all_front_steps/Evaluate.max_front_steps_per_rl_step)/30, temp_pre_model)
         # writer.add_scalar('Val_Result/reward', (Evaluate.success_num*40+(-1)*Evaluate.all_count_steps/Evaluate.max_count_steps_per_rl_step)/30, temp_pre_model)
-        
-
-
-
-

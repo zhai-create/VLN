@@ -25,7 +25,7 @@ from policy.rl_algorithms.rl_graph import RL_Graph
 
 from perception.tools import fix_depth, get_rgb_image_ls, get_gt_image_ls
 from graph.graph_utils import GraphMap
-from graph.tools import find_node_path, get_absolute_pos
+from graph.tools import find_node_path, get_absolute_pos, get_current_world_pos
 from graph.arguments import args as graph_args
 from graph.node_utils import Node
 
@@ -48,14 +48,17 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 400
+    args.graph_pre_model = 150
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     elif(args.is_llm==1):
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
-        val_note = "_multi_check_new_replan_new_topo_gt_val_"+str(args.graph_pre_model)
+        # val_note = "_multi_check_long_short_check_series_gt_val_"+str(args.graph_pre_model)
+        val_note = "_single_check_fake_intention_gt_val_"+str(args.graph_pre_model)
+        # val_note = "_single_check_fake_intention_greedy_gt_val"
+        # val_note = "_single_check_greedy_gt_val"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -65,7 +68,7 @@ if __name__=="__main__":
     args.success_distance = 1.0 
     args.max_steps = 500
 
-    args.is_vis = True # 录制视频
+    args.is_vis = False # 录制视频
 
     rl_args.score_top_k = 50
     if(args.is_llm==2):
@@ -73,7 +76,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 161
+        rl_args.graph_node_feature_dim = 2
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -90,13 +93,13 @@ if __name__=="__main__":
     #     '_'+ rl_args.graph_encoder
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
     # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_03_27_15_41_13_multi_check_new_replan_new_topo_gt_train"
+    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_04_05_14_53_16_single_check_fake_intention_gt_train"
     init_free_memory, init_process_memory = process_info()
     policy = init_RL(args, rl_args, experiment_details)
 
     # false_index_ls = [1, 17, 18, 19, 28, 41, 42, 50, 51, 53, 54, 62, 67, 80, 81, 89, 90, 94, 99]
     # false_index_ls = [23, 24, 26, 27, 29, 34, 41, 42, 46, 47, 49, 50]
-    false_index_ls = [44]
+    # false_index_ls = [42, 49, 64]
 
     for index_in_episodes in tqdm(range(args.graph_episode_num)):   
         # rl_graph_init
@@ -115,10 +118,10 @@ if __name__=="__main__":
         object_goal = args.object_ls[observations["objectgoal"][0]]
         print("=====> object_goal <=====", object_goal)
 
-        if((index_in_episodes+1) not in false_index_ls):
-            continue
+        # if((index_in_episodes+1) not in false_index_ls):
+        #     continue
 
-        # if(index_in_episodes<1):
+        # if(index_in_episodes<3):
         #     continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
@@ -162,14 +165,18 @@ if __name__=="__main__":
             # rl_graph_update
             rl_graph.update(topo_graph)
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
-                polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
+                polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train) # 1
+                # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                # action_node = policy.gt_greedy_select_action(rl_graph, world_cx, world_cy)
                 print("=====> real_action_selection <=====")
             else:
                 ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
                 rl_graph.update(topo_graph)
                 if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
                     print("=====> ghost_patch <=====")
-                    polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train)
+                    polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train) # 2
+                    # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                    # action_node = policy.gt_greedy_select_action(rl_graph, world_cx, world_cy)
                 else:
                     # action_space为空，结束当前episode
                     print("========> empty_action_space <========")
@@ -186,19 +193,17 @@ if __name__=="__main__":
             if(args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
-            action_node = rl_graph.all_nodes[polict_action]
+            action_node = rl_graph.all_nodes[polict_action] # 3
             if(args.is_vis==True):
                 achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
             else:
                 achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
-            
+        
             print("======> achieved_result <=====", achieved_result)
             print("=====> action_node_type <=====", action_node.node_type)
             
-            
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
-
-
+            
             if(evaluate_res=="episode_stop"):
                 # =====> new_add_evaluate <=====
                 writer.add_scalar('Policy/selected_intention_score', action_node.score, index_in_episodes+1)

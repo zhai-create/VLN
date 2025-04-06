@@ -53,7 +53,8 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_multi_check_long_short_check_series_gt_train" # 注释当前训练处于什么阶段
+        # train_note = "_multi_check_long_short_check_series_gt_train" # 注释当前训练处于什么阶段
+        train_note = "_single_check_fake_intention_gt_train" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -77,7 +78,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 3
+        rl_args.graph_node_feature_dim = 2
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -89,7 +90,7 @@ if __name__=="__main__":
     rl_args.lr_tune = 0.5e-3
     # rl_args.graph_lr_actor = 0.5e-4
     # rl_args.graph_lr_critic = 0.5e-4
-    rl_args.random_exploration_length = 800
+    rl_args.random_exploration_length = 400
     
     # only_train
     rl_args.save_buffer_data_path = "buffer_data/{}/".format(date_time)
@@ -238,13 +239,8 @@ if __name__=="__main__":
 
         while True:   
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
-                if(policy.train_step < 600):
-                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                    action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
-                    policy_acton_idx = action_node.action_in_space_index
-                else:
-                    polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
-                    action_node = rl_graph.all_nodes[polict_action]
+                polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
+                action_node = rl_graph.all_nodes[polict_action]
                 print("=====> real_action_selection <=====")
             else:
                 ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
@@ -252,14 +248,8 @@ if __name__=="__main__":
                 if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
                     print("=====> ghost_patch <=====")
                     current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
-
-                    if(policy.train_step < 600):
-                        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                        action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
-                        policy_acton_idx = action_node.action_in_space_index
-                    else:
-                        polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
-                        action_node = rl_graph.all_nodes[polict_action]
+                    polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
+                    action_node = rl_graph.all_nodes[polict_action]
                     # 获得初始all_map_loc和初始intention_node的个数
                     HabitatAction.get_all_map_loc(topo_graph)
                     HabitatAction.get_all_see_intention(topo_graph, rl_graph)
@@ -275,38 +265,15 @@ if __name__=="__main__":
                     Evaluate.evaluate(writer, achieved_result=achieved_result, habitat_env=habitat_env, action_node=None, index_in_episodes=index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph, scene_area=area_dict[habitat_env.current_episode.scene_id])
                     break
 
-            
-            if(action_node.intention_type==2):
-                if not habitat_env.episode_over:
-                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                    observations = habitat_env.step(habitat_action)
-                    achieved_result = "achieved"
-                else:
-                    achieved_result = "exceed"
-            else:
-                for temp_node in topo_graph.intention_nodes:
-                    if(temp_node.intention_type==2):
-                        temp_parent_node = temp_node.parent_node
-                        temp_parent_node.sub_intentions.remove(temp_node)
-                        topo_graph.intention_nodes.remove(temp_node)
-                        topo_graph.all_nodes.remove(temp_node)
-
-                achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
-                # new_recheck_train
-                if(HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved") or (HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="intention_node" and action_node.intention_type!=2 and achieved_result=="achieved"):
-                    achieved_result = "EXCEED_RL" # 超过RL最大次数 
-                # new_recheck_train
-                print("======> achieved_result <=====", achieved_result)
-                print("=====> action_node_type <=====", action_node.node_type)
+            achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=env_args.graph_train)
+            # new_recheck_train
+            if(HabitatAction.episode_train_step>=env_args.graph_episode_length-1 and action_node.node_type=="frontier_node" and achieved_result=="achieved"):
+                achieved_result = "EXCEED_RL" # 超过RL最大次数 
+            # new_recheck_train
+            print("======> achieved_result <=====", achieved_result)
+            print("=====> action_node_type <=====", action_node.node_type)
             
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph, scene_area=area_dict[habitat_env.current_episode.scene_id])
-            if(action_node.node_type=="intention_node") and (action_node.intention_type==1) and (action_node in topo_graph.all_nodes):
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
-                if (now_action_dis<1):
-                    action_node.intention_type = 2
-            
-            
             if(achieved_result=="block" or achieved_result=="Failed_Plan" or achieved_result=="exceed"):
                 break
 
