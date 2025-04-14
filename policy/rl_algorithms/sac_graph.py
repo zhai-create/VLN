@@ -120,50 +120,8 @@ class SAC(RL_Policy):
         return action, action_index # idx in padding
 
 
-    
-    # @torch.no_grad()
-    # def gt_greedy_select_action(self, rl_graph, world_cx, world_cy):
-    #     min_dis = 10000
-    #     res_node = None
-    #     for temp_node in rl_graph.all_intention_nodes:
-    #         temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-    #         if(temp_dis<min_dis):
-    #             min_dis = temp_dis
-    #             res_node = temp_node
-    #     if(res_node is None):
-    #         for temp_node in rl_graph.all_frontier_nodes:
-    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-    #             if(temp_dis<min_dis):
-    #                 min_dis = temp_dis
-    #                 res_node = temp_node
-    #     return res_node
-
     @torch.no_grad()
-    def gt_greedy_select_action(self, rl_graph, world_cx, world_cy):
-        min_dis = 10000
-        res_node = None
-        for temp_node in rl_graph.all_intention_nodes:
-            temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-            if(temp_dis<min_dis) and (temp_node.score>0.8):
-                min_dis = temp_dis
-                res_node = temp_node
-        if(res_node is None):
-            for temp_node in rl_graph.all_frontier_nodes:
-                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        if(res_node is None):
-            for temp_node in rl_graph.all_intention_nodes:
-                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        return res_node
-
-    
-    @torch.no_grad()
-    def multicheck_greedy_select_action(self, rl_graph, world_cx, world_cy):
+    def greedy_select_action(self, rl_graph, world_cx, world_cy):
         max_score = 0
         max_score_node = None
         candidate_intention_ls = []
@@ -200,18 +158,6 @@ class SAC(RL_Policy):
                     res_node = temp_node
         return res_node
                 
-
-
-
-
-
-
-
-
-
-            
-
-
 
 
     def train(self, writer, train_index, batch_size=16):
@@ -289,6 +235,11 @@ class SAC(RL_Policy):
         self.actor.load_state_dict(torch.load(dir_path + "_actor"))
         self.actor_optimizer.load_state_dict(torch.load(dir_path + "_actor_optimizer"))
         self.actor_target = copy.deepcopy(self.actor)
+
+    def load_il(self, dir_path):
+        checkpoint = torch.load(dir_path, map_location="cuda")['model_state']
+        self.actor.load_state_dict(checkpoint)
+
 
     def load_buffer_data(self, writer, load_buffer_data_cnt, load_buffer_data_path):
         while self.train_step<=load_buffer_data_cnt:

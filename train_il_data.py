@@ -54,7 +54,7 @@ if __name__=="__main__":
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
         # train_note = "_multi_check_large_punish_gt_train" # 注释当前训练处于什么阶段
-        train_note = "_multi_check_zero_punish_gt_train_second" # 注释当前训练处于什么阶段
+        train_note = "_multi_check_il_data_gt" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -90,7 +90,7 @@ if __name__=="__main__":
     rl_args.lr_tune = 0.5e-3
     # rl_args.graph_lr_actor = 0.5e-4
     # rl_args.graph_lr_critic = 0.5e-4
-    rl_args.random_exploration_length = 800
+    rl_args.random_exploration_length = 8000000000
     
     # only_train
     rl_args.save_buffer_data_path = "buffer_data/{}/".format(date_time)
@@ -239,13 +239,13 @@ if __name__=="__main__":
 
         while True:   
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
-                if(policy.train_step < 600):
+                if(policy.train_step < 6000000000):
                     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
                     action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
                     policy_acton_idx = action_node.action_in_space_index
                 else:
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
-                    action_node = rl_graph.all_nodes[polict_action-1]
+                    action_node = rl_graph.all_nodes[polict_action]
                 print("=====> real_action_selection <=====")
             else:
                 ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
@@ -254,13 +254,13 @@ if __name__=="__main__":
                     print("=====> ghost_patch <=====")
                     current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
 
-                    if(policy.train_step < 600):
+                    if(policy.train_step < 6000000000):
                         world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
                         action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
                         policy_acton_idx = action_node.action_in_space_index
                     else:
                         polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
-                        action_node = rl_graph.all_nodes[polict_action-1]
+                        action_node = rl_graph.all_nodes[polict_action]
                     # 获得初始all_map_loc和初始intention_node的个数
                     HabitatAction.get_all_map_loc(topo_graph)
                     HabitatAction.get_all_see_intention(topo_graph, rl_graph)
@@ -332,8 +332,19 @@ if __name__=="__main__":
             next_state = copy.deepcopy(rl_graph.data['state'])
 
             policy.update_buffer(current_state, policy_acton_idx, next_state, reward, done, 0) # 一个样本
-            current_state = copy.deepcopy(next_state) # 迭代更新
+            
+            # 保存buffer数据
+            il_data = {}
+            il_data["current_state"] = current_state
+            il_data["policy_acton_idx"] = policy_acton_idx
+            il_data["polict_action"] = action_node.rl_node_index
+            il_data["next_state"] = next_state
+            il_data["reward"] = reward
+            il_data["done"] = done
+            np.save('il_data/{}.npy'.format(policy.train_step+1+7735), il_data)
+            
 
+            current_state = copy.deepcopy(next_state) # 迭代更新
             # =====> Train <=====
             for train_index in range(env_args.graph_iter_per_step):     
                 train_step = policy.train(writer, train_index, env_args.graph_batch_size) 

@@ -247,9 +247,9 @@ class GraphMap(object):
                     if(is_near_real_flag==True):
                         continue
                 # 防止fake_intention生成在real_intention附近
-
-                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
                 
+                
+                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
                 # correct_recheck
                 new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
                 new_intention.dis_ls[0] = new_intention.robot_intention_dis
@@ -291,7 +291,6 @@ class GraphMap(object):
                 # 新增人工分数序列判断
                 if(min_node.robot_intention_dis<temp_intention_node.init_dis):
                     temp_intention_node.near_score_ls.append(min_node.score)
-
         # correct_recheck
 
     def get_laser_result(self, depth):

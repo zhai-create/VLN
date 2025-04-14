@@ -829,3 +829,11 @@ def init_RL(args, rl_args, experiment, writer=None):
         # 导入buffer中的数据
         policy.load_buffer_data(writer, load_buffer_data_cnt=rl_args.load_buffer_data_cnt, load_buffer_data_path=rl_args.load_buffer_data_path)
     return policy
+
+
+def init_IL(args, rl_args):
+    from policy.rl_algorithms.sac_graph import SAC as RL_Policy
+    policy = RL_Policy(rl_args)
+    pre_policy = 'checkpoints/epoch_{}.pt'.format(args.graph_pre_model)
+    policy.load_il(pre_policy)
+    return policy

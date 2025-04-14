@@ -19,7 +19,7 @@ from env_tools.evaluate_utils import Evaluate
 
 from policy.rl_algorithms.arguments import args as rl_args
 from system_utils import process_info
-from policy.tools.utils import init_RL
+from policy.tools.utils import init_RL, init_IL
 from policy.rl_algorithms.rl_graph import RL_Graph
 
 
@@ -48,7 +48,7 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 120
+    args.graph_pre_model = 533
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
@@ -56,7 +56,7 @@ if __name__=="__main__":
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
         # val_note = "_multi_check_long_short_check_series_gt_val_"+str(args.graph_pre_model)
-        val_note = "_multi_check_zero_punish_gt_second_val_"+str(args.graph_pre_model)
+        val_note = "_multi_check_il_gt_val_"+str(args.graph_pre_model)
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -87,13 +87,8 @@ if __name__=="__main__":
     habitat_env = habitat.Env(config=habitat_config)
     perception_args.intrinsic_matrix = habitat_camera_intrinsic(config=habitat_config)
 
-    # experiment_details = 'graph_'  + rl_args.graph_task + '_' + rl_args.graph_action_space + \
-    #     '_'+ rl_args.graph_encoder
-    # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_10_05_23_47_two_dim_small_thre_rgb_new_framework"
-    # experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_01_14_10_27_04_two_dim_small_thre_cluster_recheck"
-    experiment_details = "graph_object_goal_navigation_adjacent_GAT_2025_04_11_01_40_22_multi_check_zero_punish_gt_train_second"
     init_free_memory, init_process_memory = process_info()
-    policy = init_RL(args, rl_args, experiment_details)
+    policy = init_IL(args, rl_args)
 
     # false_index_ls = [1, 17, 18, 19, 28, 41, 42, 50, 51, 53, 54, 62, 67, 80, 81, 89, 90, 94, 99]
     # false_index_ls = [23, 24, 26, 27, 29, 34, 41, 42, 46, 47, 49, 50]
@@ -191,7 +186,7 @@ if __name__=="__main__":
             if(args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
 
-            action_node = rl_graph.all_nodes[polict_action-1] # 3
+            action_node = rl_graph.all_nodes[polict_action] # 3
             if(action_node.intention_type==2):
                 if not habitat_env.episode_over:
                     habitat_action = HabitatAction.set_habitat_action("s", topo_graph)

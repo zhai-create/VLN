@@ -72,6 +72,8 @@ class GraphPointerPolicy(nn.Module):
         # Graph Encoder for Data Enhancement
         if self._encoder_type == 'GCN' or self._encoder_type == 'GAT':
             graphs, current_idx, action_idx, action_mask = state
+            # print(graphs)
+            # breakpoint()
             node_enhanced = self.pre(graphs) # Batch, Graph => Num_Key, Feature_Dim
             # node_enhanced_padded, node_padding_mask = padding_graph(node_enhanced, graphs.batch, n_padding=self._num_graph_padding) # Batch, Num_Key(Padded), Dim_Feature & Batch, Num_Query=1, Num_Key
             node_enhanced_padded, node_padding_mask = padding_graph_v2(node_enhanced, graphs.batch, args)
@@ -84,6 +86,7 @@ class GraphPointerPolicy(nn.Module):
         # Current Node 
         current_idx = current_idx.unsqueeze(-1).repeat(1, 1, self._embedding_dim) # Batch, 1, Feature_Dim
         current_node = torch.gather(node_enhanced_padded, 1, current_idx) # Batch, 1, Feature_Dim
+
 
         # Action Nodes
         action_idx = action_idx.unsqueeze(-1).repeat(1, 1, self._embedding_dim) # Batch, Num_Action, Feature_Dim

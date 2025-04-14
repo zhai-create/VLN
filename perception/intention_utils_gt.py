@@ -22,16 +22,23 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
             res_depth_2d_cx, res_depth_2d_cy = depth_estimation_object_loc(new_mask, depth) # 相对于机器人的位姿
             if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
                 continue
-            '''
+            
             rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
+
+            # if(rule_dis>=4):
+            #     rule_score = HabitatAction.random_gen.uniform(0.6, 1.0)
+            # elif(rule_dis>=3 and rule_dis<4):
+            #     rule_score = HabitatAction.random_gen.uniform(0.7, 1.0)
+            # elif(rule_dis>=2 and rule_dis<3):
+            #     rule_score = HabitatAction.random_gen.uniform(0.8, 1.0)
+            # else:
+            #     rule_score = HabitatAction.random_gen.uniform(0.9, 1.0)
+
             rule_score = -0.08*rule_dis+1
             if(rule_score>1):
                 rule_score = 1
             elif(rule_score<0.6):
                 rule_score = 0.6
-            '''
-
-            rule_score = HabitatAction.random_gen.uniform(0.85, 1)
 
             if(rule_score not in detect_res_pos_dict):
                 detect_res_pos_dict[rule_score] = [[res_depth_2d_cx, res_depth_2d_cy, True]]
@@ -49,7 +56,6 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
             is_generate_fake_flag = True
         else:
             is_generate_fake_flag = False
-    
     
     if(is_generate_fake_flag==True) and (is_fake_intention==True):
         all_zero_matrix = np.zeros((120, 640))
@@ -75,16 +81,21 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
                     if(res_depth_2d_cx is None) or ((res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5)<0.75:
                         continue
 
-                    '''
                     rule_dis = (res_depth_2d_cx**2+res_depth_2d_cy**2)**0.5
+
+                    # if(rule_dis>=4):
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 1.0)
+                    # elif(rule_dis>=3 and rule_dis<4):
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 0.9)
+                    # elif(rule_dis>=2 and rule_dis<3):
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 0.8)
+                    # else:
+                    #     rule_score = HabitatAction.random_gen.uniform(0.6, 0.7)
                     rule_score = 0.07*rule_dis+0.6
                     if(rule_score>1):
                         rule_score = 1
                     elif(rule_score<0.6):
                         rule_score = 0.6
-                    '''
-
-                    rule_score = HabitatAction.random_gen.uniform(0.6, 0.75)
 
                     if(rule_score not in detect_res_pos_dict):
                         detect_res_pos_dict[rule_score] = [[res_depth_2d_cx, res_depth_2d_cy, False]]
@@ -96,3 +107,10 @@ def object_detect_gt(gt_image_ls, depth, object_text, object_id_num_ls, is_fake_
 
 
 print('GT perception initialize success!')
+
+
+
+
+
+
+

@@ -51,9 +51,6 @@ class SubgoalReach:
     init_dis_to_goal = 0
 
     false_front_step = 0 
-    delta_front_step = 0 # 用于记录每隔delta步进行一次“fake_intention的生成”和“重规划” (每隔4个front_step后重规划一次，即第5个front_step开始重规划)
-
-
 
     @staticmethod
     def reset(habitat_env, topo_graph):
@@ -73,7 +70,6 @@ class SubgoalReach:
         SubgoalReach.init_dis_to_goal = habitat_env.get_metrics()['distance_to_goal']
 
         SubgoalReach.false_front_step = 0
-        SubgoalReach.delta_front_step = 0
 
 
     @staticmethod
@@ -129,7 +125,7 @@ class SubgoalReach:
     @staticmethod
     def get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result, graph_train=False):
         if(graph_train==True): # 处于训练阶段，卡住直接退出
-            if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved"):
+            if(action_node.node_type=="frontier_node" and candidate_achieved_result=="achieved") or (action_node.node_type=="intention_node" and candidate_achieved_result=="achieved"):
                 SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
                 return candidate_achieved_result 
             else:
@@ -141,16 +137,7 @@ class SubgoalReach:
                     return "exceed"
 
         else: # 处于测试阶段
-            if(action_node.node_type=="intention_node"):
-                if not habitat_env.episode_over:
-                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                    observations = habitat_env.step(habitat_action)
-                    return candidate_achieved_result
-                else:
-                    return "exceed"
-            else:
-                SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
-                return candidate_achieved_result 
+            SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
             return candidate_achieved_result 
 
     
@@ -172,6 +159,11 @@ class SubgoalReach:
             if(SubgoalReach.is_block(habitat_env, graph_train)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
                 # "block" # new_patch1
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block", graph_train=graph_train)
+                if(action_node in topo_graph.all_nodes) and (action_node.node_type=="intention_node"): # 如果是intention_node卡住，则删除当前intention_node
+                    action_parent_node = action_node.parent_node
+                    action_parent_node.sub_intentions.remove(action_node)
+                    topo_graph.intention_nodes.remove(action_node)
+                    topo_graph.all_nodes.remove(action_node)
                 return achieved_result
 
         graph_update_flag = topo_graph.update()
@@ -185,6 +177,7 @@ class SubgoalReach:
                 rgb_image_ls = get_rgb_image_ls(habitat_env)
                 gt_image_ls = get_gt_image_ls(habitat_env)
                 # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+
                 detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
                 topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
 
@@ -302,6 +295,16 @@ class SubgoalReach:
                         faile_plan_cnt += 1
                 # ===================> Failed_control_revise <===================
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
+                if(action_node.node_type=="intention_node"):
+                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                    now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                    if(now_action_dis>1) and (action_node in topo_graph.all_nodes):
+                        action_parent_node = action_node.parent_node
+                        action_parent_node.sub_intentions.remove(action_node)
+                        topo_graph.intention_nodes.remove(action_node)
+                        topo_graph.all_nodes.remove(action_node)
+                    # else:
+                    #     action_node.intention_type = 2
                 return achieved_result
 
             if(topo_planner.state_flag=="init" or (topo_planner.state_flag=="node_path" and SubgoalReach.next_action=="suc")):
@@ -359,6 +362,17 @@ class SubgoalReach:
                     else:
                         achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
                     # ===================> Failed_plan_revise <===================
+                    if(action_node.node_type=="intention_node"):
+                        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
+                        now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                        if(now_action_dis>1):
+                            if(action_node in topo_graph.all_nodes):
+                                action_parent_node = action_node.parent_node
+                                action_parent_node.sub_intentions.remove(action_node)
+                                topo_graph.intention_nodes.remove(action_node)
+                                topo_graph.all_nodes.remove(action_node)
+                        # else:
+                        #     action_node.intention_type = 2
                     return achieved_result
             
             SubgoalReach.next_action, local_path = local_planner.update_local_path(topo_planner, SubgoalReach.next_action, local_path)
