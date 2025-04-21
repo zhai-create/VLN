@@ -35,9 +35,10 @@ from navigation.sub_goal_reach import SubgoalReach
 from vis_tools.vis_utils import init_mp4, get_top_down_map, save_mp4
 
 from perception.arguments import args as perception_args
-# from perception.intention_utils_rcnn import object_detect
+from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_dino import object_detect_sam
-from perception.intention_utils_gt import object_detect_gt
+# from perception.intention_utils_gt import object_detect_gt
+from perception.intention_utils_gt_other import object_detect_gt_other
 
 
 if __name__=="__main__":
@@ -48,7 +49,7 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 533
+    args.graph_pre_model = 1169
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
@@ -56,8 +57,10 @@ if __name__=="__main__":
         val_note = "_three_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
     else:
         # val_note = "_multi_check_long_short_check_series_gt_val_"+str(args.graph_pre_model)
-        val_note = "_multi_check_il_gt_val_"+str(args.graph_pre_model)
-    
+        # val_note = "_multi_check_il_semantic_relation_gt_val_"+str(args.graph_pre_model)
+        val_note = "_multi_check_il_semantic_ls_relation_dis_revise_gt_val_"+str(args.graph_pre_model)+"_init_800"
+
+
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
     else:
@@ -74,7 +77,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 3
+        rl_args.graph_node_feature_dim = 24
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -90,9 +93,8 @@ if __name__=="__main__":
     init_free_memory, init_process_memory = process_info()
     policy = init_IL(args, rl_args)
 
-    # false_index_ls = [1, 17, 18, 19, 28, 41, 42, 50, 51, 53, 54, 62, 67, 80, 81, 89, 90, 94, 99]
-    # false_index_ls = [23, 24, 26, 27, 29, 34, 41, 42, 46, 47, 49, 50]
-    # false_index_ls = [44]
+    # false_index_ls = [4]
+    # false_index_ls = [3, 6, 8, 11, 14, 15, 23, 24, 25, 29, 41, 50, 55, 58, 73, 76, 82, 92, 106, 115, 116, 127, 130, 138, 143, 148, 150, 154, 163, 180, 183, 184, 185, 192, 193, 195, 205, 216, 217, 218, 224, 230, 235, 238, 241, 243, 253, 255, 257, 265, 266, 267, 272, 273, 276, 278, 279, 299, 300, 301, 302, 305, 307, 310, 312, 318, 319, 322, 324, 328, 332, 360, 368, 379, 386, 390, 391, 394, 401, 402, 403, 409, 412, 415, 419, 421, 423, 426, 431, 433, 437, 438, 443, 446, 447, 450, 460, 462, 464, 470, 472, 474, 487, 490, 492, 496, 510, 518, 528, 533, 539, 552, 553, 556, 557, 574, 575, 584, 589, 601, 602, 603, 611, 626, 634, 640, 643, 652, 659, 664, 670, 671, 679, 680, 682, 684, 685, 691, 692, 693, 696, 701, 703, 708, 709, 715, 716, 728, 731, 736, 743, 744, 758, 763, 764, 775, 778, 782, 787, 788, 789, 790, 792, 793, 799, 814, 821, 822, 827, 829, 830, 833, 854, 856, 861, 862, 871, 872, 877, 880, 894, 910, 914, 915, 926, 928, 936, 942, 945, 946, 949, 962, 963, 974, 977, 983, 988, 995, 996, 997]
 
     for index_in_episodes in tqdm(range(args.graph_episode_num)):   
         # rl_graph_init
@@ -114,8 +116,8 @@ if __name__=="__main__":
         # if((index_in_episodes+1) not in false_index_ls):
         #     continue
 
-        # if(index_in_episodes<1):
-        #     continue
+        if(index_in_episodes<800):
+            continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
         habitat_metric = habitat_env.get_metrics()
@@ -138,11 +140,15 @@ if __name__=="__main__":
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
-            # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            
-            
-            detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-            topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+
+            # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+            # topo_graph.add_intention_gt(detect_res_pos_dict)
+
+            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            topo_graph.add_intention(detect_res_pos_dict)
+
+            other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
+            topo_graph.add_other_intention(other_res_pos_dict)
 
             # 底层仿真器动作执行
             habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
@@ -160,7 +166,7 @@ if __name__=="__main__":
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                 polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train) # 1
                 # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                # action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
+                # action_node = policy.greedy_select_action_gt_near_goal(rl_graph, world_cx, world_cy, habitat_env.current_episode)
                 print("=====> real_action_selection <=====")
             else:
                 ghost_patch_res = topo_graph.ghost_patch(habitat_env, object_goal)
@@ -169,7 +175,7 @@ if __name__=="__main__":
                     print("=====> ghost_patch <=====")
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=args.graph_train) # 2
                     # world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                    # action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
+                    # action_node = policy.greedy_select_action_gt_near_goal(rl_graph, world_cx, world_cy, habitat_env.current_episode)
                 else:
                     # action_space为空，结束当前episode
                     print("========> empty_action_space <========")

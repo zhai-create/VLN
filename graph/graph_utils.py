@@ -7,8 +7,9 @@ from graph.arguments import args
 from perception.arguments import args as perception_args
 from perception.frontier_utils import predict_frontier
 from perception.tools import fix_depth, get_rgb_image_ls, get_gt_image_ls
-# from perception.intention_utils_rcnn import object_detect
-from perception.intention_utils_gt import object_detect_gt
+from perception.intention_utils_rcnn import object_detect
+# from perception.intention_utils_gt import object_detect_gt
+from perception.intention_utils_gt_other import object_detect_gt_other
 from perception.intention_utils_resnet import is_close
 
 from env_tools.arguments import args as env_args
@@ -67,6 +68,9 @@ class GraphMap(object):
         self.habitat_env = habitat_env
 
         self.obs = None
+
+        self.all_real_intentions = []
+        self.obj_locations = [[] for i in range(21)] # 每用GLIP检测出一次，就记录一次 [[confidence, x, y], [confidence, x, y], ..., [confidence, x, y]]
 
     def set_current_pos(self, rela_cx, rela_cy, rela_turn):
         self.rela_cx = rela_cx
@@ -206,7 +210,7 @@ class GraphMap(object):
                 final_frontier_pos_arr.append(res_frontier_pos_arr[index])
         return np.array(final_frontier_pos_arr)
 
-
+    
     def add_ghost(self, final_frontier_pos_arr):
         for index in range(len(final_frontier_pos_arr)):
             res_loc_in_real_world = get_absolute_pos_world(final_frontier_pos_arr[index][0], final_frontier_pos_arr[index][1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
@@ -217,8 +221,95 @@ class GraphMap(object):
             self.frontier_nodes.append(new_frontier)
             self.all_nodes.append(new_frontier)
 
+    def add_real_intention(self, real_res_pos_dict):
+        rela_loc = np.array([self.rela_cx, self.rela_cy])
+        r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
+        
+        for temp_score in real_res_pos_dict:
+            for temp_rela_pos in real_res_pos_dict[temp_score]:
+                tx, ty = temp_rela_pos[0], temp_rela_pos[1]
+                center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
+                res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+                self.all_real_intentions.append([res_loc_in_real_world[0], res_loc_in_real_world[1]])
 
-    def add_intention(self, detect_res_pos_dict, rgb_image_ls, object_text):
+
+
+    # def add_intention_gt(self, detect_res_pos_dict):
+    #     rela_loc = np.array([self.rela_cx, self.rela_cy])
+    #     r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
+    
+    #     new_intention_ls = []
+    #     new_intention_name_ls = []
+        
+    #     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+
+    #     for temp_score in detect_res_pos_dict:
+    #         for temp_rela_pos in detect_res_pos_dict[temp_score]:
+    #             tx, ty = temp_rela_pos[0], temp_rela_pos[1]
+    #             is_real_intention = temp_rela_pos[2]
+    #             center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
+
+    #             # cluster_revise
+    #             res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+                
+    #             # 防止fake_intention生成在real_intention附近(# intention_node聚类距离修改)
+    #             if(is_real_intention==False):
+    #                 is_near_real_flag = False
+    #                 for temp_real_intention in self.intention_nodes:
+    #                     if(temp_real_intention.is_real_intention==True):
+    #                         if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<1.0:
+    #                             is_near_real_flag = True
+    #                             break
+    #                 if(is_near_real_flag==True):
+    #                     continue
+    #             # 防止fake_intention生成在real_intention附近
+                
+                
+    #             new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
+    #             # correct_recheck
+    #             new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
+    #             new_intention.dis_ls[0] = new_intention.robot_intention_dis
+    #             new_intention.init_dis = new_intention.robot_intention_dis
+    #             # correct_recheck
+                
+    #             self.current_node.sub_intentions.append(new_intention)
+    #             self.intention_nodes.append(new_intention)
+    #             self.all_nodes.append(new_intention)
+
+    #             new_intention_ls.append(new_intention)
+    #             new_intention_name_ls.append(new_intention.name)
+
+    #     # correct_recheck
+    #     for temp_intention_node in self.intention_nodes:
+    #         if(temp_intention_node.name in new_intention_name_ls):
+    #             continue
+                
+    #         min_dis = 10000
+    #         min_node = None
+    #         for temp_new_intention_node in new_intention_ls:
+    #             temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
+    #             if(temp_dis<min_dis):
+    #                 min_dis = temp_dis
+    #                 min_node = temp_new_intention_node
+    #         if(min_dis<=1.0): # intention_node聚类距离修改
+    #             if(-1 not in temp_intention_node.score_ls):
+    #                 temp_intention_node.score_ls.append(min_node.score)
+    #                 temp_intention_node.score_ls.pop(0)
+
+    #                 temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
+    #                 temp_intention_node.dis_ls.pop(0)
+    #             else:
+    #                 score_index = temp_intention_node.score_ls.index(-1)
+    #                 temp_intention_node.score_ls[score_index] = min_node.score
+
+    #                 temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
+
+    #             # 新增人工分数序列判断
+    #             if(min_node.robot_intention_dis<temp_intention_node.init_dis):
+    #                 temp_intention_node.near_score_ls.append(min_node.score)
+    #     # correct_recheck
+
+    def add_intention(self, detect_res_pos_dict):
         rela_loc = np.array([self.rela_cx, self.rela_cy])
         r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
     
@@ -230,26 +321,25 @@ class GraphMap(object):
         for temp_score in detect_res_pos_dict:
             for temp_rela_pos in detect_res_pos_dict[temp_score]:
                 tx, ty = temp_rela_pos[0], temp_rela_pos[1]
-                is_real_intention = temp_rela_pos[2] 
                 center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
 
                 # cluster_revise
                 res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
                 
-                # 防止fake_intention生成在real_intention附近(# intention_node聚类距离修改)
-                if(is_real_intention==False):
-                    is_near_real_flag = False
-                    for temp_real_intention in self.intention_nodes:
-                        if(temp_real_intention.is_real_intention==True):
-                            if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<1.0:
-                                is_near_real_flag = True
-                                break
-                    if(is_near_real_flag==True):
-                        continue
-                # 防止fake_intention生成在real_intention附近
+                # # 防止fake_intention生成在real_intention附近(# intention_node聚类距离修改)
+                # if(is_real_intention==False):
+                #     is_near_real_flag = False
+                #     for temp_real_intention in self.intention_nodes:
+                #         if(temp_real_intention.is_real_intention==True):
+                #             if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<1.0:
+                #                 is_near_real_flag = True
+                #                 break
+                #     if(is_near_real_flag==True):
+                #         continue
+                # # 防止fake_intention生成在real_intention附近
                 
                 
-                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention)
+                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1])
                 # correct_recheck
                 new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
                 new_intention.dis_ls[0] = new_intention.robot_intention_dis
@@ -292,6 +382,22 @@ class GraphMap(object):
                 if(min_node.robot_intention_dis<temp_intention_node.init_dis):
                     temp_intention_node.near_score_ls.append(min_node.score)
         # correct_recheck
+
+    def add_other_intention(self, other_res_pos_dict):
+        rela_loc = np.array([self.rela_cx, self.rela_cy])
+        r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
+        
+        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+
+        for temp_score in other_res_pos_dict:
+            for temp_rela_pos in other_res_pos_dict[temp_score]:
+                tx, ty = temp_rela_pos[0], temp_rela_pos[1]
+                temp_object_text = temp_rela_pos[2]
+                center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
+
+                # cluster_revise
+                res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+                self.obj_locations[HabitatAction.categories_21.index(temp_object_text)].append([temp_score, res_loc_in_real_world[0], res_loc_in_real_world[1]])
 
     def get_laser_result(self, depth):
         laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered = \
@@ -411,9 +517,14 @@ class GraphMap(object):
 
                     rgb_image_ls = get_rgb_image_ls(habitat_env)
                     gt_image_ls = get_gt_image_ls(habitat_env)
-                    # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-                    detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-                    self.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+                    # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+                    # self.add_intention_gt(detect_res_pos_dict)
+
+                    detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+                    self.add_intention(detect_res_pos_dict)
+
+                    other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
+                    self.add_other_intention(other_res_pos_dict)
                 else:
                     return "exceed"
             return "ok" # 表示没有超过最大步数             

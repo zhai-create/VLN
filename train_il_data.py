@@ -1,9 +1,18 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"] = '3'
+os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
-os.environ['CUDA_LAUNCH_BLOCKING'] = '3'
+os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import random
-random.seed(233)
+# random.seed(233)
+# random.seed(344)
+# random.seed(455)
+# random.seed(566)
+# random.seed(677)
+# random.seed(788)
+# random.seed(899)
+# random.seed(911)
+# random.seed(122)
+random.seed(400)
 
 import cv2
 import copy
@@ -11,7 +20,16 @@ import habitat
 import argparse
 import datetime
 import numpy as np
-np.random.seed(233)
+# np.random.seed(233)
+# np.random.seed(344)
+# np.random.seed(455)
+# np.random.seed(566)
+# np.random.seed(677)
+# np.random.seed(788)
+# np.random.seed(899)
+# np.random.seed(911)
+# np.random.seed(122)
+np.random.seed(400)
 
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -36,6 +54,7 @@ from navigation.sub_goal_reach import SubgoalReach
 
 # from perception.intention_utils_rcnn import object_detect
 from perception.intention_utils_gt import object_detect_gt
+from perception.intention_utils_gt_other import object_detect_gt_other
 
 
 if __name__=="__main__":
@@ -53,8 +72,8 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        # train_note = "_multi_check_large_punish_gt_train" # 注释当前训练处于什么阶段
-        train_note = "_multi_check_il_data_gt" # 注释当前训练处于什么阶段
+        train_note = "_multi_check_il_data_semantic_ls_part10" # 注释当前训练处于什么阶段
+        # train_note = "_multi_check_il_data_zero_relation_gt" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -78,7 +97,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 3
+        rl_args.graph_node_feature_dim = 45
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -206,10 +225,16 @@ if __name__=="__main__":
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
+
             # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            
+            # topo_graph.add_intention(detect_res_pos_dict)
+
             detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-            topo_graph.add_intention(detect_res_pos_dict, rgb_image_ls, object_goal)
+            topo_graph.add_intention_gt(detect_res_pos_dict)
+
+            other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
+            topo_graph.add_other_intention(other_res_pos_dict)
+
 
             # 底层仿真器动作执行
             habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
@@ -341,7 +366,11 @@ if __name__=="__main__":
             il_data["next_state"] = next_state
             il_data["reward"] = reward
             il_data["done"] = done
-            np.save('il_data/{}.npy'.format(policy.train_step+1+7735), il_data)
+            save_root = "il_data_semantic_ls_part10"
+            if not os.path.exists(save_root):
+                os.makedirs(save_root)
+            np.save('{}/{}.npy'.format(save_root, policy.train_step+1+90000), il_data)
+            # np.save('il_data_zero_relation_gt/{}.npy'.format(policy.train_step+1), il_data)
             
 
             current_state = copy.deepcopy(next_state) # 迭代更新

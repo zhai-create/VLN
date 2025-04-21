@@ -50,16 +50,6 @@ def object_detect(rgb_image_ls, depth, object_text):
         if(len(temp_boxes)==0):
             return detect_res_pos_dict
 
-        temp_box_ls = copy.deepcopy(temp_boxes)
-        temp_box_for_embed = np.zeros((temp_box_ls.shape[0], 5))
-        temp_box_for_embed[:, 1] = temp_box_ls[:, 0]/args.depth_width
-        temp_box_for_embed[:, 2] = temp_box_ls[:, 1]/args.depth_height
-        temp_box_for_embed[:, 3] = temp_box_ls[:, 2]/args.depth_width
-        temp_box_for_embed[:, 4] = temp_box_ls[:, 3]/args.depth_height
-
-        temp_boxes_embedding = embed_object(rgb_image_ls[index], temp_box_for_embed)
-
-
         for temp_index in range(temp_boxes.shape[0]): # 遍历每一个图像实例
             if(int(temp_pre_labels[temp_index].item())==coco_categories_mapping[object_text]):
                 new_mask = temp_masks.cpu().numpy()[temp_index]
@@ -69,9 +59,10 @@ def object_detect(rgb_image_ls, depth, object_text):
                     continue
 
                 if(temp_pre_scores[temp_index].item() not in detect_res_pos_dict):
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy, temp_boxes_embedding[temp_index].reshape(1, 32)]]
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()] = [[res_depth_2d_cx, res_depth_2d_cy]]
                 else:
-                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy, temp_boxes_embedding[temp_index].reshape(1, 32)])
+                    detect_res_pos_dict[temp_pre_scores[temp_index].item()].append([res_depth_2d_cx, res_depth_2d_cy])
+
     return detect_res_pos_dict
 
 

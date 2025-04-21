@@ -323,6 +323,12 @@ class Evaluate:
 
                 writer.add_scalar('Result/fake_intention_check_flag', HabitatAction.fake_intention_check_flag, index_in_episodes+1)
                 writer.add_scalar('Result/real_intention_check_flag', HabitatAction.real_intention_check_flag, index_in_episodes+1)
+                
+                
+                writer.add_scalar('Result/first_score', 0, index_in_episodes+1)
+                writer.add_scalar('Result/second_score', 0, index_in_episodes+1)
+                writer.add_scalar('Result/is_true_intention', 0, index_in_episodes+1)
+                
                 return "episode_stop" # 结束当前episode, 开始下一个episode
                 
             elif(achieved_result=="achieved" or achieved_result=="block" or achieved_result=="Failed_Plan"):
@@ -366,4 +372,19 @@ class Evaluate:
                     writer.add_scalar('Result/fake_intention_check_flag', HabitatAction.fake_intention_check_flag, index_in_episodes+1)
                     writer.add_scalar('Result/real_intention_check_flag', HabitatAction.real_intention_check_flag, index_in_episodes+1)
                     
+                    writer.add_scalar('Result/first_score', action_node.score, index_in_episodes+1)
+                    
+                    if(len(action_node.near_score_ls)>0):
+                        recheck_score = np.mean(action_node.near_score_ls)
+                    else:
+                        recheck_score = 0
+                    writer.add_scalar('Result/second_score', recheck_score, index_in_episodes+1)
+
+                    is_true_intention = 0
+                    for temp_real_intention in topo_graph.all_real_intentions:
+                        if ((temp_real_intention[0]-action_node.world_cx)**2+(temp_real_intention[1]-action_node.world_cy)**2)**0.5<1.0:
+                            is_true_intention = 1
+                            break
+                    writer.add_scalar('Result/is_true_intention', is_true_intention, index_in_episodes+1)
+
                     return "episode_stop" # 结束当前episode, 开始下一个episode

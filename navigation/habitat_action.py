@@ -73,6 +73,7 @@ class HabitatAction:
 
     scene_file_dict = {}
     object_id_num_ls = []
+    other_object_id_num_ls = []
 
     init_all_map_loc = np.array([[500, 500]]) # size: (1001, 1001)
 
@@ -85,6 +86,12 @@ class HabitatAction:
     real_intention_check_flag = 0
 
     cluster_intention_name_history = []
+
+    prob_array_obj = []
+
+    categories_21 = ['chair', 'table', 'picture', 'cabinet', 'cushion', 'sofa',
+        'bed', 'drawer', 'plant', 'sink', 'toilet', 'stool',
+        'towel', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace', 'gym_equipment', 'seat', 'clothes']
 
     @staticmethod
     def get_current_scene_dict(habitat_env, graph_train):
@@ -139,6 +146,35 @@ class HabitatAction:
 
         return object_id_num_ls
 
+    @staticmethod
+    def get_other_object_num_ls(scene_file_dict, object_text):
+        other_object_id_num_ls = []
+
+        for temp_object_text in HabitatAction.categories_21:
+            if(temp_object_text==object_text):
+                continue
+        
+            if(temp_object_text=="bed" or temp_object_text=="toilet"):
+                if(temp_object_text in scene_file_dict):
+                    other_object_id_num_ls += [(temp, temp_object_text) for temp in scene_file_dict[temp_object_text]]
+                else:
+                    other_object_id_num_ls += []
+            
+            elif(temp_object_text=="sofa"):
+                for temp_object_name in scene_file_dict:
+                    if(temp_object_name==temp_object_text) or (temp_object_name=="couch"):
+                        other_object_id_num_ls += [(temp, temp_object_text) for temp in scene_file_dict[temp_object_name]]
+
+            elif(temp_object_text=="tv_monitor"):
+                for temp_object_name in scene_file_dict:
+                    if(temp_object_name==temp_object_text) or (temp_object_name=="tv") or (temp_object_name=="monitor") or (temp_object_name=="tv "):
+                        other_object_id_num_ls += [(temp, temp_object_text) for temp in scene_file_dict[temp_object_name]]
+            else:
+                for temp_object_name in scene_file_dict:
+                    if(temp_object_text in temp_object_name):
+                        other_object_id_num_ls += [(temp, temp_object_text) for temp in scene_file_dict[temp_object_name]]
+        return other_object_id_num_ls
+
 
     @staticmethod
     def reset(habitat_env, object_text, graph_train):
@@ -167,6 +203,20 @@ class HabitatAction:
         HabitatAction.real_intention_check_flag = 0
 
         HabitatAction.cluster_intention_name_history = []
+
+
+        HabitatAction.categories_21 = ['chair', 'table', 'picture', 'cabinet', 'cushion', 'sofa',
+        'bed', 'drawer', 'plant', 'sink', 'toilet', 'stool',
+        'towel', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace', 'gym_equipment', 'seat', 'clothes']
+        
+        co_occur_mtx = np.load('dependencies/obj.npy') # array 21*21
+    
+        co_occur_mtx -= co_occur_mtx.min()
+        co_occur_mtx /= co_occur_mtx.max() # 归一化
+        
+        HabitatAction.prob_array_obj = co_occur_mtx[HabitatAction.categories_21.index(object_text)]
+
+        HabitatAction.other_object_id_num_ls =HabitatAction.get_other_object_num_ls(HabitatAction.scene_file_dict, object_text)
 
     @staticmethod
     def get_all_map_loc(topo_graph):

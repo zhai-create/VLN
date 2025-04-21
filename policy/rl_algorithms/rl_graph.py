@@ -208,23 +208,173 @@ class RL_Graph(object):
             frontier_clustered_res_ls.append(min_node)
         return frontier_clustered_res_ls
 
+    # def get_all_frontier_score(self, topo_graph, frontier_clustered_res_ls):
+    #     num_16_frontiers = len(frontier_clustered_res_ls)
+    #     if(num_16_frontiers==0):
+    #         return frontier_clustered_res_ls
+        
+    #     scores = np.zeros((num_16_frontiers))
+    #     frontier_locations_16 = [[temp_frontier.world_cx, temp_frontier.world_cy] for temp_frontier in frontier_clustered_res_ls]
+    #     frontier_locations_16 = np.array(frontier_locations_16)
 
+    #     for i in range(21): # 遍历每一类物体
+    #         num_obj = len(topo_graph.obj_locations[i]) # [[confidence, x, y], [confidence, x, y], ..., [confidence, x, y]]
+    #         if (num_obj <= 0) or (len(frontier_locations_16)==0):
+    #             continue
+    #         frontier_location_mtx = np.tile(frontier_locations_16, (num_obj,1,1)) # 重复后(按照该类物体的检测次数)的frontiers_location
+    #         obj_location_mtx = np.array(topo_graph.obj_locations[i])[:,1:] # 该类物体多次观测的位置
+    #         obj_confidence_mtx = np.tile(np.array(topo_graph.obj_locations[i])[:,0],(num_16_frontiers,1)).transpose(1,0) # 重复后(按照frontier个数)的obj_confidence
+    #         obj_location_mtx = np.tile(obj_location_mtx, (num_16_frontiers,1,1)).transpose(1,0,2) # 重复后(按照frontier个数)的obj_location
+            
+    #         dist_frontier_obj = np.square(frontier_location_mtx - obj_location_mtx)
+    #         dist_frontier_obj = np.sqrt(np.sum(dist_frontier_obj, axis=2)) / 20 # 计算所有frontiers到当前该类物体所有观测的距离 （size：(num_obj, num_16_frontiers)）
+    #         near_frontier_obj = dist_frontier_obj < 1.6
+    #         obj_confidence_mtx[near_frontier_obj==False] = 0
+    #         obj_confidence_max = np.max(obj_confidence_mtx, axis=0) # 各列取最大值（维度与frontier个数相同）--> 计算每个frontier的1.6m附近置信度最大的object的检测分数
+    #         score_1 = np.clip(1-(1-HabitatAction.prob_array_obj[i])-(1-obj_confidence_max), 0, 10) # score_1 鼓励选择 高物体概率 + 高置信度物体附近 的前沿
+    #         score_2 = 1- np.clip(HabitatAction.prob_array_obj[i]+(1-obj_confidence_max), -10,1) # score_2 惩罚 低物体概率 + 低置信度物体附近 的前沿
+    #         scores += score_1 - score_2
+
+    #     distances_16 = []
+    #     for temp_frontier in frontier_clustered_res_ls:
+    #         if temp_frontier.parent_node.name != topo_graph.current_node.name:
+    #             n_in_current_node = topo_graph.current_node.all_other_nodes_loc[temp_frontier.parent_node.name] # 将node中的ghost坐标位置转换到当前node下
+    #             g_ref_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+    #         else:
+    #             g_ref_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
+    #         distances_16.append(((g_ref_loc[0]-topo_graph.rela_cx)**2+(g_ref_loc[1]-topo_graph.rela_cy)**2)**0.5)
+    #     distances_16 = np.array(distances_16)
+        
+    #     distances_16_inverse = 1 - (np.clip(distances_16,0,11.6)-0) / (11.6-0)
+    #     scores += 2 * distances_16_inverse
+
+
+    #     for i in range(len(scores)):
+    #         frontier_clustered_res_ls[i].score = scores[i]
+    #     return frontier_clustered_res_ls
+
+
+    # def get_all_frontier_score(self, topo_graph, frontier_clustered_res_ls):
+    #     num_16_frontiers = len(frontier_clustered_res_ls)
+    #     if(num_16_frontiers==0):
+    #         return frontier_clustered_res_ls
+
+    #     score_sum = 0
+    #     for temp_frontier in frontier_clustered_res_ls:
+    #         temp_frontier_score = 0
+    #         for i in range(21):
+    #             max_score = 0
+    #             max_world_cx, max_world_cy = 0, 0
+    #             for temp_info in topo_graph.obj_locations[i]:
+    #                 temp_score, temp_world_cx, temp_world_cy = temp_info[0], temp_info[1], temp_info[2]
+    #                 if(temp_score>max_score):
+    #                     max_score = temp_score
+    #                     max_world_cx, max_world_cy = temp_world_cx, temp_world_cy
+    #             if(max_score==0):
+    #                 temp_frontier_score += 0
+    #             else:
+    #                 temp_frontier_score += max_score*HabitatAction.prob_array_obj[i]/(((max_world_cx-temp_frontier.world_cx)**2+(max_world_cy-temp_frontier.world_cy)**2)**0.5)
+    #                 # temp_dis = (((max_world_cx-temp_frontier.world_cx)**2+(max_world_cy-temp_frontier.world_cy)**2)**0.5)
+    #                 # if(temp_dis<=2.0):
+    #                 #     temp_frontier_score += max_score*HabitatAction.prob_array_obj[i]
+    #                 # else:
+    #                 #     temp_frontier_score += 0
+            
+    #         if temp_frontier.parent_node.name != topo_graph.current_node.name:
+    #             n_in_current_node = topo_graph.current_node.all_other_nodes_loc[temp_frontier.parent_node.name] # 将node中的ghost坐标位置转换到当前node下
+    #             g_ref_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+    #         else:
+    #             g_ref_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
+    #         distances_16 = ((g_ref_loc[0]-topo_graph.rela_cx)**2+(g_ref_loc[1]-topo_graph.rela_cy)**2)**0.5
+    #         distances_16_inverse = 1 - (np.clip(distances_16,0,11.6)-0) / (11.6-0)
+    #         temp_frontier_score += distances_16_inverse
+    #         temp_frontier.score = temp_frontier_score
+    #         score_sum += temp_frontier.score
+        
+    #     for temp_frontier in frontier_clustered_res_ls:
+    #         temp_frontier.score /= score_sum
+    #         # temp_frontier.score = 0
+
+    #     return frontier_clustered_res_ls
+
+
+    def get_all_frontier_score_ls(self, topo_graph, frontier_clustered_res_ls):
+        num_16_frontiers = len(frontier_clustered_res_ls)
+        if(num_16_frontiers==0): # 如果没有frontier
+            return frontier_clustered_res_ls
+
+        for temp_frontier in frontier_clustered_res_ls:
+            temp_frontier.frontier_score_ls = []
+            temp_frontier.frontier_dis_ls = []
+            for i in range(21):
+                max_score = 0
+                max_world_cx, max_world_cy = 0, 0
+                for temp_info in topo_graph.obj_locations[i]:
+                    temp_score, temp_world_cx, temp_world_cy = temp_info[0], temp_info[1], temp_info[2]
+                    if(temp_score>max_score):
+                        max_score = temp_score
+                        max_world_cx, max_world_cy = temp_world_cx, temp_world_cy
+                if(max_score==0):
+                    temp_dis = 100
+                else:
+                    temp_dis = ((max_world_cx-temp_frontier.world_cx)**2+(max_world_cy-temp_frontier.world_cy)**2)**0.5
+                temp_frontier.frontier_score_ls.append(max_score*HabitatAction.prob_array_obj[i]/temp_dis)
+                # temp_frontier.frontier_dis_ls.append(temp_dis)
+
+        return frontier_clustered_res_ls
+
+    # def get_all_frontier_score(self, topo_graph, frontier_clustered_res_ls):
+    #     num_16_frontiers = len(frontier_clustered_res_ls)
+    #     if(num_16_frontiers==0):
+    #         return frontier_clustered_res_ls
+
+    #     score_sum = 0
+    #     for temp_frontier in frontier_clustered_res_ls:
+    #         temp_frontier_score = 0
+    #         for i in range(21):
+    #             for temp_info in topo_graph.obj_locations[i]:
+    #                 temp_score, temp_world_cx, temp_world_cy = temp_info[0], temp_info[1], temp_info[2]
+    #                 temp_dis = ((temp_world_cx-temp_frontier.world_cx)**2+(temp_world_cy-temp_frontier.world_cy)**2)**0.5
+    #                 temp_frontier_score += temp_score*HabitatAction.prob_array_obj[i]/temp_dis
+            
+    #         if temp_frontier.parent_node.name != topo_graph.current_node.name:
+    #             n_in_current_node = topo_graph.current_node.all_other_nodes_loc[temp_frontier.parent_node.name] # 将node中的ghost坐标位置转换到当前node下
+    #             g_ref_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+    #         else:
+    #             g_ref_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
+    #         distances_16 = ((g_ref_loc[0]-topo_graph.rela_cx)**2+(g_ref_loc[1]-topo_graph.rela_cy)**2)**0.5
+    #         distances_16_inverse = 1 - (np.clip(distances_16,0,11.6)-0) / (11.6-0)
+    #         temp_frontier_score += distances_16_inverse
+    #         temp_frontier.score = temp_frontier_score
+    #         score_sum += temp_frontier.score
+        
+    #     for temp_frontier in frontier_clustered_res_ls:
+    #         temp_frontier.score /= score_sum
+
+    #     return frontier_clustered_res_ls
+        
+        
+
+    # 用于il的update
     def update(self, topo_graph):
         self.reset()
         selected_intention_node_ls = self.select_intention(topo_graph)
         # =======update node feature=======
         for temp_node in topo_graph.all_nodes:
             if(temp_node.node_type=="explored_node"):
-                feature_ls = [0, 0, 0]
+                # feature_ls = [0, 0, 0]+[0 for i in range(21)]+[100 for i in range(21)]
+                feature_ls = [0, 0, 0]+[0 for i in range(21)]
                 self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
                 temp_node.rl_node_index = len(self.all_nodes)
                 self.all_nodes.append(temp_node)
 
         frontier_clustered_res_ls = self.get_clustered_frontier(topo_graph)
+        frontier_clustered_res_ls = self.get_all_frontier_score_ls(topo_graph, frontier_clustered_res_ls)
         for temp_node in frontier_clustered_res_ls:
             if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                 continue
-            feature_ls = [0, 0, 0.5]
+            # feature_ls = [0, 0, 0.5]+temp_node.frontier_score_ls+temp_node.frontier_dis_ls
+            feature_ls = [0, 0, 0.5]+temp_node.frontier_score_ls
             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
             temp_node.rl_node_index = len(self.all_nodes)
             self.all_nodes.append(temp_node)
@@ -246,7 +396,8 @@ class RL_Graph(object):
                 recheck_score = np.mean(temp_node.near_score_ls)
             else:
                 recheck_score = 0
-            feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]
+            # feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]+[0 for i in range(21)]+[100 for i in range(21)]
+            feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]+[0 for i in range(21)]
             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
             temp_node.rl_node_index = len(self.all_nodes)
             self.all_nodes.append(temp_node)
@@ -271,7 +422,8 @@ class RL_Graph(object):
                     self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.rl_node_index], [topo_graph.get_node(temp_neighbor_name).rl_node_index]])], dim=1)
 
         # 添加当前机器人的node特征
-        feature_ls = [0, 0, 3]
+        # feature_ls = [0, 0, 3]+[0 for i in range(21)]+[100 for i in range(21)]
+        feature_ls = [0, 0, 3]+[0 for i in range(21)]
         self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
 
         # edge特征
@@ -289,6 +441,7 @@ class RL_Graph(object):
         self.data['state']['action_idxes'] = torch.tensor(self.data['state']['action_idxes'], dtype=torch.int64)
 
 
+    # 用于rl的update
     # def update(self, topo_graph):
     #     self.reset()
     #     selected_intention_node_ls = self.select_intention(topo_graph)

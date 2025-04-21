@@ -83,6 +83,8 @@ class Node(object):
         self.deleted_frontiers = [] # rl_step中实际行走步数为0的frontier
         self.deleted_intentions = [] # rl_step中实际行走步数为0的intention
 
+        self.frontier_score_ls = []
+        self.frontier_dis_ls = []
 
     def __eq__(self, other):
         if isinstance(other, Node):
