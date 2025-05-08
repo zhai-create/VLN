@@ -11,7 +11,7 @@ half_len = (int)(perception_args.graid_map_scale/args.resolution)
 
 class Node(object):
 
-    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None, is_real_intention=None):
+    def __init__(self, node_type, rela_cx=0, rela_cy=0, world_cx=None, world_cy=None, world_cz=None, world_turn=None, parent_node=None, score=0.0, pc=None, bounding_box_embedding=None, is_real_intention=None, rgb_image_ls=None, res_col_index_factor=None):
         self.node_type = node_type # 直接赋值, str
         self.name = str(HabitatAction.name_val) # 在graph update时赋值, str
         HabitatAction.name_val += 1
@@ -35,6 +35,8 @@ class Node(object):
 
         # 新增人工分数序列判断
         self.near_score_ls = []
+        self.near_dis_ls = []
+        self.near_res_col_index_factor_ls = []
         self.init_dis = -2
 
         self.action_in_space_index = None
@@ -85,6 +87,12 @@ class Node(object):
 
         self.frontier_score_ls = []
         self.frontier_dis_ls = []
+
+        # 用于frontier的分数
+        self.rgb_image_ls = rgb_image_ls
+        self.vlm_score = None
+        self.res_col_index_factor = res_col_index_factor
+
 
     def __eq__(self, other):
         if isinstance(other, Node):

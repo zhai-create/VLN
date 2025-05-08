@@ -20,7 +20,9 @@ from torch.utils.tensorboard import SummaryWriter
 rl_args.graph_num_graph_padding = -1
 rl_args.graph_embedding_dim = 64
 
-rl_args.graph_node_feature_dim = 3
+# rl_args.graph_node_feature_dim = 5
+# rl_args.graph_node_feature_dim = 4
+rl_args.graph_node_feature_dim = 102
 rl_args.graph_edge_feature_dim = 3
 
 # 设备自动选择
@@ -28,17 +30,17 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 class GraphSupervisedDataset(Dataset):
     """加载存储在.npy文件中的图监督学习数据集"""
+    # def __init__(self, data_dir, encoder_type='GCN'):
     def __init__(self, data_dir, encoder_type='GCN', data_num=100000):
         self.data_dir = data_dir
         self.encoder_type = encoder_type
-
         al_file_ls = os.listdir(data_dir)[:data_num]
         self.samples = [f for f in al_file_ls if f.endswith('.npy')]
         
         # 验证数据完整性
         sample_path = os.path.join(data_dir, self.samples[0])
         sample_data = np.load(sample_path, allow_pickle=True).item()
-        assert 'current_state' in sample_data and 'policy_acton_idx' in sample_data, "数据格式不符合要求"
+        assert 'current_state' in sample_data and 'policy_acton_idx' in sample_data and 'policy_acton_idx_copy_llm' in sample_data, "数据格式不符合要求"
 
     def __len__(self):
         return len(self.samples)
@@ -50,13 +52,11 @@ class GraphSupervisedDataset(Dataset):
         
         # 解析特征和标签
         state_dict = data['current_state']
-        label = data['policy_acton_idx']
+        label = data['policy_acton_idx_copy_llm']
+        # label = data['policy_acton_idx']
 
         # state_dict['pyg_graph'].x[:, 3:24] /= state_dict['pyg_graph'].x[:, 24:45] # dis_revise
-        
-        # product = state_dict['pyg_graph'].x[:, 3:24]/state_dict['pyg_graph'].x[:, 24:45]
-        # sum_product = product.sum(dim=1)
-        # state_dict['pyg_graph'].x[:, 3] = sum_product
+        # state_dict['pyg_graph'].x = torch.cat([state_dict['pyg_graph'].x[:, 0:100], state_dict['pyg_graph'].x[:, 150:]], dim=1)
 
         # 根据编码器类型构造输入状态
         if self.encoder_type in ['GCN', 'GAT']:
@@ -125,15 +125,15 @@ def collate_fn(batch):
 
 # 数据加载（假设已实现自定义Dataset）
 train_dataset = GraphSupervisedDataset(
-    data_dir="il_data_gt_near_agent/",
+    data_dir="il_data_frontier_score_revise_intention_for_train/",
     encoder_type='GAT',  # 根据实际情况修改
-    data_num=9000
+    data_num=9100
 )
 
 val_dataset = GraphSupervisedDataset(
-    data_dir="il_data_gt_near_agent_val/",
+    data_dir="il_data_frontier_score_revise_intention_for_train_val/",
     encoder_type='GAT',  # 根据实际情况修改
-    data_num=100
+    data_num=120
 )
 
 # 创建数据加载器
@@ -171,8 +171,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-# train_note = "_multi_check_il_data_semantic_ls_sum_v2_three_dim_train" # 注释当前训练处于什么阶段
-train_note = "_multi_check_il_data_gt_near_agent_v2_train" # 注释当前训练处于什么阶段
+train_note = "_multi_check_il_gt_train_frontier_score_revise_intention_for_train_old_label_only_score_dis" # 注释当前训练处于什么阶段
 logger_file_name = "./log_files_train_il/log_"+date_time+train_note
 writer = SummaryWriter(logger_file_name)
 
@@ -185,9 +184,7 @@ def save_checkpoint(epoch, model, optimizer):
     }
     
     # 常规保存
-    # torch.save(state, f'checkpoints_semantic_ls/epoch_{epoch+1}.pt')
-    # torch.save(state, f'checkpoints_semantic_ls_sum_v2_three_dim/epoch_{epoch+1}.pt')
-    torch.save(state, f'checkpoints_near_agent_v2/epoch_{epoch+1}.pt')
+    torch.save(state, f'checkpoints_frontier_score_revise_intention_for_train_old_label_only_score_dis/epoch_{epoch+1}.pt')
 
 
 # 训练循环
@@ -237,7 +234,6 @@ def train_supervised(model, train_loader, val_loader, criterion, optimizer, num_
         writer.add_scalar('Result/train_loss', avg_loss, epoch+1)
         writer.add_scalar('Result/train_accu', accu, epoch+1)     
 
-        
         # 验证集验证
         model.eval()   
         eval_loss = 0.0
@@ -256,8 +252,9 @@ def train_supervised(model, train_loader, val_loader, criterion, optimizer, num_
         eval_accuracy = eval_correct / eval_samples
 
         writer.add_scalar('Result/eval_loss', eval_loss, epoch+1)
-        writer.add_scalar('Result/eval_accu', eval_accuracy, epoch+1)  
-          
+        writer.add_scalar('Result/eval_accu', eval_accuracy, epoch+1)     
+
+
 
 # 执行训练
 train_supervised(model, train_loader, val_loader, criterion, optimizer, num_epochs=10000)

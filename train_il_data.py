@@ -3,16 +3,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = '0'
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 os.environ['CUDA_LAUNCH_BLOCKING'] = '0'
 import random
-# random.seed(233)
-# random.seed(344)
-# random.seed(455)
-# random.seed(566)
-# random.seed(677)
-# random.seed(788)
-# random.seed(899)
-# random.seed(911)
-# random.seed(122)
-random.seed(400)
+random.seed(233)
 
 import cv2
 import copy
@@ -20,16 +11,7 @@ import habitat
 import argparse
 import datetime
 import numpy as np
-# np.random.seed(233)
-# np.random.seed(344)
-# np.random.seed(455)
-# np.random.seed(566)
-# np.random.seed(677)
-# np.random.seed(788)
-# np.random.seed(899)
-# np.random.seed(911)
-# np.random.seed(122)
-np.random.seed(400)
+np.random.seed(233)
 
 from tqdm import tqdm
 from torch.utils.tensorboard import SummaryWriter
@@ -47,14 +29,14 @@ from perception.tools import fix_depth, get_rgb_image_ls, get_gt_image_ls
 from perception.arguments import args as perception_args
 from graph.graph_utils import GraphMap
 from graph.node_utils import Node
-from graph.tools import get_current_world_pos
+from graph.tools import get_current_world_pos, get_min_goal_loc
 
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
 
 # from perception.intention_utils_rcnn import object_detect
 from perception.intention_utils_gt import object_detect_gt
-from perception.intention_utils_gt_other import object_detect_gt_other
+# from perception.intention_utils_gt_other import object_detect_gt_other
 
 
 if __name__=="__main__":
@@ -72,8 +54,9 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         train_note = "_three_dim_small_thre_one_rgb_large_bs" # 注释当前训练处于什么阶段
     else:
-        train_note = "_multi_check_il_data_semantic_ls_part10" # 注释当前训练处于什么阶段
-        # train_note = "_multi_check_il_data_zero_relation_gt" # 注释当前训练处于什么阶段
+        # train_note = "_multi_check_large_punish_gt_train" # 注释当前训练处于什么阶段
+        # train_note = "_multi_check_il_data_gt_0421_semantic_ls_near_goal" # 注释当前训练处于什么阶段
+        train_note = "_multi_check_il_data_frontier_score_revise_intention" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -97,7 +80,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 45
+        rl_args.graph_node_feature_dim = 3
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -225,16 +208,13 @@ if __name__=="__main__":
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
-
             # detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            # topo_graph.add_intention(detect_res_pos_dict)
-
+            
             detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-            topo_graph.add_intention_gt(detect_res_pos_dict)
+            topo_graph.add_intention_gt(detect_res_pos_dict, rgb_image_ls, object_goal)
 
-            other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
-            topo_graph.add_other_intention(other_res_pos_dict)
-
+            # other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
+            # topo_graph.add_other_intention(other_res_pos_dict)
 
             # 底层仿真器动作执行
             habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
@@ -250,6 +230,10 @@ if __name__=="__main__":
         # rl_graph_update
         rl_graph.update(topo_graph)
         current_state = copy.deepcopy(rl_graph.data['state'])
+        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+        current_min_goal_loc = get_min_goal_loc(habitat_env.current_episode, world_cx, world_cy)
+        current_robot_loc = np.array([world_cx, world_cy])
+
 
         # 获得初始all_map_loc和初始intention_node的个数
         HabitatAction.get_all_map_loc(topo_graph)
@@ -266,7 +250,8 @@ if __name__=="__main__":
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                 if(policy.train_step < 6000000000):
                     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                    action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
+                    action_node = policy.greedy_select_action_dis_score(rl_graph, world_cx, world_cy)
+                    polict_action = action_node.rl_node_index
                     policy_acton_idx = action_node.action_in_space_index
                 else:
                     polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
@@ -278,10 +263,14 @@ if __name__=="__main__":
                 if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0) and (ghost_patch_res=="ok"):
                     print("=====> ghost_patch <=====")
                     current_state = copy.deepcopy(rl_graph.data['state']) # 1106最新修改
+                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+                    current_min_goal_loc = get_min_goal_loc(habitat_env.current_episode, world_cx, world_cy)
+                    current_robot_loc = np.array([world_cx, world_cy])
 
                     if(policy.train_step < 6000000000):
                         world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                        action_node = policy.greedy_select_action(rl_graph, world_cx, world_cy)
+                        action_node = policy.greedy_select_action_dis_score(rl_graph, world_cx, world_cy)
+                        polict_action = action_node.rl_node_index
                         policy_acton_idx = action_node.action_in_space_index
                     else:
                         polict_action, policy_acton_idx = policy.select_action(rl_graph.data['state'], if_train=env_args.graph_train)
@@ -353,27 +342,43 @@ if __name__=="__main__":
             reward = rl_graph.data['reward']
             done = rl_graph.data['arrive']
 
-            rl_graph.update(topo_graph)
-            next_state = copy.deepcopy(rl_graph.data['state'])
-
-            policy.update_buffer(current_state, policy_acton_idx, next_state, reward, done, 0) # 一个样本
-            
             # 保存buffer数据
             il_data = {}
             il_data["current_state"] = current_state
             il_data["policy_acton_idx"] = policy_acton_idx
-            il_data["polict_action"] = action_node.rl_node_index
-            il_data["next_state"] = next_state
-            il_data["reward"] = reward
-            il_data["done"] = done
-            save_root = "il_data_semantic_ls_part10"
+            il_data["current_min_goal_loc"] = current_min_goal_loc
+            il_data["index_in_episodes"] = index_in_episodes # 从0开始
+            il_data["current_robot_loc"] = current_robot_loc # 从0开始
+
+            il_data["all_goal_loc_ls"] = [[temp_position.position[0], temp_position.position[1], temp_position.position[2]] for temp_position in habitat_env.current_episode.goals]
+            il_data["polict_action"] = polict_action
+
+
+            frontier_dict = {}
+            for temp_frontier in rl_graph.all_frontier_nodes:
+                frontier_dict[temp_frontier.name] = [temp_frontier.rgb_image_ls, HabitatAction.object_goal, temp_frontier.rl_node_index , temp_frontier.action_in_space_index, temp_frontier.world_cx, temp_frontier.world_cy]
+            il_data["frontier_dict"] = frontier_dict
+
+            intention_dict = {}
+            for temp_intention in rl_graph.all_intention_nodes:
+                intention_dict[temp_intention.name] = [temp_intention.score, temp_intention.near_score_ls, temp_intention.init_dis, temp_intention.near_dis_ls, temp_intention.res_col_index_factor, temp_intention.near_res_col_index_factor_ls, HabitatAction.object_goal, temp_intention.intention_type, temp_intention.rl_node_index , temp_intention.action_in_space_index, temp_intention.world_cx, temp_intention.world_cy]
+            il_data["intention_dict"] = intention_dict
+
+            rl_graph.update(topo_graph)
+            next_state = copy.deepcopy(rl_graph.data['state'])
+            policy.update_buffer(current_state, policy_acton_idx, next_state, reward, done, 0) # 一个样本
+            
+            # np.save('il_data/{}.npy'.format(policy.train_step+1+7735), il_data)
+            save_root = "il_data_frontier_score_revise_intention"
             if not os.path.exists(save_root):
                 os.makedirs(save_root)
-            np.save('{}/{}.npy'.format(save_root, policy.train_step+1+90000), il_data)
-            # np.save('il_data_zero_relation_gt/{}.npy'.format(policy.train_step+1), il_data)
+            np.save('{}/{}.npy'.format(save_root, policy.train_step+1), il_data)
             
 
             current_state = copy.deepcopy(next_state) # 迭代更新
+            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
+            current_min_goal_loc = get_min_goal_loc(habitat_env.current_episode, world_cx, world_cy)
+            current_robot_loc = np.array([world_cx, world_cy])
             # =====> Train <=====
             for train_index in range(env_args.graph_iter_per_step):     
                 train_step = policy.train(writer, train_index, env_args.graph_batch_size) 

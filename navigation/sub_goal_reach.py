@@ -17,9 +17,10 @@ from perception.tools import get_rgb_image_ls, get_gt_image_ls, fix_depth
 from vis_tools.vis_utils import save_mp4
 
 from perception.intention_utils_rcnn import object_detect
+# from perception.intention_utils_groundsam import object_detect_grounding_sam
 # from perception.intention_utils_dino import object_detect_sam
 # from perception.intention_utils_gt import object_detect_gt
-from perception.intention_utils_gt_other import object_detect_gt_other
+# from perception.intention_utils_gt_other import object_detect_gt_other
 
 from graph.tools import get_current_world_pos
 
@@ -177,15 +178,18 @@ class SubgoalReach:
 
                 rgb_image_ls = get_rgb_image_ls(habitat_env)
                 gt_image_ls = get_gt_image_ls(habitat_env)
-                
-                # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
-                # topo_graph.add_intention_gt(detect_res_pos_dict)
 
                 detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
                 topo_graph.add_intention(detect_res_pos_dict)
 
-                other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
-                topo_graph.add_other_intention(other_res_pos_dict)
+                # detect_res_pos_dict = object_detect_grounding_sam(rgb_image_ls, depth, object_goal)
+                # topo_graph.add_intention(detect_res_pos_dict)
+
+                # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls)
+                # topo_graph.add_intention_gt(detect_res_pos_dict, rgb_image_ls, object_goal)
+
+                # other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
+                # topo_graph.add_other_intention(other_res_pos_dict)
 
                 # 底层仿真器动作执行
                 habitat_action = HabitatAction.set_habitat_action("r", topo_graph)
@@ -207,8 +211,14 @@ class SubgoalReach:
 
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
+
+            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
+            topo_graph.add_intention(detect_res_pos_dict)
+
+            # detect_res_pos_dict = object_detect_grounding_sam(rgb_image_ls, depth, object_goal)
+            # topo_graph.add_intention(detect_res_pos_dict)
             
-            # ===========================
+            # # ===========================
             # if(SubgoalReach.next_action=="f"):
             #     SubgoalReach.false_front_step += 1
             #     if(SubgoalReach.false_front_step>=4):
@@ -220,15 +230,11 @@ class SubgoalReach:
             #     is_fake_intention = False
 
             # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
-            # topo_graph.add_intention_gt(detect_res_pos_dict)
-            # ===========================
-            
-            detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
-            topo_graph.add_intention(detect_res_pos_dict)
+            # topo_graph.add_intention_gt(detect_res_pos_dict, rgb_image_ls, object_goal)
+            # # ===========================
 
-            other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
-            topo_graph.add_other_intention(other_res_pos_dict)
-
+            # other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
+            # topo_graph.add_other_intention(other_res_pos_dict)
         return "go_on"
 
 

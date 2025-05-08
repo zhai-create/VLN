@@ -228,3 +228,15 @@ def get_current_world_pos(habitat_env):
     world_turn = 2 * math.atan(habitat_env._sim.get_agent_state(0).rotation.y/habitat_env._sim.get_agent_state(0).rotation.w)
     return world_cx, world_cy, world_cz, world_turn
 
+
+def get_min_goal_loc(current_episode, world_cx, world_cy):
+    # 找到距离当前机器人最近的object所在的位置
+    min_goal_dis = 1000000
+    min_goal_loc = None
+    for temp_index in range(len(current_episode.goals)):
+        temp_dis = ((current_episode.goals[temp_index].position[2]-world_cx)**2+(current_episode.goals[temp_index].position[0]-world_cy)**2)**0.5
+        if temp_dis<min_goal_dis:
+            min_goal_dis = temp_dis
+            min_goal_loc = current_episode.goals[temp_index].position
+    return min_goal_loc
+

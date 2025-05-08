@@ -88,10 +88,13 @@ class HabitatAction:
     cluster_intention_name_history = []
 
     prob_array_obj = []
-
+ 
     categories_21 = ['chair', 'table', 'picture', 'cabinet', 'cushion', 'sofa',
-        'bed', 'drawer', 'plant', 'sink', 'toilet', 'stool',
-        'towel', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace', 'gym_equipment', 'seat', 'clothes']
+         'bed', 'drawer', 'plant', 'sink', 'toilet', 'stool',
+         'towel', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace', 'gym_equipment', 'seat', 'clothes']
+
+    object_goal = None
+    habitat_env = None
 
     @staticmethod
     def get_current_scene_dict(habitat_env, graph_train):
@@ -176,6 +179,7 @@ class HabitatAction:
         return other_object_id_num_ls
 
 
+
     @staticmethod
     def reset(habitat_env, object_text, graph_train):
         """
@@ -204,7 +208,6 @@ class HabitatAction:
 
         HabitatAction.cluster_intention_name_history = []
 
-
         HabitatAction.categories_21 = ['chair', 'table', 'picture', 'cabinet', 'cushion', 'sofa',
         'bed', 'drawer', 'plant', 'sink', 'toilet', 'stool',
         'towel', 'tv_monitor', 'shower', 'bathtub', 'counter', 'fireplace', 'gym_equipment', 'seat', 'clothes']
@@ -217,6 +220,9 @@ class HabitatAction:
         HabitatAction.prob_array_obj = co_occur_mtx[HabitatAction.categories_21.index(object_text)]
 
         HabitatAction.other_object_id_num_ls =HabitatAction.get_other_object_num_ls(HabitatAction.scene_file_dict, object_text)
+ 
+        HabitatAction.object_goal = object_text
+        HabitatAction.habitat_env = habitat_env
 
     @staticmethod
     def get_all_map_loc(topo_graph):

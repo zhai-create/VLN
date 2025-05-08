@@ -21,8 +21,6 @@ from graph.tools import get_absolute_pos
 
 from navigation.habitat_action import HabitatAction
 
-from graph.tools import get_current_world_pos
-
 
 class SAC(RL_Policy):
     def __init__(self, args):
@@ -121,93 +119,6 @@ class SAC(RL_Policy):
         action = all_action_indexes[action_index][0]
         return action, action_index # idx in padding
 
-    @torch.no_grad()
-    def greedy_select_action(self, rl_graph, world_cx, world_cy):
-        max_score = 0
-        max_score_node = None
-        candidate_intention_ls = []
-        for temp_node in rl_graph.all_intention_nodes:
-            if(temp_node.score>max_score):
-                max_score = temp_node.score
-                max_score_node = temp_node
-
-            if(len(temp_node.near_score_ls)>0):
-                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-                    candidate_intention_ls.append(temp_node)
-                
-        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-            min_dis = 10000
-            res_node = None
-            for temp_node in candidate_intention_ls:
-                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        else: # 没有“两次有效观察”的intention
-            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-            if(max_score>0.8):
-                if(max_score_node.intention_type==1):
-                    return max_score_node
-            if(len(rl_graph.all_frontier_nodes)==0):
-                return max_score_node
-            min_dis = 10000
-            res_node = None
-            for temp_node in rl_graph.all_frontier_nodes:
-                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        return res_node
-
-    # semantic_ls对应的policy
-    # @torch.no_grad()
-    # def greedy_select_action(self, rl_graph, world_cx, world_cy, current_episode):
-    #     # 找到距离当前机器人最近的object所在的位置
-    #     min_goal_dis = 1000000
-    #     min_goal_loc = None
-    #     for temp_index in range(len(current_episode.goals)):
-    #         temp_dis = ((current_episode.goals[temp_index].position[2]-world_cx)**2+(current_episode.goals[temp_index].position[0]-world_cy)**2)**0.5
-    #         if temp_dis<min_goal_dis:
-    #             min_goal_dis = temp_dis
-    #             min_goal_loc = current_episode.goals[temp_index].position
-        
-    #     max_score = 0
-    #     max_score_node = None
-    #     candidate_intention_ls = []
-    #     for temp_node in rl_graph.all_intention_nodes:
-    #         if(temp_node.score>max_score):
-    #             max_score = temp_node.score
-    #             max_score_node = temp_node
-
-    #         if(len(temp_node.near_score_ls)>0):
-    #             if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-    #                 candidate_intention_ls.append(temp_node)
-                
-    #     if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-    #         min_dis = 10000
-    #         res_node = None
-    #         for temp_node in candidate_intention_ls:
-    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-    #             if(temp_dis<min_dis):
-    #                 min_dis = temp_dis
-    #                 res_node = temp_node
-    #     else: # 没有“两次有效观察”的intention
-    #         if(max_score>0.8):
-    #             if(max_score_node.intention_type==1):
-    #                 return max_score_node
-    #         if(len(rl_graph.all_frontier_nodes)==0):
-    #             return max_score_node
-    #         min_dis = 10000
-    #         res_node = None
-    #         for temp_node in rl_graph.all_frontier_nodes:
-    #             temp_dis = ((temp_node.world_cx-min_goal_loc[0])**2+(temp_node.world_cy-min_goal_loc[1])**2)**0.5
-    #             if(temp_dis<min_dis):
-    #                 min_dis = temp_dis
-    #                 res_node = temp_node
-    #     return res_node
-
-
-
 
     # @torch.no_grad()
     # def greedy_select_action(self, rl_graph, world_cx, world_cy):
@@ -238,184 +149,159 @@ class SAC(RL_Policy):
     #                 return max_score_node
     #         if(len(rl_graph.all_frontier_nodes)==0):
     #             return max_score_node
-            
-    #         all_frontier_score = [temp_frontier.score for temp_frontier in rl_graph.all_frontier_nodes]
-    #         all_zero_flag = np.all(np.array(all_frontier_score) == 0)
-            
-    #         if(all_zero_flag==True):
-    #             min_dis = 10000
-    #             res_node = None
-    #             for temp_node in rl_graph.all_frontier_nodes:
-    #                 temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-    #                 if(temp_dis<min_dis):
-    #                     min_dis = temp_dis
-    #                     res_node = temp_node
-    #         else:
-    #             res_node = None
-    #             max_score = 0
-    #             for temp_node in rl_graph.all_frontier_nodes:
-    #                 if(temp_node.score>max_score) or (res_node is None):
-    #                     max_score = temp_node.score
-    #                     res_node = temp_node
-        
+    #         min_dis = 10000
+    #         res_node = None
+    #         for temp_node in rl_graph.all_frontier_nodes:
+    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+    #             if(temp_dis<min_dis):
+    #                 min_dis = temp_dis
+    #                 res_node = temp_node
     #     return res_node
+
+    # 用于“our+rcnn+greedy+llm_frontier”
+    '''
+    @torch.no_grad()
+    def greedy_select_action_frontier_score(self, rl_graph, world_cx, world_cy):
+        max_score = 0
+        max_score_node = None
+        candidate_intention_ls = []
+        for temp_node in rl_graph.all_intention_nodes:
+            if(temp_node.score>max_score):
+                max_score = temp_node.score
+                max_score_node = temp_node
+
+            if(len(temp_node.near_score_ls)>0):
+                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
+                    candidate_intention_ls.append(temp_node)
+                
+        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
+            min_dis = 10000
+            res_node = None
+            for temp_node in candidate_intention_ls:
+                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        else: # 没有“两次有效观察”的intention
+            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
+            if(max_score>0.8):
+                if(max_score_node.intention_type==1):
+                    return max_score_node
+            if(len(rl_graph.all_frontier_nodes)==0):
+                return max_score_node
+            # 选择一个frontier
+            all_frontier_score = [temp_frontier.vlm_score for temp_frontier in rl_graph.all_frontier_nodes]
+            all_zero_flag = np.all(np.array(all_frontier_score) == 0)
+            if(all_zero_flag==True): # 选择距离机器人最近的frontier
+                min_dis = 10000
+                res_node = None
+                for temp_node in rl_graph.all_frontier_nodes:
+                    temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+                    if(temp_dis<min_dis):
+                        min_dis = temp_dis
+                        res_node = temp_node
+            else: # 选择分数最高的frontier
+                res_node = None
+                max_score = 0
+                now_frontier_distance_ls = [((temp_frontier.world_cx-world_cx)**2+(temp_frontier.world_cy-world_cy)**2)**0.5 for temp_frontier in rl_graph.all_frontier_nodes]
+                # sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes))] # 按照距离递增排序后的list
+                sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes), key=lambda x: x[0])]
+                for temp_node in sorted_nodes:
+                    if(temp_node.vlm_score>max_score) or (res_node is None):
+                        max_score = temp_node.vlm_score
+                        res_node = temp_node
+        return res_node
+    '''
+
+
+    @torch.no_grad()
+    def greedy_select_action_dis_score(self, rl_graph, world_cx, world_cy):
+        max_score = 0
+        max_score_node = None
+        candidate_intention_ls = []
+        for temp_node in rl_graph.all_intention_nodes:
+            if(temp_node.score>max_score):
+                max_score = temp_node.score
+                max_score_node = temp_node
+
+            if(len(temp_node.near_score_ls)>0):
+                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
+                    candidate_intention_ls.append(temp_node)
+                
+        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
+            min_dis = 10000
+            res_node = None
+            for temp_node in candidate_intention_ls:
+                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        else: # 没有“两次有效观察”的intention
+            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
+            if(max_score>0.8):
+                if(max_score_node.intention_type==1):
+                    return max_score_node
+            if(len(rl_graph.all_frontier_nodes)==0):
+                return max_score_node
+            # 选择一个frontier
+            now_frontier_distance_ls = [((temp_frontier.world_cx-world_cx)**2+(temp_frontier.world_cy-world_cy)**2)**0.5 for temp_frontier in rl_graph.all_frontier_nodes]
+            sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes), key=lambda x: x[0])]
+            res_node = None
+            max_score = 0
+            for temp_node in sorted_nodes:
+                if(temp_node.vlm_score>max_score) or (res_node is None):
+                    max_score = temp_node.vlm_score
+                    res_node = temp_node
+        return res_node
+
+
 
 
     # @torch.no_grad()
-    # def greedy_select_action_gt_near_goal(self, rl_graph, world_cx, world_cy, current_episode):
+    # def greedy_select_action_near_goal(self, rl_graph, world_cx, world_cy, current_episode):
+    #     # 找到距离当前机器人最近的object所在的位置
+    #     min_goal_dis = 1000000
+    #     min_goal_loc = None
+    #     for temp_index in range(len(current_episode.goals)):
+    #         temp_dis = ((current_episode.goals[temp_index].position[2]-world_cx)**2+(current_episode.goals[temp_index].position[0]-world_cy)**2)**0.5
+    #         if temp_dis<min_goal_dis:
+    #             min_goal_dis = temp_dis
+    #             min_goal_loc = current_episode.goals[temp_index].position
+        
+    #     max_score = 0
+    #     max_score_node = None
     #     candidate_intention_ls = []
-    #     real_rcnn_intention_ls = []
-    #     real_intention_type2_ls = []
     #     for temp_node in rl_graph.all_intention_nodes:
-    #         if(temp_node.is_real_intention==True) and (len(temp_node.near_score_ls)>0): # 真实的 and 两次观测有效的
+    #         if(temp_node.score>max_score):
+    #             max_score = temp_node.score
+    #             max_score_node = temp_node
+
+    #         if(len(temp_node.near_score_ls)>0):
     #             if(temp_node.score<=np.mean(temp_node.near_score_ls)):
     #                 candidate_intention_ls.append(temp_node)
-
-    #         if(temp_node.is_real_intention==True): # 真实的
-    #             real_rcnn_intention_ls.append(temp_node)
-
-    #         if(temp_node.is_real_intention==True) and (temp_node.intention_type==2): # 真实的 and 类型为2的
-    #             real_intention_type2_ls.append(temp_node)
-  
-    #     # 找到距离当前机器人最近的object所在的位置
-    #     min_goal_dis = 1000000
-    #     min_goal_loc = None
-    #     for temp_index in range(len(current_episode.goals)):
-    #         temp_dis = ((current_episode.goals[temp_index].position[2]-world_cx)**2+(current_episode.goals[temp_index].position[0]-world_cy)**2)**0.5
-    #         if temp_dis<min_goal_dis:
-    #             min_goal_dis = temp_dis
-    #             min_goal_loc = current_episode.goals[temp_index].position
-
-    #     if(len(real_intention_type2_ls)>0): # 优先选择intention_type为2的真实的intention
-    #         min_res_dis = 1000000
+                
+    #     if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
+    #         min_dis = 10000
     #         res_node = None
-    #         for temp_node in real_intention_type2_ls:
-    #             temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #             if(temp_dis<min_res_dis):
-    #                 min_res_dis = temp_dis
+    #         for temp_node in candidate_intention_ls:
+    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
+    #             if(temp_dis<min_dis):
+    #                 min_dis = temp_dis
     #                 res_node = temp_node
-    #     else:
-    #         if(len(candidate_intention_ls)>0): # 优先选择具有“两次有效观察”的intention
-    #             min_res_dis = 1000000
-    #             res_node = None
-    #             for temp_node in candidate_intention_ls:
-    #                 temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #                 if(temp_dis<min_res_dis):
-    #                     min_res_dis = temp_dis
-    #                     res_node = temp_node
-    #         else: # 没有“两次有效观察”的intention
-    #             if(len(real_rcnn_intention_ls)>0): # 优先选择距离目标较近的真实的intention
-    #                 min_res_dis = 1000000
-    #                 res_node = None
-    #                 for temp_real_rcnn_intention in real_rcnn_intention_ls:
-    #                     temp_dis = ((temp_real_rcnn_intention.world_cx-min_goal_loc[2])**2+(temp_real_rcnn_intention.world_cy-min_goal_loc[0])**2)**0.5
-    #                     if(temp_dis<min_res_dis):
-    #                         min_res_dis = temp_dis
-    #                         res_node = temp_real_rcnn_intention
-    #             else: # 没有真实的intention(只有fake_intention or 只有frontier or fake_intention+frontier)
-    #                 if(len(rl_graph.all_frontier_nodes)==0): # 选择一个距离目标最近的fake_intention
-    #                     min_res_dis = 1000000
-    #                     res_node = None
-    #                     for temp_node in rl_graph.all_intention_nodes:
-    #                         temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #                         if(temp_dis<min_res_dis):
-    #                             min_res_dis = temp_dis
-    #                             res_node = temp_node
-    #                 else: # 选择一个frontier
-    #                     all_frontier_score = [temp_frontier.score for temp_frontier in rl_graph.all_frontier_nodes]
-    #                     all_zero_flag = np.all(np.array(all_frontier_score) == 0)
-                        
-    #                     if(all_zero_flag==True): # 选择距离目标最近的frontier
-    #                         min_dis = 10000
-    #                         res_node = None
-    #                         for temp_node in rl_graph.all_frontier_nodes:
-    #                             temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #                             if(temp_dis<min_dis):
-    #                                 min_dis = temp_dis
-    #                                 res_node = temp_node
-    #                     else: # 选择分数最高的frontier
-    #                         res_node = None
-    #                         max_score = 0
-    #                         for temp_node in rl_graph.all_frontier_nodes:
-    #                             if(temp_node.score>max_score) or (res_node is None):
-    #                                 max_score = temp_node.score
-    #                                 res_node = temp_node
-    #     return res_node
-
-
-    # @torch.no_grad()
-    # def greedy_select_action_rcnn_near_goal(self, topo_graph, rl_graph, world_cx, world_cy, current_episode):
-    #     candidate_intention_ls = []
-    #     real_rcnn_intention_ls = []
-    #     real_intention_type2_ls = []
-    #     for temp_node in rl_graph.all_intention_nodes:
-    #         if(temp_node.is_real_intention==False):
-    #             for temp_real_intention in topo_graph.all_real_intentions:
-    #                 if ((temp_real_intention[0]-temp_node.world_cx)**2+(temp_real_intention[1]-temp_node.world_cy)**2)**0.5<1.0:
-    #                     temp_node.is_real_intention = True
-    #                     break
-
-    #         if(temp_node.is_real_intention==True) and (len(temp_node.near_score_ls)>0): # 真实的 and 两次观测有效的
-    #             candidate_intention_ls.append(temp_node)
-
-    #         if(temp_node.is_real_intention==True): # 真实的
-    #             real_rcnn_intention_ls.append(temp_node)
-
-    #         if(temp_node.is_real_intention==True) and (temp_node.intention_type==2): # 真实的 and 类型为2的
-    #             real_intention_type2_ls.append(temp_node)
-  
-    #     # 找到距离当前机器人最近的object所在的位置
-    #     min_goal_dis = 1000000
-    #     min_goal_loc = None
-    #     for temp_index in range(len(current_episode.goals)):
-    #         temp_dis = ((current_episode.goals[temp_index].position[2]-world_cx)**2+(current_episode.goals[temp_index].position[0]-world_cy)**2)**0.5
-    #         if temp_dis<min_goal_dis:
-    #             min_goal_dis = temp_dis
-    #             min_goal_loc = current_episode.goals[temp_index].position
-
-    #     if(len(real_intention_type2_ls)>0): # 优先选择intention_type为2的真实的intention
-    #         min_res_dis = 1000000
+    #     else: # 没有“两次有效观察”的intention
+    #         # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
+    #         if(max_score>0.8):
+    #             if(max_score_node.intention_type==1):
+    #                 return max_score_node
+    #         if(len(rl_graph.all_frontier_nodes)==0):
+    #             return max_score_node
+    #         min_dis = 10000
     #         res_node = None
-    #         for temp_node in real_intention_type2_ls:
-    #             temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #             if(temp_dis<min_res_dis):
-    #                 min_res_dis = temp_dis
+    #         for temp_node in rl_graph.all_frontier_nodes:
+    #             temp_dis = ((temp_node.world_cx-min_goal_loc[0])**2+(temp_node.world_cy-min_goal_loc[1])**2)**0.5
+    #             if(temp_dis<min_dis):
+    #                 min_dis = temp_dis
     #                 res_node = temp_node
-    #     else:
-    #         if(len(candidate_intention_ls)>0): # 优先选择具有“两次有效观察”的intention
-    #             min_res_dis = 1000000
-    #             res_node = None
-    #             for temp_node in candidate_intention_ls:
-    #                 temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #                 if(temp_dis<min_res_dis):
-    #                     min_res_dis = temp_dis
-    #                     res_node = temp_node
-    #         else: # 没有“两次有效观察”的intention
-    #             if(len(real_rcnn_intention_ls)>0): # 优先选择距离目标较近的真实的intention
-    #                 min_res_dis = 1000000
-    #                 res_node = None
-    #                 for temp_real_rcnn_intention in real_rcnn_intention_ls:
-    #                     temp_dis = ((temp_real_rcnn_intention.world_cx-min_goal_loc[2])**2+(temp_real_rcnn_intention.world_cy-min_goal_loc[0])**2)**0.5
-    #                     if(temp_dis<min_res_dis):
-    #                         min_res_dis = temp_dis
-    #                         res_node = temp_real_rcnn_intention
-    #             else: # 没有真实的intention(只有fake_intention or 只有frontier or fake_intention+frontier)
-    #                 if(len(rl_graph.all_frontier_nodes)==0): # 选择一个距离目标最近的fake_intention
-    #                     min_res_dis = 1000000
-    #                     res_node = None
-    #                     for temp_node in rl_graph.all_intention_nodes:
-    #                         temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #                         if(temp_dis<min_res_dis):
-    #                             min_res_dis = temp_dis
-    #                             res_node = temp_node
-    #                 else: # 选择一个距离目标最近的frontier
-    #                     min_res_dis = 1000000
-    #                     res_node = None
-    #                     for temp_node in rl_graph.all_frontier_nodes:
-    #                         temp_dis = ((temp_node.world_cx-min_goal_loc[2])**2+(temp_node.world_cy-min_goal_loc[0])**2)**0.5
-    #                         if(temp_dis<min_res_dis):
-    #                             min_res_dis = temp_dis
-    #                             res_node = temp_node
     #     return res_node
                 
 

@@ -113,15 +113,16 @@ def depth_estimation_object_loc(new_mask, depth):
     res_center_ls = res_center_ls[col_indices]
 
     if(len(res_center_ls)==0):
-        return None, None
+        return None, None, None
     else:
-        dis_center_ls = [(res_center_ls[index][0]**2+res_center_ls[index][1]**2, (res_center_ls[index][0], res_center_ls[index][1]))  for index in range(len(res_center_ls))]
+        dis_center_ls = [(res_center_ls[index][0]**2+res_center_ls[index][1]**2, (res_center_ls[index][0], res_center_ls[index][1], col_indices[index]))  for index in range(len(res_center_ls))]
         dis_center_ls = sorted(dis_center_ls)
         dis_center_ls = dis_center_ls[len(dis_center_ls)//2:]
         
         res_depth_2d_cx = dis_center_ls[0][1][0]
         res_depth_2d_cy = dis_center_ls[0][1][1]
-        return res_depth_2d_cx, res_depth_2d_cy
+        res_col_index_factor = dis_center_ls[0][1][2]/args.depth_width
+        return res_depth_2d_cx, res_depth_2d_cy, res_col_index_factor
 
 def depth_estimation_laser(large_mask, depth, rgb_image_ls=None):
     depth_2d = depth * np.cos(pre_depth.data[:, :, 2:3]) * args.depth_scale # 单位：meter

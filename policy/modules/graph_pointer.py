@@ -67,13 +67,96 @@ class GraphPointerPolicy(nn.Module):
         self.combine_residual = nn.Linear(embedding_dim * 2, embedding_dim)
         
         self._num_graph_padding = num_graph_padding
+
+        # 增强的CNN模块（每个部分使用多层小卷积核）
+        self.cnn_part1 = self._build_deep_cnn()
+        self.cnn_part2 = self._build_deep_cnn() 
+        self.cnn_part3 = self._build_deep_cnn()
         
+    
+    def _build_deep_cnn(self):
+        """构建深度CNN结构，包含多个小卷积核层"""
+        return nn.Sequential(
+            # 第一卷积层
+            nn.Conv1d(1, 32, kernel_size=5, padding=2),  # 保持长度不变
+            nn.ReLU(),
+            nn.BatchNorm1d(32),
+            
+            # 第二卷积层
+            nn.Conv1d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.BatchNorm1d(64),
+            
+            # 第三卷积层
+            nn.Conv1d(64, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            
+            # 全局最大池化
+            nn.AdaptiveMaxPool1d(1)
+        )
+    
     def forward(self, state, args):
         # Graph Encoder for Data Enhancement
         if self._encoder_type == 'GCN' or self._encoder_type == 'GAT':
             graphs, current_idx, action_idx, action_mask = state
             # print(graphs)
             # breakpoint()
+
+
+            # # ================================================
+            # # Process node features with CNN layers
+            # original_x = graphs.x
+            # # Part1处理（1-50维）
+            # part1_input = original_x[:, :50].unsqueeze(1)  # [N,1,50]
+            # pooled1 = self.cnn_part1(part1_input).squeeze(-1)  # [N,128]
+            
+            # # Part2处理（51-100维）
+            # part2_input = original_x[:, 50:100].unsqueeze(1)
+            # pooled2 = self.cnn_part2(part2_input).squeeze(-1)
+            
+            # # # Part3处理（101-150维）
+            # # part3_input = original_x[:, 100:150].unsqueeze(1)
+            # # pooled3 = self.cnn_part3(part3_input).squeeze(-1)
+
+            
+            # # 合并特征（取每个CNN输出的通道均值）
+            # rest_features = original_x[:, 150:152]  # [N,2]
+            # new_x = torch.cat([
+            #     pooled1.mean(dim=1, keepdim=True),  # [N,1]
+            #     pooled2.mean(dim=1, keepdim=True),  # [N,1] 
+            #     # pooled3.mean(dim=1, keepdim=True),  # [N,1]
+            #     rest_features
+            # ], dim=1)  # [N,5]
+            
+            # # Update the graph features
+            # graphs = graphs.clone()
+            # graphs.x = new_x
+            # # ================================================
+
+
+            # 只有分数序列
+            # ==========================================
+            original_x = graphs.x
+            rest_features = original_x[:, 150:152]  # [N,2]
+            new_x = torch.cat([
+                original_x[:, 0:50],
+                original_x[:, 150:152]
+            ], dim=1)  # [N,5]
+            graphs.x = new_x
+            # ==========================================
+
+            # # 只有分数序列+距离序列
+            # # ==========================================
+            # original_x = graphs.x
+            # new_x = torch.cat([
+            #     original_x[:, 0:100],
+            #     original_x[:, 150:152]
+            # ], dim=1)  # [N,5]
+            # graphs.x = new_x
+            # # ==========================================
+
+
+
             node_enhanced = self.pre(graphs) # Batch, Graph => Num_Key, Feature_Dim
             # node_enhanced_padded, node_padding_mask = padding_graph(node_enhanced, graphs.batch, n_padding=self._num_graph_padding) # Batch, Num_Key(Padded), Dim_Feature & Batch, Num_Query=1, Num_Key
             node_enhanced_padded, node_padding_mask = padding_graph_v2(node_enhanced, graphs.batch, args)
