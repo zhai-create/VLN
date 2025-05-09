@@ -40,6 +40,61 @@ def laser_filter(laser_2d, pixel_y_2d):
     return laser_2d_filtered, laser_2d_filtered_angle, pixel_y_2d_filtered
 
 
+def laser_filter_for_ring(laser_2d):
+    """
+    Filter the 2d-laser and get corresponding angle
+    :param laser_2d: original laser
+    :return laser_2d_filtered:  filtered 2d-laser based on gradient 
+    :return laser_2d_filtered_angle: corresponding angle of the 2d-laser
+    """
+    laser_2d_filtered = []
+    laser_2d_filtered_angle = []
+
+    laser_len = len(laser_2d)
+    for i in range(laser_len):
+        left_ave_depth_dif = (np.absolute(laser_2d[(i-1+laser_len)%laser_len]-laser_2d[(i-2+laser_len)%laser_len])*args.depth_scale \
+                            + np.absolute(laser_2d[(i-2+laser_len)%laser_len]-laser_2d[(i-3+laser_len)%laser_len])*args.depth_scale \
+                            + np.absolute(laser_2d[(i-3+laser_len)%laser_len]-laser_2d[(i-4+laser_len)%laser_len])*args.depth_scale) / 3
+        right_ave_depth_dif = (np.absolute(laser_2d[(i+1+laser_len)%laser_len]-laser_2d[(i+2+laser_len)%laser_len])*args.depth_scale \
+                            + np.absolute(laser_2d[(i+2+laser_len)%laser_len]-laser_2d[(i+3+laser_len)%laser_len])*args.depth_scale \
+                            + np.absolute(laser_2d[(i+3+laser_len)%laser_len]-laser_2d[(i+4+laser_len)%laser_len])*args.depth_scale) / 3  
+
+
+        if (np.absolute(laser_2d[i]-laser_2d[(i-1+laser_len)%laser_len]) * args.depth_scale < min(args.filter_thre, 2.5*left_ave_depth_dif) \
+        or np.absolute(laser_2d[i]-laser_2d[(i+1+laser_len)%laser_len]) * args.depth_scale < min(args.filter_thre, 2.5*right_ave_depth_dif)) \
+        or laser_2d[i]*args.depth_scale < 0.01: 
+            laser_2d_filtered.append(laser_2d[i])
+            temp_angle = 1.5 * np.pi - i / laser_len * 2 * np.pi
+            if temp_angle >= np.pi:
+                temp_angle = temp_angle - 2*np.pi
+            laser_2d_filtered_angle.append(temp_angle)
+    laser_2d_filtered = np.array(laser_2d_filtered)
+    laser_2d_filtered_angle = np.array(laser_2d_filtered_angle)
+    return laser_2d_filtered, laser_2d_filtered_angle
+
+
+def get_laser_point_for_ring(large_depth):
+    split_h = (int)(args.depth_height/2+1)
+    depth_for_unprojection_for_close_loop = large_depth[split_h-1:split_h, :, :]
+    laser_dis_for_close_loop = depth_for_unprojection_for_close_loop # 单位: meter
+    laser_for_close_loop = laser_dis_for_close_loop[0, np.arange(depth_for_unprojection_for_close_loop.shape[1]), 0] / args.depth_scale # 单位: 无量纲
+
+    laser_2d_filtered_for_close_loop, laser_2d_filtered_angle_for_close_loop = laser_filter_for_ring(laser_for_close_loop) # 深度相机中间高度的filter_scan和filter_scan_angle
+
+
+    number_of_filtered = len(laser_2d_filtered_for_close_loop)
+    indices = np.arange(0, number_of_filtered, args.index_ratio) 
+    new_laser_2d_filtered = laser_2d_filtered_for_close_loop[indices]
+    new_laser_2d_filtered_angle = laser_2d_filtered_angle_for_close_loop[indices]
+    x_for_close_loop = new_laser_2d_filtered * np.cos(new_laser_2d_filtered_angle)
+    y_for_close_loop = new_laser_2d_filtered * np.sin(new_laser_2d_filtered_angle)
+    z_for_close_loop = np.ones(number_of_filtered)
+    point_for_close_loop_detection = np.array([x_for_close_loop, y_for_close_loop, z_for_close_loop])
+    
+    return point_for_close_loop_detection
+
+
+
 def get_laser_point(depth):
     """
     Get the filtered 2d-laser

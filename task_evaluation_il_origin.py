@@ -144,7 +144,6 @@ if __name__=="__main__":
             rgb_image_ls = get_rgb_image_ls(habitat_env)
             gt_image_ls = get_gt_image_ls(habitat_env)
             
-            
             detect_res_pos_dict = object_detect(rgb_image_ls, depth, object_goal)
             topo_graph.add_intention(detect_res_pos_dict)
 
@@ -163,6 +162,7 @@ if __name__=="__main__":
             # 用于录制视频
             if(args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
+        HabitatAction.rotate_loc_ls.append([0, 0])
 
         while True:
             # rl_graph_update
@@ -225,15 +225,25 @@ if __name__=="__main__":
             
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, topo_graph=topo_graph)
             if(action_node.node_type=="intention_node") and (action_node.intention_type==1) and (action_node in topo_graph.all_nodes):
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                if(topo_graph.current_node.name==action_node.parent_node.name):
+                    action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
+                else:
+                    n_in_current_node = topo_graph.current_node.all_other_nodes_loc[action_node.parent_node.name]
+                    action_node_in_current_loc = get_absolute_pos(np.array([action_node.rela_cx, action_node.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+
+                now_action_dis = ((topo_graph.rela_cx-action_node_in_current_loc[0])**2+(topo_graph.rela_cy-action_node_in_current_loc[1])**2)**0.5
                 if (now_action_dis<1):
                     action_node.intention_type = 2
                     # 距离1m以内的intention_node全部变为类型为2的intention_node
                     for temp_node in topo_graph.intention_nodes:
-                        if (((temp_node.world_cx-action_node.world_cx)**2+(temp_node.world_cy-action_node.world_cy)**2)**0.5)<1:
+                        if(temp_node.parent_node.name==action_node.parent_node.name):
+                            temp_node_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
+                        else:
+                            temp_parent_in_action_parent = action_node.parent_node.all_other_nodes_loc[temp_node.parent_node.name]
+                            temp_node_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_action_parent[:2], temp_parent_in_action_parent[2])
+
+                        if (((temp_node_loc[0]-action_node.rela_cx)**2+(temp_node_loc[1]-action_node.rela_cy)**2)**0.5)<1:
                             temp_node.intention_type = 2
-            
             
             if(evaluate_res=="episode_stop"):
                 # =====> new_add_evaluate <=====

@@ -367,6 +367,157 @@ def get_rgb_image(env, turn_id):
     return rgb
 
 
+def get_dis_array(depth):
+    if len(depth.shape) == 3:
+        depth = depth[:,:,0]
+    intrinsic = args.intrinsic_matrix
+
+    filter_z,filter_x = np.where(depth>-10) # 原始depth中所有位置
+    depth_values_array = depth*args.depth_scale # meter
+
+
+    filter_x_array = filter_x.reshape(args.depth_height, args.depth_width) # 列号矩阵
+    pixel_x = (filter_x_array - intrinsic[0][2])*depth_values_array / intrinsic[0][0]
+    pixel_y = depth_values_array
+    laser_dis = (pixel_x**2+pixel_y**2)**0.5
+    normal_laser_index_bool = np.where(pixel_y==5)
+    # laser_dis[normal_laser_index_bool] = 5
+    laser_dis[normal_laser_index_bool] = 0
+    laser_dis_array = np.expand_dims(laser_dis, axis=-1)
+    
+    return laser_dis_array # meter
+
+
+
+def get_large_depth(env):
+    """
+    Get the image list
+    :param env: habitat_env
+    :return image_ls: [rgb_1, rgb_2, rgb_3, rgb_4]
+    """
+    # (480, 640, 1)
+    # =======================> depth_behind <=======================
+    dis, angle = 0, np.pi
+    p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
+    state = env._sim.get_agent_state(0)
+    translation = state.position # 1: right; 2: up; 3: back
+    rotation = state.rotation # anti-clockwise / up-righthand principle
+    euler = quaternion.as_euler_angles(rotation)
+    if euler[0]!=0:
+        euler[1] = 2*euler[0]-euler[1]
+        euler[0] = 0
+        euler[2] = 0
+    euler[1]+=angle
+    ref_true_loc = np.array([-translation[2], translation[0]])
+    ref_true_dir = euler[1]
+    rotation = quaternion.from_euler_angles(euler)
+    p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
+    goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
+    obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
+    depth_behind = obs["depth"]
+
+    depth_behind = get_dis_array(depth_behind)
+
+
+    # =======================> depth_left <=======================
+    dis, angle = 0, (180-79)*np.pi/180
+    p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
+    state = env._sim.get_agent_state(0)
+    translation = state.position # 1: right; 2: up; 3: back
+    rotation = state.rotation # anti-clockwise / up-righthand principle
+    euler = quaternion.as_euler_angles(rotation)
+    if euler[0]!=0:
+        euler[1] = 2*euler[0]-euler[1]
+        euler[0] = 0
+        euler[2] = 0
+    euler[1]+=angle
+    ref_true_loc = np.array([-translation[2], translation[0]])
+    ref_true_dir = euler[1]
+    rotation = quaternion.from_euler_angles(euler)
+    p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
+    goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
+    obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
+    depth_left = obs["depth"]
+
+    depth_left = get_dis_array(depth_left)
+
+
+    # =======================> depth_right <=======================
+    dis, angle = 0, (79-180)*np.pi/180
+    p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
+    state = env._sim.get_agent_state(0)
+    translation = state.position # 1: right; 2: up; 3: back
+    rotation = state.rotation # anti-clockwise / up-righthand principle
+    euler = quaternion.as_euler_angles(rotation)
+    if euler[0]!=0:
+        euler[1] = 2*euler[0]-euler[1]
+        euler[0] = 0
+        euler[2] = 0
+    euler[1]+=angle
+    ref_true_loc = np.array([-translation[2], translation[0]])
+    ref_true_dir = euler[1]
+    rotation = quaternion.from_euler_angles(euler)
+    p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
+    goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
+    obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
+    depth_right = obs["depth"]
+
+    depth_right = get_dis_array(depth_right)
+
+    # =======================> depth_left_front <=======================
+    dis, angle = 0, (180-79-79)*np.pi/180
+    p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
+    state = env._sim.get_agent_state(0)
+    translation = state.position # 1: right; 2: up; 3: back
+    rotation = state.rotation # anti-clockwise / up-righthand principle
+    euler = quaternion.as_euler_angles(rotation)
+    if euler[0]!=0:
+        euler[1] = 2*euler[0]-euler[1]
+        euler[0] = 0
+        euler[2] = 0
+    euler[1]+=angle
+    ref_true_loc = np.array([-translation[2], translation[0]])
+    ref_true_dir = euler[1]
+    rotation = quaternion.from_euler_angles(euler)
+    p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
+    goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
+    obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
+    depth_left_front = obs["depth"]
+
+    depth_left_front = get_dis_array(depth_left_front)
+
+    # =======================> depth_rest <======================= (79度中从左到右挑选44度)
+    dis, angle = 0, (-57)*np.pi/180
+    p_ref_loc = np.array([dis*np.sin(angle), dis*np.cos(angle)])
+    state = env._sim.get_agent_state(0)
+    translation = state.position # 1: right; 2: up; 3: back
+    rotation = state.rotation # anti-clockwise / up-righthand principle
+    euler = quaternion.as_euler_angles(rotation)
+    if euler[0]!=0:
+        euler[1] = 2*euler[0]-euler[1]
+        euler[0] = 0
+        euler[2] = 0
+    euler[1]+=angle
+    ref_true_loc = np.array([-translation[2], translation[0]])
+    ref_true_dir = euler[1]
+    rotation = quaternion.from_euler_angles(euler)
+    p_true_loc = get_absolute_pos(p_ref_loc, ref_true_loc, ref_true_dir)
+    goal_position = np.array([p_true_loc[1], translation[1], -p_true_loc[0]])
+    obs = env._sim.get_observations_at(position=goal_position, rotation=rotation, keep_agent_at_new_pose=False)
+    depth_rest = obs["depth"]
+
+    depth_rest = get_dis_array(depth_rest)
+
+    origin_width = 640
+    origin_height = 480
+    large_depth = np.concatenate((depth_behind[:, origin_width//2:, :], depth_left, depth_left_front, depth_rest[:, :44*640//79, :], depth_right, depth_behind[:, :origin_width//2, :]), axis=1)  # 结果形状为 (6, 24, 1)
+    
+    return large_depth
+
+
+
+
+
 def get_rgb_image_ls(env):
     """
     Get the image list

@@ -114,7 +114,6 @@ def forth_check(middle, current_node, nodes_list):
             else:
                 current_node_in_n = temp_node.all_other_nodes_loc[current_node.name]
                 rela_loc = get_absolute_pos(middle, current_node_in_n[:2], current_node_in_n[2])
-            
             gx = (int)(half_len-rela_loc[0]/args.resolution)
             gy = (int)(half_len+rela_loc[1]/args.resolution)
             if gx>=1 and gx<=(2*half_len-1) and gy>=1 and gy<=(2*half_len-1):

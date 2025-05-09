@@ -22,7 +22,7 @@ from perception.intention_utils_rcnn import object_detect
 # from perception.intention_utils_gt import object_detect_gt
 # from perception.intention_utils_gt_other import object_detect_gt_other
 
-from graph.tools import get_current_world_pos
+from graph.tools import get_absolute_pos
 
 from perception.arguments import args as perception_args
 
@@ -168,8 +168,30 @@ class SubgoalReach:
                     topo_graph.all_nodes.remove(action_node)
                 return achieved_result
 
-        graph_update_flag = topo_graph.update()
-        if(graph_update_flag==True): # 需要转圈
+        if(SubgoalReach.next_action=="f"):
+            graph_update_flag = topo_graph.update()
+        else:
+            graph_update_flag = False
+
+        # 将相对坐标转换到第一个节点的坐标系下
+        if(graph_update_flag==True):
+            current_node_in_init_node = topo_graph.explored_nodes[0].all_other_nodes_loc[topo_graph.current_node.name]
+            current_loc_in_init_node = get_absolute_pos(np.array([topo_graph.rela_cx, topo_graph.rela_cy]), current_node_in_init_node[:2], current_node_in_init_node[2])
+
+            min_dis = 10000
+            for temp_loc in HabitatAction.rotate_loc_ls:
+                temp_dis = ((current_loc_in_init_node[0]-temp_loc[0])**2+(current_loc_in_init_node[1]-temp_loc[1])**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+            if(min_dis>4):
+                is_need_rotate_flag = True
+            else:
+                is_need_rotate_flag = False
+        else:
+            is_need_rotate_flag = False
+
+            
+        if(graph_update_flag==True) and (is_need_rotate_flag==True): # 需要转圈
             for i in range(12):
                 depth = fix_depth(observations["depth"])
                 topo_graph.get_laser_result(depth)
@@ -202,6 +224,7 @@ class SubgoalReach:
                 # 用于录制视频
                 if(env_args.is_vis==True):
                     save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
+            HabitatAction.rotate_loc_ls.append(current_loc_in_init_node)
 
         else:
             depth = fix_depth(observations["depth"])
@@ -269,9 +292,15 @@ class SubgoalReach:
 
             elif (SubgoalReach.next_action == "suc" and topo_planner.state_flag=="finish"):
                 # "achieved"
-                # ===================> Failed_control_revise <===================
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                # ===================> Failed_control_revise <===================                
+                if(topo_graph.current_node.name==action_node.parent_node.name):
+                    action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
+                else:
+                    n_in_current_node = topo_graph.current_node.all_other_nodes_loc[action_node.parent_node.name]
+                    action_node_in_current_loc = get_absolute_pos(np.array([action_node.rela_cx, action_node.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+                now_action_dis = ((topo_graph.rela_cx-action_node_in_current_loc[0])**2+(topo_graph.rela_cy-action_node_in_current_loc[1])**2)**0.5
+                
+                
                 if(now_action_dis>1):
                     faile_plan_cnt = 0
                     pid_waypoint_0 = action_node.world_cy
@@ -315,8 +344,14 @@ class SubgoalReach:
                 # ===================> Failed_control_revise <===================
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
                 if(action_node.node_type=="intention_node"):
-                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                    now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                    
+                    if(topo_graph.current_node.name==action_node.parent_node.name):
+                        action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
+                    else:
+                        n_in_current_node = topo_graph.current_node.all_other_nodes_loc[action_node.parent_node.name]
+                        action_node_in_current_loc = get_absolute_pos(np.array([action_node.rela_cx, action_node.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+                    now_action_dis = ((topo_graph.rela_cx-action_node_in_current_loc[0])**2+(topo_graph.rela_cy-action_node_in_current_loc[1])**2)**0.5
+                    
                     if(now_action_dis>1) and (action_node in topo_graph.all_nodes):
                         action_parent_node = action_node.parent_node
                         action_parent_node.sub_intentions.remove(action_node)
@@ -382,8 +417,15 @@ class SubgoalReach:
                         achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
                     # ===================> Failed_plan_revise <===================
                     if(action_node.node_type=="intention_node"):
-                        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                        now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                        
+                        if(topo_graph.current_node.name==action_node.parent_node.name):
+                            action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
+                        else:
+                            n_in_current_node = topo_graph.current_node.all_other_nodes_loc[action_node.parent_node.name]
+                            action_node_in_current_loc = get_absolute_pos(np.array([action_node.rela_cx, action_node.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+                        now_action_dis = ((topo_graph.rela_cx-action_node_in_current_loc[0])**2+(topo_graph.rela_cy-action_node_in_current_loc[1])**2)**0.5
+                        
+                        
                         if(now_action_dis>1):
                             if(action_node in topo_graph.all_nodes):
                                 action_parent_node = action_node.parent_node

@@ -18,8 +18,6 @@ from graph.node_utils import Node
 from navigation.habitat_action import HabitatAction
 from navigation.tools import get_node_robot_dis, get_action_robot_dis, get_absolute_pos_world
 
-from graph.tools import get_current_world_pos
-
 from perception.intention_utils_ollama import get_vlm_response
 
 
@@ -180,7 +178,15 @@ class RL_Graph(object):
         all_frontier_world_loc = []
         for temp_index in range(len(topo_graph.frontier_nodes)):
             temp_node = topo_graph.frontier_nodes[temp_index]
-            all_frontier_world_loc.append([temp_node.world_cx, temp_node.world_cy])
+
+            if(temp_node.parent_node.name==topo_graph.explored_nodes[0].name):
+                all_frontier_world_loc.append([temp_node.rela_cx, temp_node.rela_cy])
+            else:
+                temp_parent_in_init = topo_graph.explored_nodes[0].all_other_nodes_loc[temp_node.parent_node.name]
+                temp_loc_in_init_node = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_init[:2], temp_parent_in_init[2])
+                all_frontier_world_loc.append([temp_loc_in_init_node[0], temp_loc_in_init_node[1]])
+
+
         if(len(all_frontier_world_loc)==0):
             return []
         all_frontier_world_loc = np.array(all_frontier_world_loc)

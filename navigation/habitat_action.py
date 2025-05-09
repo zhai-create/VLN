@@ -96,6 +96,9 @@ class HabitatAction:
     object_goal = None
     habitat_env = None
 
+    rotate_loc_ls = []
+
+
     @staticmethod
     def get_current_scene_dict(habitat_env, graph_train):
         current_scene = habitat_env.current_episode.scene_id
@@ -223,6 +226,8 @@ class HabitatAction:
  
         HabitatAction.object_goal = object_text
         HabitatAction.habitat_env = habitat_env
+
+        HabitatAction.rotate_loc_ls = []
 
     @staticmethod
     def get_all_map_loc(topo_graph):

@@ -99,7 +99,7 @@ def find_current_node(explored_nodes, current_node, current_pc, rela_turn, rela_
     src_pc = current_pc
     I = Close_Loop()
     max_ratio = 0.0
-    ratio_thre = 0.9
+    ratio_thre = 0.4
     flag = True
     final_theta = None
     final_t = None
@@ -133,6 +133,9 @@ def find_current_node(explored_nodes, current_node, current_pc, rela_turn, rela_
         flag = True # generate new node
     else:
         flag = False # no generate
+    
+    print("==============================> max_ratio <==============================", max_ratio)
+    
     return flag, pre_node, [final_theta, final_t], [theta_to_current, t_to_current], max_ratio
 
 
