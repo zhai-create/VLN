@@ -98,8 +98,13 @@ class Evaluate:
             
             elif(achieved_result=="achieved"):
                 # =============> reward_revise <=============
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                if(topo_graph.current_node.name==action_node.parent_node.name):
+                    action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
+                else:
+                    n_in_current_node = topo_graph.current_node.all_other_nodes_loc[action_node.parent_node.name]
+                    action_node_in_current_loc = get_absolute_pos(np.array([action_node.rela_cx, action_node.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+                now_action_dis = ((topo_graph.rela_cx-action_node_in_current_loc[0])**2+(topo_graph.rela_cy-action_node_in_current_loc[1])**2)**0.5
+                
                 if(now_action_dis>1) or (((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0) and (action_node.intention_type==1)):                                       
 
                     # if((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0) and (action_node.intention_type==1):
@@ -208,8 +213,13 @@ class Evaluate:
             
             elif(achieved_result=="EXCEED_RL"):
                 # =============> reward_revise <=============
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                if(topo_graph.current_node.name==action_node.parent_node.name):
+                    action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
+                else:
+                    n_in_current_node = topo_graph.current_node.all_other_nodes_loc[action_node.parent_node.name]
+                    action_node_in_current_loc = get_absolute_pos(np.array([action_node.rela_cx, action_node.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+                now_action_dis = ((topo_graph.rela_cx-action_node_in_current_loc[0])**2+(topo_graph.rela_cy-action_node_in_current_loc[1])**2)**0.5
+                
                 if(now_action_dis>1) or (((HabitatAction.front_steps-SubgoalReach.init_front_steps)==0) and (action_node.intention_type==1)):  
                     Evaluate.reward_false_num += 1
                     writer.add_scalar('Result/episode_state', -6, index_in_episodes+1)

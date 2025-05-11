@@ -99,7 +99,9 @@ def find_current_node(explored_nodes, current_node, current_pc, rela_turn, rela_
     src_pc = current_pc
     I = Close_Loop()
     max_ratio = 0.0
-    ratio_thre = 0.4
+    # ratio_thre = 0.4
+    ratio_thre = 0.5
+    # ratio_thre = 0.9
     flag = True
     final_theta = None
     final_t = None

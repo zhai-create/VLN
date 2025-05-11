@@ -349,7 +349,14 @@ class GraphMap(object):
                 
                 new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention, res_col_index_factor=res_col_index_factor)                
                 # correct_recheck
-                new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
+
+                if(new_intention.parent_node.name==self.current_node.name):
+                    new_intention_loc = np.array([new_intention.rela_cx, new_intention.rela_cy])
+                else:
+                    new_intention_parent_in_current = self.current_node.all_other_nodes_loc[new_intention.parent_node.name]
+                    new_intention_loc = get_absolute_pos(np.array([new_intention.rela_cx, new_intention.rela_cy]), new_intention_parent_in_current[:2], new_intention_parent_in_current[2])
+                
+                new_intention.robot_intention_dis = ((new_intention_loc[0]-self.rela_cx)**2+(new_intention_loc[1]-self.rela_cy)**2)**0.5
                 new_intention.dis_ls[0] = new_intention.robot_intention_dis
                 new_intention.init_dis = new_intention.robot_intention_dis
                 # correct_recheck
@@ -369,7 +376,16 @@ class GraphMap(object):
             min_dis = 10000
             min_node = None
             for temp_new_intention_node in new_intention_ls:
-                temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
+                
+                # 把old转到new坐标系下
+                if(temp_new_intention_node.parent_node.name==temp_intention_node.parent_node.name):
+                    temp_intention_loc = np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy])
+                else:
+                    old_parent_in_new_parent_loc = temp_new_intention_node.parent_node.all_other_nodes_loc[temp_intention_node.parent_node.name]
+                    temp_intention_loc = get_absolute_pos(np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy]), old_parent_in_new_parent_loc[:2], old_parent_in_new_parent_loc[2])
+
+                temp_dis = ((temp_new_intention_node.rela_cx-temp_intention_loc[0])**2+(temp_new_intention_node.rela_cy-temp_intention_loc[1])**2)**0.5
+                
                 if(temp_dis<min_dis):
                     min_dis = temp_dis
                     min_node = temp_new_intention_node

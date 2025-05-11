@@ -134,26 +134,26 @@ class GraphPointerPolicy(nn.Module):
             # # ================================================
 
 
-            # 只有分数序列
-            # ==========================================
-            original_x = graphs.x
-            rest_features = original_x[:, 150:152]  # [N,2]
-            new_x = torch.cat([
-                original_x[:, 0:50],
-                original_x[:, 150:152]
-            ], dim=1)  # [N,5]
-            graphs.x = new_x
-            # ==========================================
-
-            # # 只有分数序列+距离序列
+            # # 只有分数序列
             # # ==========================================
             # original_x = graphs.x
+            # rest_features = original_x[:, 150:152]  # [N,2]
             # new_x = torch.cat([
-            #     original_x[:, 0:100],
+            #     original_x[:, 0:50],
             #     original_x[:, 150:152]
             # ], dim=1)  # [N,5]
             # graphs.x = new_x
             # # ==========================================
+
+            # 只有分数序列+距离序列
+            # ==========================================
+            original_x = graphs.x
+            new_x = torch.cat([
+                original_x[:, 0:100],
+                original_x[:, 150:152]
+            ], dim=1)  # [N,5]
+            graphs.x = new_x
+            # ==========================================
 
 
 

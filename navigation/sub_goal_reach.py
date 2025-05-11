@@ -254,7 +254,7 @@ class SubgoalReach:
 
             # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
             # topo_graph.add_intention_gt(detect_res_pos_dict, rgb_image_ls, object_goal)
-            # # ===========================
+            # # # ===========================
 
             # other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
             # topo_graph.add_other_intention(other_res_pos_dict)

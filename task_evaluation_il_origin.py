@@ -50,7 +50,7 @@ if __name__=="__main__":
         args.model_file_name = "Models_train_llm"
     else:
         args.model_file_name = "Models_train"
-    args.graph_pre_model = 2851
+    args.graph_pre_model = 683
 
     if(args.is_llm==2):
         val_note = "_four_dim_small_thre_one_rgb_large_bs_val_"+str(args.graph_pre_model)
@@ -59,7 +59,7 @@ if __name__=="__main__":
     else:
         # val_note = "_multi_check_long_short_check_series_gt_val_"+str(args.graph_pre_model)
         # val_note = "_multi_check_il_gt_val_"+str(args.graph_pre_model)
-        val_note = "_rcnn_frontier_score_revise_intention_for_val_old_label_only_score_temp_"+str(args.graph_pre_model)
+        val_note = "_rcnn_frontier_score_revise_intention_for_val_old_label_only_score_dis_ring_9_thre_"+str(args.graph_pre_model)+"_init_800"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -77,7 +77,7 @@ if __name__=="__main__":
     elif(args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 52
+        rl_args.graph_node_feature_dim = 102
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -119,8 +119,8 @@ if __name__=="__main__":
         # if((index_in_episodes+1) not in false_index_ls):
         #     continue
 
-        # if(index_in_episodes<800):
-        #     continue
+        if(index_in_episodes<800):
+            continue
 
         HabitatAction.reset(habitat_env, object_goal, args.graph_train) 
         habitat_metric = habitat_env.get_metrics()

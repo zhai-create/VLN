@@ -834,6 +834,6 @@ def init_RL(args, rl_args, experiment, writer=None):
 def init_IL(args, rl_args):
     from policy.rl_algorithms.sac_graph import SAC as RL_Policy
     policy = RL_Policy(rl_args)
-    pre_policy = 'checkpoints_frontier_score_revise_intention_for_train_old_label_only_score/epoch_{}.pt'.format(args.graph_pre_model)
+    pre_policy = 'checkpoints_frontier_score_revise_intention_for_train_old_label_only_score_dis/epoch_{}.pt'.format(args.graph_pre_model)
     policy.load_il(pre_policy)
     return policy

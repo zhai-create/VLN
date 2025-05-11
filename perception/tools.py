@@ -121,7 +121,8 @@ def depth_estimation_object_loc(new_mask, depth):
         
         res_depth_2d_cx = dis_center_ls[0][1][0]
         res_depth_2d_cy = dis_center_ls[0][1][1]
-        res_col_index_factor = dis_center_ls[0][1][2]/args.depth_width
+        delta_jiaodu = abs(dis_center_ls[0][1][2]-args.depth_width//2)*79/args.depth_width
+        res_col_index_factor = (np.cos((delta_jiaodu/39.5)*(np.pi/2)))**2
         return res_depth_2d_cx, res_depth_2d_cy, res_col_index_factor
 
 def depth_estimation_laser(large_mask, depth, rgb_image_ls=None):

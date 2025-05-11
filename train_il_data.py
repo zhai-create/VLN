@@ -29,7 +29,7 @@ from perception.tools import fix_depth, get_rgb_image_ls, get_gt_image_ls
 from perception.arguments import args as perception_args
 from graph.graph_utils import GraphMap
 from graph.node_utils import Node
-from graph.tools import get_current_world_pos, get_min_goal_loc
+from graph.tools import get_current_world_pos, get_min_goal_loc, get_absolute_pos
 
 from navigation.habitat_action import HabitatAction
 from navigation.sub_goal_reach import SubgoalReach
@@ -56,7 +56,7 @@ if __name__=="__main__":
     else:
         # train_note = "_multi_check_large_punish_gt_train" # 注释当前训练处于什么阶段
         # train_note = "_multi_check_il_data_gt_0421_semantic_ls_near_goal" # 注释当前训练处于什么阶段
-        train_note = "_multi_check_il_data_frontier_score_revise_intention" # 注释当前训练处于什么阶段
+        train_note = "_multi_check_il_data_frontier_score_revise_intention_for_ring" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -80,7 +80,7 @@ if __name__=="__main__":
     elif(env_args.is_llm==1):
         rl_args.graph_node_feature_dim = 3
     else:
-        rl_args.graph_node_feature_dim = 3
+        rl_args.graph_node_feature_dim = 152
     rl_args.graph_edge_feature_dim = 3
     rl_args.graph_embedding_dim = 64
     rl_args.graph_num_action_padding = 500
@@ -225,7 +225,7 @@ if __name__=="__main__":
             # 用于录制视频
             if(env_args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
-
+        HabitatAction.rotate_loc_ls.append([0, 0])
         
         # rl_graph_update
         rl_graph.update(topo_graph)
@@ -233,6 +233,9 @@ if __name__=="__main__":
         world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
         current_min_goal_loc = get_min_goal_loc(habitat_env.current_episode, world_cx, world_cy)
         current_robot_loc = np.array([world_cx, world_cy])
+        current_robot_rela_loc_in_init = np.array([0.0, 0.0])
+        current_robot_rela_loc_in_current = np.array([topo_graph.rela_cx, topo_graph.rela_cy])
+        current_node_name_for_calculate = topo_graph.current_node.name
 
 
         # 获得初始all_map_loc和初始intention_node的个数
@@ -249,8 +252,7 @@ if __name__=="__main__":
         while True:   
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                 if(policy.train_step < 6000000000):
-                    world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                    action_node = policy.greedy_select_action_dis_score(rl_graph, world_cx, world_cy)
+                    action_node = policy.greedy_select_action_ring_vlm_score(rl_graph, topo_graph)
                     polict_action = action_node.rl_node_index
                     policy_acton_idx = action_node.action_in_space_index
                 else:
@@ -266,10 +268,18 @@ if __name__=="__main__":
                     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
                     current_min_goal_loc = get_min_goal_loc(habitat_env.current_episode, world_cx, world_cy)
                     current_robot_loc = np.array([world_cx, world_cy])
+                    current_node_name_for_calculate = topo_graph.current_node.name
+
+                    if(topo_graph.current_node.name==topo_graph.explored_nodes[0].name):
+                        current_robot_rela_loc_in_init = np.array([topo_graph.rela_cx, topo_graph.rela_cy])
+                    else:
+                        current_node_in_init_loc = topo_graph.explored_nodes[0].all_other_nodes_loc[topo_graph.current_node.name]
+                        current_robot_rela_loc_in_init = get_absolute_pos(np.array([topo_graph.rela_cx, topo_graph.rela_cy]), current_node_in_init_loc[:2], current_node_in_init_loc[2])
+
+                    current_robot_rela_loc_in_current = np.array([topo_graph.rela_cx, topo_graph.rela_cy])
 
                     if(policy.train_step < 6000000000):
-                        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
-                        action_node = policy.greedy_select_action_dis_score(rl_graph, world_cx, world_cy)
+                        action_node = policy.greedy_select_action_ring_vlm_score(rl_graph, topo_graph)
                         polict_action = action_node.rl_node_index
                         policy_acton_idx = action_node.action_in_space_index
                     else:
@@ -319,13 +329,24 @@ if __name__=="__main__":
             
             evaluate_res = Evaluate.evaluate(writer, achieved_result, habitat_env, action_node, index_in_episodes, graph_train=env_args.graph_train, rl_graph=rl_graph, policy=policy, topo_graph=topo_graph, scene_area=area_dict[habitat_env.current_episode.scene_id])
             if(action_node.node_type=="intention_node") and (action_node.intention_type==1) and (action_node in topo_graph.all_nodes):
-                world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env) # 当前机器人的位置
-                now_action_dis = ((world_cx-action_node.world_cx)**2+(world_cy-action_node.world_cy)**2)**0.5
+                if(topo_graph.current_node.name==action_node.parent_node.name):
+                    action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
+                else:
+                    n_in_current_node = topo_graph.current_node.all_other_nodes_loc[action_node.parent_node.name]
+                    action_node_in_current_loc = get_absolute_pos(np.array([action_node.rela_cx, action_node.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+                
+                now_action_dis = ((topo_graph.rela_cx-action_node_in_current_loc[0])**2+(topo_graph.rela_cy-action_node_in_current_loc[1])**2)**0.5
                 if (now_action_dis<1):
                     action_node.intention_type = 2
                     # 距离1m以内的intention_node全部变为类型为2的intention_node
                     for temp_node in topo_graph.intention_nodes:
-                        if (((temp_node.world_cx-action_node.world_cx)**2+(temp_node.world_cy-action_node.world_cy)**2)**0.5)<1:
+                        if(temp_node.parent_node.name==action_node.parent_node.name):
+                            temp_node_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
+                        else:
+                            temp_parent_in_action_parent = action_node.parent_node.all_other_nodes_loc[temp_node.parent_node.name]
+                            temp_node_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_action_parent[:2], temp_parent_in_action_parent[2])
+                        
+                        if (((temp_node_loc[0]-action_node.rela_cx)**2+(temp_node_loc[1]-action_node.rela_cy)**2)**0.5)<1:
                             temp_node.intention_type = 2
             
             
@@ -349,6 +370,8 @@ if __name__=="__main__":
             il_data["current_min_goal_loc"] = current_min_goal_loc
             il_data["index_in_episodes"] = index_in_episodes # 从0开始
             il_data["current_robot_loc"] = current_robot_loc # 从0开始
+            il_data["current_robot_rela_loc_in_init"] = current_robot_rela_loc_in_init
+            il_data["current_robot_rela_loc_in_current"] = current_robot_rela_loc_in_current
 
             il_data["all_goal_loc_ls"] = [[temp_position.position[0], temp_position.position[1], temp_position.position[2]] for temp_position in habitat_env.current_episode.goals]
             il_data["polict_action"] = polict_action
@@ -356,12 +379,40 @@ if __name__=="__main__":
 
             frontier_dict = {}
             for temp_frontier in rl_graph.all_frontier_nodes:
-                frontier_dict[temp_frontier.name] = [temp_frontier.rgb_image_ls, HabitatAction.object_goal, temp_frontier.rl_node_index , temp_frontier.action_in_space_index, temp_frontier.world_cx, temp_frontier.world_cy]
+                if(temp_frontier.parent_node.name==topo_graph.explored_nodes[0].name):
+                    temp_frontier_init_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
+                else:
+                    temp_frontier_parent_in_init = topo_graph.explored_nodes[0].all_other_nodes_loc[temp_frontier.parent_node.name]
+                    temp_frontier_init_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), temp_frontier_parent_in_init[:2], temp_frontier_parent_in_init[2])
+
+                current_node_for_cal = topo_graph.get_node(current_node_name_for_calculate)
+
+                if(temp_frontier.parent_node.name==current_node_for_cal.name):
+                    temp_frontier_current_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
+                else:
+                    temp_frontier_parent_in_current = current_node_for_cal.all_other_nodes_loc[temp_frontier.parent_node.name]
+                    temp_frontier_current_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), temp_frontier_parent_in_current[:2], temp_frontier_parent_in_current[2])
+
+                frontier_dict[temp_frontier.name] = [temp_frontier.rgb_image_ls, HabitatAction.object_goal, temp_frontier.rl_node_index , temp_frontier.action_in_space_index, temp_frontier.world_cx, temp_frontier.world_cy, temp_frontier_init_loc[0], temp_frontier_init_loc[1], temp_frontier_current_loc[0], temp_frontier_current_loc[1]]
             il_data["frontier_dict"] = frontier_dict
 
             intention_dict = {}
             for temp_intention in rl_graph.all_intention_nodes:
-                intention_dict[temp_intention.name] = [temp_intention.score, temp_intention.near_score_ls, temp_intention.init_dis, temp_intention.near_dis_ls, temp_intention.res_col_index_factor, temp_intention.near_res_col_index_factor_ls, HabitatAction.object_goal, temp_intention.intention_type, temp_intention.rl_node_index , temp_intention.action_in_space_index, temp_intention.world_cx, temp_intention.world_cy]
+                if(temp_intention.parent_node.name==topo_graph.explored_nodes[0].name):
+                    temp_intention_init_loc = np.array([temp_intention.rela_cx, temp_intention.rela_cy])
+                else:
+                    temp_intention_parent_in_init = topo_graph.explored_nodes[0].all_other_nodes_loc[temp_intention.parent_node.name]
+                    temp_intention_init_loc = get_absolute_pos(np.array([temp_intention.rela_cx, temp_intention.rela_cy]), temp_intention_parent_in_init[:2], temp_intention_parent_in_init[2])
+
+                current_node_for_cal = topo_graph.get_node(current_node_name_for_calculate)
+
+                if(temp_intention.parent_node.name==current_node_for_cal.name):
+                    temp_intention_current_loc = np.array([temp_intention.rela_cx, temp_intention.rela_cy])
+                else:
+                    temp_intention_parent_in_current = current_node_for_cal.all_other_nodes_loc[temp_intention.parent_node.name]
+                    temp_intention_current_loc = get_absolute_pos(np.array([temp_intention.rela_cx, temp_intention.rela_cy]), temp_intention_parent_in_current[:2], temp_intention_parent_in_current[2])
+
+                intention_dict[temp_intention.name] = [temp_intention.score, temp_intention.near_score_ls, temp_intention.init_dis, temp_intention.near_dis_ls, temp_intention.res_col_index_factor, temp_intention.near_res_col_index_factor_ls, HabitatAction.object_goal, temp_intention.intention_type, temp_intention.rl_node_index , temp_intention.action_in_space_index, temp_intention.world_cx, temp_intention.world_cy, temp_intention_init_loc[0], temp_intention_init_loc[1], temp_intention_current_loc[0], temp_intention_current_loc[1]]
             il_data["intention_dict"] = intention_dict
 
             rl_graph.update(topo_graph)
@@ -369,7 +420,7 @@ if __name__=="__main__":
             policy.update_buffer(current_state, policy_acton_idx, next_state, reward, done, 0) # 一个样本
             
             # np.save('il_data/{}.npy'.format(policy.train_step+1+7735), il_data)
-            save_root = "il_data_frontier_score_revise_intention"
+            save_root = "il_data_frontier_score_revise_intention_for_ring"
             if not os.path.exists(save_root):
                 os.makedirs(save_root)
             np.save('{}/{}.npy'.format(save_root, policy.train_step+1), il_data)
@@ -379,6 +430,16 @@ if __name__=="__main__":
             world_cx, world_cy, world_cz, world_turn = get_current_world_pos(habitat_env)
             current_min_goal_loc = get_min_goal_loc(habitat_env.current_episode, world_cx, world_cy)
             current_robot_loc = np.array([world_cx, world_cy])
+            current_node_name_for_calculate = topo_graph.current_node.name
+
+            if(topo_graph.current_node.name==topo_graph.explored_nodes[0].name):
+                current_robot_rela_loc_in_init = np.array([topo_graph.rela_cx, topo_graph.rela_cy])
+            else:
+                current_node_in_init_loc = topo_graph.explored_nodes[0].all_other_nodes_loc[topo_graph.current_node.name]
+                current_robot_rela_loc_in_init = get_absolute_pos(np.array([topo_graph.rela_cx, topo_graph.rela_cy]), current_node_in_init_loc[:2], current_node_in_init_loc[2])
+
+            current_robot_rela_loc_in_current = np.array([topo_graph.rela_cx, topo_graph.rela_cy])
+
             # =====> Train <=====
             for train_index in range(env_args.graph_iter_per_step):     
                 train_step = policy.train(writer, train_index, env_args.graph_batch_size) 

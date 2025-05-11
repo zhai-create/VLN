@@ -38,17 +38,37 @@ class Close_Loop:
         last_error = 100
         i = 0
         matched_ratio = 0.0
+
+        # 保存上一次的有效结果
+        last_valid_theta = init_theta
+        last_valid_t = init_t
+        last_valid_matched_ratio = matched_ratio
+
+
         while abs(last_error - error) / (last_error + 0.1) > self.iter_tolerance and i < self.max_iter:
             last_error = error
             transformed = self.transformPointsForward(init_theta, init_t, src_pc)
             # if i == 0:
             #     print(tar_pc, transformed)
             matched_tar, filtered_src_indices, dists, error, matched_ratio = self.findNearest(tree, transformed, tar_pc)
+
+            # —— 新增：检查有效点数 —— #
+            if len(matched_tar)==0 or len(filtered_src_indices)==0:
+                print("===============> 匹配点过少，提前退出 <===============")
+                print("temp_ratio:", matched_ratio)
+                break
+            
             # print(matched_tar)
             matched_cen = np.average(matched_tar, axis=0)
-            tar = matched_tar - matched_cen
             filtered_src = src_pc[filtered_src_indices]
             filtered_src_cen = np.average(filtered_src, axis=0)
+            
+            # —— 新增：检查 cen 是否包含 nan —— 
+            if np.any(np.isnan(matched_cen)) or np.any(np.isnan(filtered_src_cen)):
+                print("===============> 存在nan <===============")
+                break  # 无效 cen，终止迭代
+            
+            tar = matched_tar - matched_cen
             src = filtered_src - filtered_src_cen
             # fenzi, fenmu = 0., 0.
             # for i in range(len(tar)):
@@ -59,15 +79,23 @@ class Close_Loop:
             s2 = src[:, 0:2]
             fenzi = np.sum(np.cross(t2, s2))
             fenmu = np.sum(t2 * s2)
-            # init_theta = -math.atan(fenzi / fenmu)
+
             init_theta = -np.arctan2(fenzi, fenmu)
-            # print(init_theta/np.pi*180)
             init_t = matched_cen - np.dot(self.getR(init_theta), filtered_src_cen)
+
+            if np.any(np.isnan(init_t)):
+                print("===============> temp_t为nan <===============")
+                break  # 无效 t，终止迭代
+
+            # 更新上一次的有效结果
+            last_valid_theta = init_theta
+            last_valid_t = init_t
+            last_valid_matched_ratio = matched_ratio
             i = i + 1
-        theta, t = init_theta, init_t
+        theta, t = last_valid_theta, last_valid_t
         T = self.getTransform(theta, t)
         # return T
-        return theta, t[:2], matched_ratio
+        return theta, t[:2], last_valid_matched_ratio
         pass
 
     # find the nearest points & filter

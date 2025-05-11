@@ -119,44 +119,140 @@ class SAC(RL_Policy):
         action = all_action_indexes[action_index][0]
         return action, action_index # idx in padding
 
+    '''
+    @torch.no_grad()
+    def greedy_select_action(self, rl_graph, topo_graph):
+        max_score = 0
+        max_score_node = None
+        candidate_intention_ls = []
+        for temp_node in rl_graph.all_intention_nodes:
+            if(temp_node.score>max_score):
+                max_score = temp_node.score
+                max_score_node = temp_node
 
-    # @torch.no_grad()
-    # def greedy_select_action(self, rl_graph, world_cx, world_cy):
-    #     max_score = 0
-    #     max_score_node = None
-    #     candidate_intention_ls = []
-    #     for temp_node in rl_graph.all_intention_nodes:
-    #         if(temp_node.score>max_score):
-    #             max_score = temp_node.score
-    #             max_score_node = temp_node
-
-    #         if(len(temp_node.near_score_ls)>0):
-    #             if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-    #                 candidate_intention_ls.append(temp_node)
+            if(len(temp_node.near_score_ls)>0):
+                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
+                    candidate_intention_ls.append(temp_node)
                 
-    #     if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-    #         min_dis = 10000
-    #         res_node = None
-    #         for temp_node in candidate_intention_ls:
-    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-    #             if(temp_dis<min_dis):
-    #                 min_dis = temp_dis
-    #                 res_node = temp_node
-    #     else: # 没有“两次有效观察”的intention
-    #         # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-    #         if(max_score>0.8):
-    #             if(max_score_node.intention_type==1):
-    #                 return max_score_node
-    #         if(len(rl_graph.all_frontier_nodes)==0):
-    #             return max_score_node
-    #         min_dis = 10000
-    #         res_node = None
-    #         for temp_node in rl_graph.all_frontier_nodes:
-    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-    #             if(temp_dis<min_dis):
-    #                 min_dis = temp_dis
-    #                 res_node = temp_node
-    #     return res_node
+        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
+            min_dis = 10000
+            res_node = None
+            for temp_node in candidate_intention_ls:
+                if(temp_node.parent_node.name==topo_graph.current_node.name):
+                    temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
+                else:
+                    temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
+                    temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
+
+                temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        else: # 没有“两次有效观察”的intention
+            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
+            if(max_score>0.8):
+                if(max_score_node.intention_type==1):
+                    return max_score_node
+            if(len(rl_graph.all_frontier_nodes)==0):
+                return max_score_node
+            min_dis = 10000
+            res_node = None
+            for temp_node in rl_graph.all_frontier_nodes:
+                if(temp_node.parent_node.name==topo_graph.current_node.name):
+                    temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
+                else:
+                    temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
+                    temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
+                
+                temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        return res_node
+    '''
+
+
+    @torch.no_grad()
+    def greedy_select_action_ring_vlm_score(self, rl_graph, topo_graph):
+        max_score = 0
+        max_score_node = None
+        candidate_intention_ls = []
+        for temp_node in rl_graph.all_intention_nodes:
+            if(temp_node.score>max_score):
+                max_score = temp_node.score
+                max_score_node = temp_node
+
+            if(len(temp_node.near_score_ls)>0):
+                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
+                    candidate_intention_ls.append(temp_node)
+                
+        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
+            min_dis = 10000
+            res_node = None
+            for temp_node in candidate_intention_ls:
+                if(temp_node.parent_node.name==topo_graph.current_node.name):
+                    temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
+                else:
+                    temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
+                    temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
+
+                temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
+                if(temp_dis<min_dis):
+                    min_dis = temp_dis
+                    res_node = temp_node
+        else: # 没有“两次有效观察”的intention
+            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
+            if(max_score>0.8):
+                if(max_score_node.intention_type==1):
+                    return max_score_node
+            if(len(rl_graph.all_frontier_nodes)==0):
+                return max_score_node
+
+            # 选择一个frontier
+            all_frontier_score = [temp_frontier.vlm_score for temp_frontier in rl_graph.all_frontier_nodes]
+            all_zero_flag = np.all(np.array(all_frontier_score) == 0)
+            if(all_zero_flag==True): # 选择距离机器人最近的frontier
+                min_dis = 10000
+                res_node = None
+                for temp_node in rl_graph.all_frontier_nodes:
+                    if(temp_node.parent_node.name==topo_graph.current_node.name):
+                        temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
+                    else:
+                        temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
+                        temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
+                    
+                    temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
+                    if(temp_dis<min_dis):
+                        min_dis = temp_dis
+                        res_node = temp_node
+            else: # 选择分数最高的frontier
+                res_node = None
+                max_score = 0
+
+                now_frontier_distance_ls = []
+                for temp_node in rl_graph.all_frontier_nodes:
+                    if(temp_node.parent_node.name==topo_graph.current_node.name):
+                        temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
+                    else:
+                        temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
+                        temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
+                    temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
+                    now_frontier_distance_ls.append(temp_dis)
+                
+                sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes), key=lambda x: x[0])]
+                for temp_node in sorted_nodes:
+                    if(temp_node.vlm_score>max_score) or (res_node is None):
+                        max_score = temp_node.vlm_score
+                        res_node = temp_node
+
+        return res_node
+
+
+
+
+
+
+
 
     # 用于“our+rcnn+greedy+llm_frontier”
     '''
@@ -213,7 +309,7 @@ class SAC(RL_Policy):
         return res_node
     '''
 
-
+    '''
     @torch.no_grad()
     def greedy_select_action_dis_score(self, rl_graph, world_cx, world_cy):
         max_score = 0
@@ -253,7 +349,7 @@ class SAC(RL_Policy):
                     max_score = temp_node.vlm_score
                     res_node = temp_node
         return res_node
-
+    '''
 
 
 
