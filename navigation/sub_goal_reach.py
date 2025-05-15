@@ -173,25 +173,9 @@ class SubgoalReach:
         else:
             graph_update_flag = False
 
-        # 将相对坐标转换到第一个节点的坐标系下
-        if(graph_update_flag==True):
-            current_node_in_init_node = topo_graph.explored_nodes[0].all_other_nodes_loc[topo_graph.current_node.name]
-            current_loc_in_init_node = get_absolute_pos(np.array([topo_graph.rela_cx, topo_graph.rela_cy]), current_node_in_init_node[:2], current_node_in_init_node[2])
-
-            min_dis = 10000
-            for temp_loc in HabitatAction.rotate_loc_ls:
-                temp_dis = ((current_loc_in_init_node[0]-temp_loc[0])**2+(current_loc_in_init_node[1]-temp_loc[1])**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-            if(min_dis>4):
-                is_need_rotate_flag = True
-            else:
-                is_need_rotate_flag = False
-        else:
-            is_need_rotate_flag = False
 
             
-        if(graph_update_flag==True) and (is_need_rotate_flag==True): # 需要转圈
+        if(graph_update_flag==True): # 需要转圈
             for i in range(12):
                 depth = fix_depth(observations["depth"])
                 topo_graph.get_laser_result(depth)
@@ -224,7 +208,6 @@ class SubgoalReach:
                 # 用于录制视频
                 if(env_args.is_vis==True):
                     save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node, object_goal)
-            HabitatAction.rotate_loc_ls.append(current_loc_in_init_node)
 
         else:
             depth = fix_depth(observations["depth"])
@@ -254,7 +237,7 @@ class SubgoalReach:
 
             # detect_res_pos_dict = object_detect_gt(gt_image_ls, depth, object_goal, HabitatAction.object_id_num_ls, is_fake_intention=is_fake_intention)
             # topo_graph.add_intention_gt(detect_res_pos_dict, rgb_image_ls, object_goal)
-            # # # ===========================
+            # # ===========================
 
             # other_res_pos_dict = object_detect_gt_other(gt_image_ls, depth, HabitatAction.other_object_id_num_ls)
             # topo_graph.add_other_intention(other_res_pos_dict)

@@ -435,70 +435,23 @@ class GraphMap(object):
         self.laser_2d_filtered_angle = laser_2d_filtered_angle
         self.pixel_y_2d_filtered = pixel_y_2d_filtered
     
-    '''
-    def update(self):
-        flag, predict_node, final_t, final_theta = find_current_node_world(self.explored_nodes, self.habitat_env, self.current_node)
-
-        # update explored node
-        if flag == True:
-            last_node = self.current_node
-            world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
-            
-            if(last_node is None):
-                self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn)
-                self.current_node = predict_node
-                self.all_nodes.append(self.current_node)
-                self.explored_nodes.append(self.current_node)
-            else:
-                self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn)
-                self.current_node = predict_node
-                
-                current_node_in_last_node_loc = get_relative_pos_world(self.current_node.world_cx, self.current_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
-                current_node_in_last_node_turn = self.current_node.world_turn-last_node.world_turn
-                # node_robot_dis = get_node_robot_dis(current_node_in_last_node_loc[0], current_node_in_last_node_loc[1], last_node.occupancy_map, is_explored_node=True)
-
-                last_node.add_neighbor(self.current_node, current_node_in_last_node_loc, current_node_in_last_node_turn)
-                # last_node.neighbor_dis_dict[self.current_node.name] = node_robot_dis
-
-                last_node_in_current_node_loc =  get_relative_pos_world(last_node.world_cx, last_node.world_cy, self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
-                last_node_in_current_node_turn = last_node.world_turn-self.current_node.world_turn
-                self.current_node.add_neighbor(last_node, last_node_in_current_node_loc, last_node_in_current_node_turn)
-                # self.current_node.neighbor_dis_dict[last_node.name] = node_robot_dis
-
-
-                self.all_nodes.append(self.current_node)
-                self.explored_nodes.append(self.current_node)
-
-        elif flag == False and predict_node.name != self.current_node.name:
-            self.set_current_pos(final_t[0], final_t[1], final_theta)
-
-            last_node = self.current_node
-            self.current_node = predict_node
-
-            predicted_t_in_last = get_relative_pos_world(predict_node.world_cx, predict_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
-            predicted_theta_in_last = predict_node.world_turn-last_node.world_turn
-            # node_robot_dis = get_node_robot_dis(predicted_t_in_last[0], predicted_t_in_last[1], last_node.occupancy_map, is_explored_node=True)
-
-            last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last)
-            # last_node.neighbor_dis_dict[self.current_node.name] = node_robot_dis
-
-            last_t_in_predicted = get_relative_pos_world(last_node.world_cx, last_node.world_cy, predict_node.world_cx, predict_node.world_cy, predict_node.world_turn)
-            last_theta_in_predicted = last_node.world_turn-predict_node.world_turn            
-            self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)     
-            # self.current_node.neighbor_dis_dict[last_node.name] = node_robot_dis
-        else:
-            self.set_current_pos(final_t[0], final_t[1], final_theta)
-        return flag
-    '''
+    
 
     def update(self):
         large_depth = get_large_depth(self.habitat_env) # meter
         point_for_close_loop_detection = get_laser_point_for_ring(large_depth) # current_laser_for_loop
 
-        flag, predict_node, [final_theta, final_t], [theta_to_current, t_to_current], ratio = \
+
+        start_time = time.time()
+        flag, predict_node, final_rela_t, final_rela_turn, t_to_current, theta_to_current = \
         find_current_node(self.explored_nodes, self.current_node, point_for_close_loop_detection, self.rela_turn, np.array([self.rela_cx, self.rela_cy]))
+        end_time = time.time()
+
+        print("========> delta_ring_time <========", end_time-start_time)
+        print("=====> len(self.explored_nodes) <=====", len(self.explored_nodes))
+
+        # if(len(self.explored_nodes)>5):
+        #     breakpoint()
 
         # update explored node
         if flag == True:
@@ -515,7 +468,6 @@ class GraphMap(object):
                 self.set_current_pos(0.0, 0.0, 0.0)
                 predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
                 self.current_node = predict_node
-
 
                 last_node.add_neighbor(self.current_node, t_to_current, theta_to_current)
                 R = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
@@ -525,9 +477,9 @@ class GraphMap(object):
 
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
-
+        
         elif flag == False and predict_node.name != self.current_node.name:
-            self.set_current_pos(final_t[0], final_t[1], final_theta)
+            self.set_current_pos(final_rela_t[0], final_rela_t[1], final_rela_turn)
 
             last_node = self.current_node
             self.current_node = predict_node
@@ -535,19 +487,20 @@ class GraphMap(object):
             R1 = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
             theta_last_in_current_p = -theta_to_current
             t_last_in_current_p = np.dot(R1, -t_to_current)
-            R2 = np.array([[np.cos(-final_theta), np.sin(-final_theta)], [-np.sin(-final_theta), np.cos(-final_theta)]])
-            theta_predicted_in_current_p = -final_theta
-            t_predicted_in_current_p = np.dot(R2, -final_t)
+            
+            R2 = np.array([[np.cos(-final_rela_turn), np.sin(-final_rela_turn)], [-np.sin(-final_rela_turn), np.cos(-final_rela_turn)]])
+            theta_predicted_in_current_p = -final_rela_turn
+            t_predicted_in_current_p = np.dot(R2, -final_rela_t)
 
             predicted_t_in_last = get_absolute_pos(t_predicted_in_current_p, t_to_current, theta_to_current)
-            predicted_theta_in_last = theta_predicted_in_current_p + theta_to_current
-            last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last)
+            predicted_theta_in_last = theta_predicted_in_current_p + theta_to_current # 机器人相对于B的相对角度-机器人相对于A的相对角度
+            last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last) # 新current_node相对于旧current_node的相对位置（A相对于B）
 
-            last_t_in_predicted = get_absolute_pos(t_last_in_current_p, final_t, final_theta)
-            last_theta_in_predicted = theta_last_in_current_p + final_theta
+            last_t_in_predicted = get_absolute_pos(t_last_in_current_p, final_rela_t, final_rela_turn)
+            last_theta_in_predicted = theta_last_in_current_p + final_rela_turn
             self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)     
         else:
-            self.set_current_pos(final_t[0], final_t[1], final_theta)
+            self.set_current_pos(final_rela_t[0], final_rela_t[1], final_rela_turn)
         return flag
 
 

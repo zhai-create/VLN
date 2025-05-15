@@ -99,46 +99,54 @@ def find_current_node(explored_nodes, current_node, current_pc, rela_turn, rela_
     src_pc = current_pc
     I = Close_Loop()
     max_ratio = 0.0
-    # ratio_thre = 0.4
-    ratio_thre = 0.5
-    # ratio_thre = 0.9
-    flag = True
-    final_theta = None
-    final_t = None
-    theta_to_current = None
-    t_to_current = None
-    pre_node = None
+    # ratio_thre = 0.5
+    ratio_thre = 0.9
 
     if(len(explored_nodes)==0):
-        return True, pre_node, [final_theta, final_t], [theta_to_current, t_to_current], max_ratio
+        return True, None, np.array([0, 0]), 0, np.array([0, 0]), 0
 
+    min_dis = 10000
+    pre_node = None
+    final_rela_t = None
+    final_rela_turn = None
     for n in explored_nodes:
-        if n.name == current_node.name:
-            final_rela_turn = rela_turn
-            final_rela_t = rela_t
-        else:
-            final_rela_turn = n.all_other_nodes_loc[current_node.name][2] + rela_turn
+        # 计算里程计下，机器人相对于被遍历到的常规节点的坐标
+        if n.name == current_node.name: 
+            temp_rela_dis = (rela_t[0]**2+rela_t[1]**2)**0.5
+            temp_rela_t = rela_t
+            temp_rela_turn = rela_turn
+
+            theta_to_current = rela_turn
+            t_to_current = rela_t
+        else: 
+            temp_rela_turn = n.all_other_nodes_loc[current_node.name][2] + rela_turn
+            
             current_in_n_node = n.all_other_nodes_loc[current_node.name] 
-            rela_t_in_n = get_absolute_pos(rela_t, current_in_n_node[:2], current_in_n_node[2]) 
-            final_rela_t = rela_t_in_n
-        final_rela_t = final_rela_t / perception_args.depth_scale # 单位: meter --> 无量纲
-        theta, t, matched_ratio= I.process(n.pc, src_pc, final_rela_turn, np.array([final_rela_t[1], final_rela_t[0], 0]))
-        if matched_ratio > max_ratio:
-            max_ratio = matched_ratio
+            temp_rela_t = get_absolute_pos(rela_t, current_in_n_node[:2], current_in_n_node[2]) 
+
+            temp_rela_t = temp_rela_t / perception_args.depth_scale # 单位: meter --> 无量纲            
+            theta, t, matched_ratio= I.process(n.pc, src_pc, temp_rela_turn, np.array([temp_rela_t[1], temp_rela_t[0], 0]))
+            if(matched_ratio>ratio_thre):
+                temp_rela_t = np.array([t[1],t[0]]) * perception_args.depth_scale
+                temp_rela_turn = temp_rela_turn
+                temp_rela_dis = (temp_rela_t[0]**2+temp_rela_t[1]**2)**0.5
+            else:
+                temp_rela_t = None
+                temp_rela_turn = None
+                temp_rela_dis = 10000
+        if(temp_rela_dis<min_dis):
+            min_dis = temp_rela_dis
             pre_node = n
-            final_theta = theta
-            final_t = np.array([t[1],t[0]]) * perception_args.depth_scale
-        if n.name == current_node.name:
-            theta_to_current = theta
-            t_to_current = np.array([t[1],t[0]]) * perception_args.depth_scale
-    if max_ratio <= ratio_thre:
-        flag = True # generate new node
+            final_rela_t = temp_rela_t
+            final_rela_turn = temp_rela_turn
+    
+    if(min_dis<4):
+        flag = False
     else:
-        flag = False # no generate
-    
-    print("==============================> max_ratio <==============================", max_ratio)
-    
-    return flag, pre_node, [final_theta, final_t], [theta_to_current, t_to_current], max_ratio
+        flag = True
+    # final_rela_t：当前机器人与最匹配节点的相对位置
+    # t_to_current：当前机器人相对于原来current_node的相对位置
+    return flag, pre_node, final_rela_t, final_rela_turn, t_to_current, theta_to_current
 
 
 def find_current_node_world(explored_nodes, habitat_env, current_node):

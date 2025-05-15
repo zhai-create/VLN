@@ -59,7 +59,7 @@ if __name__=="__main__":
     else:
         # val_note = "_multi_check_long_short_check_series_gt_val_"+str(args.graph_pre_model)
         # val_note = "_multi_check_il_gt_val_"+str(args.graph_pre_model)
-        val_note = "_rcnn_frontier_score_revise_intention_for_val_old_label_only_score_dis_ring_9_thre_"+str(args.graph_pre_model)+"_init_800"
+        val_note = "_rcnn_frontier_score_revise_intention_for_val_only_score_dis_new_ring_"+str(args.graph_pre_model)+"_init_800"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -162,7 +162,6 @@ if __name__=="__main__":
             # 用于录制视频
             if(args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
-        HabitatAction.rotate_loc_ls.append([0, 0])
 
         while True:
             # rl_graph_update

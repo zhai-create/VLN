@@ -10,7 +10,7 @@ from policy.rl_algorithms.arguments import args
 
 from env_tools.arguments import args as env_args
 
-from graph.tools import get_absolute_pos, get_relative_pos
+from graph.tools import get_absolute_pos, get_relative_pos, get_current_world_pos
 from collections import Counter
 from navigation.tools import get_relative_pos_world
 from graph.node_utils import Node

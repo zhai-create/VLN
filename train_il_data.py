@@ -56,7 +56,7 @@ if __name__=="__main__":
     else:
         # train_note = "_multi_check_large_punish_gt_train" # 注释当前训练处于什么阶段
         # train_note = "_multi_check_il_data_gt_0421_semantic_ls_near_goal" # 注释当前训练处于什么阶段
-        train_note = "_multi_check_il_data_frontier_score_revise_intention_for_ring" # 注释当前训练处于什么阶段
+        train_note = "_multi_check_il_data_frontier_score_revise_intention_for_new_ring" # 注释当前训练处于什么阶段
 
     date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
     if(env_args.is_llm==1 or env_args.is_llm==2):
@@ -221,11 +221,9 @@ if __name__=="__main__":
             observations = habitat_env.step(habitat_action)
             topo_graph.obs = observations
             
-        
             # 用于录制视频
             if(env_args.is_vis==True):
                 save_mp4(occu_writer, video_writer, map_writer, gt_writer, habitat_env, topo_graph, rl_graph, action_node=None, object_goal=object_goal)
-        HabitatAction.rotate_loc_ls.append([0, 0])
         
         # rl_graph_update
         rl_graph.update(topo_graph)
@@ -252,7 +250,7 @@ if __name__=="__main__":
         while True:   
             if(int(np.sum(rl_graph.data['state']['action_mask'].cpu().numpy()))>0):
                 if(policy.train_step < 6000000000):
-                    action_node = policy.greedy_select_action_ring_vlm_score(rl_graph, topo_graph)
+                    action_node = policy.greedy_select_action_ring_dis_score(rl_graph, topo_graph)
                     polict_action = action_node.rl_node_index
                     policy_acton_idx = action_node.action_in_space_index
                 else:
@@ -279,7 +277,7 @@ if __name__=="__main__":
                     current_robot_rela_loc_in_current = np.array([topo_graph.rela_cx, topo_graph.rela_cy])
 
                     if(policy.train_step < 6000000000):
-                        action_node = policy.greedy_select_action_ring_vlm_score(rl_graph, topo_graph)
+                        action_node = policy.greedy_select_action_ring_dis_score(rl_graph, topo_graph)
                         polict_action = action_node.rl_node_index
                         policy_acton_idx = action_node.action_in_space_index
                     else:
@@ -420,7 +418,7 @@ if __name__=="__main__":
             policy.update_buffer(current_state, policy_acton_idx, next_state, reward, done, 0) # 一个样本
             
             # np.save('il_data/{}.npy'.format(policy.train_step+1+7735), il_data)
-            save_root = "il_data_frontier_score_revise_intention_for_ring"
+            save_root = "il_data_frontier_score_revise_intention_for_new_ring"
             if not os.path.exists(save_root):
                 os.makedirs(save_root)
             np.save('{}/{}.npy'.format(save_root, policy.train_step+1), il_data)

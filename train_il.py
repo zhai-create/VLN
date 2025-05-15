@@ -40,7 +40,9 @@ class GraphSupervisedDataset(Dataset):
         # 验证数据完整性
         sample_path = os.path.join(data_dir, self.samples[0])
         sample_data = np.load(sample_path, allow_pickle=True).item()
-        assert 'current_state' in sample_data and 'policy_acton_idx' in sample_data and 'policy_acton_idx_copy_llm' in sample_data, "数据格式不符合要求"
+        # assert 'current_state' in sample_data and 'policy_acton_idx_dis' in sample_data and 'policy_acton_idx_llm' in sample_data, "数据格式不符合要求"
+
+
 
     def __len__(self):
         return len(self.samples)
@@ -52,8 +54,11 @@ class GraphSupervisedDataset(Dataset):
         
         # 解析特征和标签
         state_dict = data['current_state']
-        label = data['policy_acton_idx_copy_llm']
-        # label = data['policy_acton_idx']
+
+        if("policy_acton_idx_llm" in data):
+            label = data['policy_acton_idx_llm']
+        else:
+            label = data['policy_acton_idx']
 
         # state_dict['pyg_graph'].x[:, 3:24] /= state_dict['pyg_graph'].x[:, 24:45] # dis_revise
         # state_dict['pyg_graph'].x = torch.cat([state_dict['pyg_graph'].x[:, 0:100], state_dict['pyg_graph'].x[:, 150:]], dim=1)
@@ -125,13 +130,13 @@ def collate_fn(batch):
 
 # 数据加载（假设已实现自定义Dataset）
 train_dataset = GraphSupervisedDataset(
-    data_dir="il_data_frontier_score_revise_intention_for_train/",
+    data_dir="il_data_llm_score_revise_intention_for_new_ring/",
     encoder_type='GAT',  # 根据实际情况修改
     data_num=9100
 )
 
 val_dataset = GraphSupervisedDataset(
-    data_dir="il_data_frontier_score_revise_intention_for_train_val/",
+    data_dir="il_data_llm_score_revise_intention_for_new_ring_val/",
     encoder_type='GAT',  # 根据实际情况修改
     data_num=120
 )
@@ -171,7 +176,7 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 date_time = datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')
-train_note = "_multi_check_il_gt_train_frontier_score_revise_intention_for_train_old_label_only_score_dis" # 注释当前训练处于什么阶段
+train_note = "_multi_check_il_data_llm_score_revise_intention_for_new_ring" # 注释当前训练处于什么阶段
 logger_file_name = "./log_files_train_il/log_"+date_time+train_note
 writer = SummaryWriter(logger_file_name)
 
@@ -184,7 +189,7 @@ def save_checkpoint(epoch, model, optimizer):
     }
     
     # 常规保存
-    torch.save(state, f'checkpoints_frontier_score_revise_intention_for_train_old_label_only_score_dis/epoch_{epoch+1}.pt')
+    torch.save(state, f'checkpoints_llm_score_revise_intention_for_new_ring/epoch_{epoch+1}.pt')
 
 
 # 训练循环
