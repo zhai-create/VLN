@@ -59,7 +59,7 @@ if __name__=="__main__":
     else:
         # val_note = "_multi_check_long_short_check_series_gt_val_"+str(args.graph_pre_model)
         # val_note = "_multi_check_il_gt_val_"+str(args.graph_pre_model)
-        val_note = "_rcnn_frontier_score_revise_intention_for_val_only_score_dis_new_ring_"+str(args.graph_pre_model)+"_init_800"
+        val_note = "_rcnn_frontier_score_revise_intention_for_val_only_score_dis_new_ring_large_match_thre_"+str(args.graph_pre_model)+"_init_800"
     
     if(args.is_llm==1 or args.is_llm==2):
         args.logger_file_name = "./log_files_llm/log_"+datetime.datetime.now().strftime('%Y_%m_%d_%H_%M_%S')+val_note
@@ -199,12 +199,25 @@ if __name__=="__main__":
 
             action_node = rl_graph.all_nodes[polict_action] # 3
             if(action_node.intention_type==2):
-                if not habitat_env.episode_over:
-                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
-                    observations = habitat_env.step(habitat_action)
-                    achieved_result = "achieved"
+                # =====> final step <=====
+                # if not habitat_env.episode_over:
+                #     habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                #     observations = habitat_env.step(habitat_action)
+                #     achieved_result = "achieved"
+                # else:
+                #     achieved_result = "exceed"
+                # =====> final step <=====
+
+                # =====> final step <=====
+                if(args.is_vis==True):
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
                 else:
-                    achieved_result = "exceed"
+                    achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
+
+                print("======> achieved_result <=====", achieved_result)
+                print("=====> action_node_type <=====", action_node.node_type)
+                # =====> final step <=====
+
             else:
                 for temp_node in topo_graph.intention_nodes:
                     if(temp_node.intention_type==2):
@@ -219,6 +232,7 @@ if __name__=="__main__":
                     achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal, graph_train=False, rl_graph=rl_graph, occu_writer=occu_writer, video_writer=video_writer, map_writer=map_writer, gt_writer=gt_writer)
                 else:
                     achieved_result = SubgoalReach.go_to_sub_goal(topo_graph, action_node, habitat_env, object_goal)
+                
                 print("======> achieved_result <=====", achieved_result)
                 print("=====> action_node_type <=====", action_node.node_type)
             

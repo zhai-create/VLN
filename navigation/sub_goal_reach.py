@@ -115,7 +115,13 @@ class SubgoalReach:
                 topo_graph.frontier_nodes.remove(action_node)
                 topo_graph.all_nodes.remove(action_node)
         
-        else: # action_node为intention_node
+        # =====> final step <=====
+        # else: # action_node为intention_node
+        # =====> final step <=====
+
+        # =====> final step <=====
+        elif(action_node.node_type=="intention_node" and action_node.intention_type == 1):
+        # =====> final step <=====
             # rl_step中实际行走步数为0的frontier
             if((HabitatAction.count_steps-SubgoalReach.init_count_steps)==0):
                 action_parent_node.deleted_intentions.append(action_node)
@@ -139,7 +145,18 @@ class SubgoalReach:
                     return "exceed"
 
         else: # 处于测试阶段
-            SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)
+            SubgoalReach.achieved_remove_action_node(topo_graph, action_node, habitat_env)    
+            
+            # =====> final step <=====
+            if(action_node.node_type=="intention_node" and action_node.intention_type==2):
+                if not habitat_env.episode_over:
+                    habitat_action = HabitatAction.set_habitat_action("s", topo_graph)
+                    observations = habitat_env.step(habitat_action)
+                    achieved_result = "achieved"
+                else:
+                    achieved_result = "exceed"
+            # =====> final step <=====
+        
             return candidate_achieved_result 
 
     
@@ -161,7 +178,14 @@ class SubgoalReach:
             if(SubgoalReach.is_block(habitat_env, graph_train)==True): # 认为自己卡住了，则跳出该函数，直接重新选择action node
                 # "block" # new_patch1
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="block", graph_train=graph_train)
-                if(action_node in topo_graph.all_nodes) and (action_node.node_type=="intention_node"): # 如果是intention_node卡住，则删除当前intention_node
+                # =====> final step <=====
+                # if(action_node in topo_graph.all_nodes) and (action_node.node_type=="intention_node"): # 如果是intention_node卡住，则删除当前intention_node
+                # =====> final step <=====
+
+                # =====> final step <=====
+                if(action_node in topo_graph.all_nodes) and (action_node.node_type=="intention_node") and (action_node.intention_type == 1): # 如果是intention_node卡住，则删除当前intention_node
+                # =====> final step <=====
+
                     action_parent_node = action_node.parent_node
                     action_parent_node.sub_intentions.remove(action_node)
                     topo_graph.intention_nodes.remove(action_node)
@@ -326,8 +350,14 @@ class SubgoalReach:
                         faile_plan_cnt += 1
                 # ===================> Failed_control_revise <===================
                 achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
-                if(action_node.node_type=="intention_node"):
-                    
+                # =====> final step <=====
+                # if(action_node.node_type=="intention_node"):
+                # =====> final step <=====
+
+                # =====> final step <=====
+                if(action_node.node_type=="intention_node") and (action_node.intention_type == 1):
+                # =====> final step <=====
+
                     if(topo_graph.current_node.name==action_node.parent_node.name):
                         action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
                     else:
@@ -399,8 +429,14 @@ class SubgoalReach:
                     else:
                         achieved_result = SubgoalReach.get_achieved_result(action_node, habitat_env, topo_graph, candidate_achieved_result="achieved", graph_train=graph_train)
                     # ===================> Failed_plan_revise <===================
-                    if(action_node.node_type=="intention_node"):
-                        
+                    # =====> final step <=====
+                    # if(action_node.node_type=="intention_node"):
+                    # =====> final step <=====    
+
+                    # =====> final step <=====    
+                    if(action_node.node_type=="intention_node") and (action_node.intention_type==1):
+                    # =====> final step <=====    
+                    
                         if(topo_graph.current_node.name==action_node.parent_node.name):
                             action_node_in_current_loc = np.array([action_node.rela_cx, action_node.rela_cy])
                         else:
