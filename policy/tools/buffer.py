@@ -143,6 +143,89 @@ class ReplayBuffer_List(object):
         return (batch_state, batch_action, batch_next_state, batch_reward, batch_not_done, batch_cbf_label)
 
 
+class Memory_Graph(object):
+    def __init__(self, max_size, num_action_padding=5, num_graph_padding=5, node_feature_dim=3, using_pyg=True):
+        self.actions = []
+        self.states = []
+        self.logprobs = []
+        self.rewards = []
+        self.is_terminals = []
+        self.reward_arrives = []
+        self.next_states = []
+
+        self._max_size = int(max_size)
+        self._num_action_padding = num_action_padding 
+        self._num_graph_padding= num_graph_padding
+        self._using_pyg = using_pyg
+        self._node_feature_dim = node_feature_dim
+    
+    def clear_memory(self):
+        self.actions = []
+        self.states = []
+        self.logprobs = []
+        self.rewards = []
+        self.is_terminals = []
+        self.reward_arrives = []
+        self.next_states = []
+
+    def sample(self):
+        batch_size = len(self.states)
+
+        batch_graph = []
+        batch_current_idx = torch.zeros((batch_size, 1))
+        batch_action_idxes = torch.zeros((batch_size, self._num_action_padding))
+        batch_action_mask = torch.zeros((batch_size, self._num_action_padding))
+
+        batch_action = torch.zeros((batch_size, 1))
+        batch_reward = torch.zeros((batch_size, 1))
+        batch_not_done = torch.zeros((batch_size, 1))
+        batch_action_logprob = torch.zeros((batch_size, 1))
+
+        next_batch_graph = []
+        next_batch_current_idx = torch.zeros((batch_size, 1))
+        next_batch_action_idxes = torch.zeros((batch_size, self._num_action_padding))
+        next_batch_action_mask = torch.zeros((batch_size, self._num_action_padding))
+
+        for idx in range(batch_size):
+            action = torch.Tensor(self.actions[idx])
+            reward = self.rewards[idx]
+            not_done = 1-self.is_terminals[idx]
+            action_logprob = self.logprobs[idx]
+
+            # =====> state <=====
+            state = self.states[idx]            
+            batch_graph.append(state['pyg_graph'])
+            batch_current_idx[idx] = state['current_idx']
+            batch_action_idxes[idx] = state['action_idxes']
+            batch_action_mask[idx] = state['action_mask']
+            
+            batch_action[idx] = deepcopy(action)
+            batch_reward[idx] = reward
+            batch_not_done[idx] = not_done
+            batch_action_logprob[idx] = action_logprob
+
+
+            # =====> next_state <=====
+            next_state = self.next_states[idx]
+            next_batch_graph.append(next_state['pyg_graph'])
+            next_batch_current_idx[idx] = next_state['current_idx']
+            next_batch_action_idxes[idx] = next_state['action_idxes']
+            next_batch_action_mask[idx] = next_state['action_mask']
+
+
+        # print("==================before return==================")
+        # print(Batch.from_data_list(batch_graph))
+        # print("==================after return==================")
+        # return (dict(pyg_graph=Batch.from_data_list(batch_graph), current_idx=batch_current_idx.long(), action_idxes=batch_action_idxes.long(), action_mask=batch_action_mask),
+        #         batch_action.long(), 
+        #         batch_reward, batch_not_done, batch_action_logprob)
+        return (dict(pyg_graph=batch_graph, current_idx=batch_current_idx.long(), action_idxes=batch_action_idxes.long(), action_mask=batch_action_mask),
+                batch_action.long(), 
+                dict(pyg_graph=next_batch_graph, current_idx=next_batch_current_idx.long(), action_idxes=next_batch_action_idxes.long(), action_mask=next_batch_action_mask),
+                batch_reward, batch_not_done, batch_action_logprob)
+
+
+
 class ReplayBuffer_Graph(object):
     def __init__(self, max_size, num_action_padding=5, num_graph_padding=5, node_feature_dim=3, using_pyg=True):        
         self._storage = {}

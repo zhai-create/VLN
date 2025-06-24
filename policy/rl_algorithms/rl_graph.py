@@ -18,7 +18,11 @@ from graph.node_utils import Node
 from navigation.habitat_action import HabitatAction
 from navigation.tools import get_node_robot_dis, get_action_robot_dis, get_absolute_pos_world
 
-from perception.intention_utils_ollama import get_vlm_response
+from perception.intention_utils_ollama import get_vlm_response, clean_response
+import json
+import time
+import cv2
+import base64
 
 
 half_len = (int)(perception_args.graid_map_scale/graph_args.resolution)
@@ -44,6 +48,7 @@ class RL_Graph(object):
         self.all_action_nodes = []
 
         self.data.update({"arrive": False}) 
+        self.data.update({"reward_arrive": False})
         self.data.update({"state": {}})
         self.data.update({"reward": 0})
         self.data['state'].update({"current_idx": torch.Tensor([[0]])}) 
@@ -252,8 +257,22 @@ class RL_Graph(object):
 
         for temp_frontier in frontier_clustered_res_ls:
             if(temp_frontier.vlm_score is None):
-                response_object_list = get_vlm_response(temp_frontier.rgb_image_ls, prompt="Describe the objects present in this image, you have to answer with only a object list and do not answer any other text. Answer Example: ['bed', 'Mirror']}")
-                response_score_str = get_vlm_response(temp_frontier.rgb_image_ls, prompt="What is the probability of {} appearing around this this image? You should answer this question based on this image and its corresponding object list: {}. You have to answer with a value from 0 to 1 anyway. Answer only the value of probability and do not answer any other text.".format(HabitatAction.object_goal, response_object_list))
+                original_image = temp_frontier.rgb_image_ls[0]
+                _, buffer = cv2.imencode(".png", original_image)  # 直接编码为 PNG 字节流
+                image_str = base64.b64encode(buffer).decode("utf-8")  # 转为 base64
+
+                # print("11111111111")
+                # time_1 = time.time()
+                # response_object_list = get_vlm_response(image_str, prompt="Describe the objects present in this image, you have to answer with only a object list and do not answer any other text. Answer Example: ['bed', 'Mirror']}")
+                # time_2 = time.time()
+                # print("22222222222:", time_2-time_1)
+                # response_object_list = clean_response(response_object_list)
+                # response_object_list = json.dumps(eval(response_object_list))
+                # response_score_str = get_vlm_response(image_str, prompt="What is the probability of {} appearing around this this image? You should answer this question based on this image and its corresponding object list: {}. You have to answer with a value from 0 to 1 anyway. Answer only the value of probability and do not answer any other text.".format(HabitatAction.object_goal, response_object_list))
+                # time_3 = time.time()
+                # print("333333333333:", time_3-time_2)
+
+                response_score_str = get_vlm_response(image_str, prompt="What is the probability of {} appearing around this image? You should answer this question based on objects and room type in this image. You have to answer with a value from 0 to 1 anyway. Answer only the value of probability and do not answer any other text.".format(HabitatAction.object_goal))
                 try:
                     temp_frontier.vlm_score = eval(response_score_str)
                 except:
@@ -267,7 +286,7 @@ class RL_Graph(object):
     
     
 
-    '''
+    
     def get_frontier_dis_score(self, frontier_clustered_res_ls):
         if(len(frontier_clustered_res_ls)==0):
             return frontier_clustered_res_ls
@@ -289,20 +308,132 @@ class RL_Graph(object):
             if(temp_frontier.vlm_score>1):
                 temp_frontier.vlm_score = 1
         return frontier_clustered_res_ls
-    '''
+    
+
+    # # 适用于IL
+    # def update(self, topo_graph):
+    #     self.reset()
+    #     selected_intention_node_ls = self.select_intention(topo_graph)
+    #     # =======update node feature=======
+    #     for temp_node in topo_graph.all_nodes:
+    #         if(temp_node.node_type=="explored_node"):
+    #             # feature_ls = [0, 0, 0]
+    #             # feature_ls = [0, 0, 0]+[0 for i in range(21)]+[100 for i in range(21)]
+    #             feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[0, 0]
+    #             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
+    #             temp_node.rl_node_index = len(self.all_nodes)
+    #             self.all_nodes.append(temp_node)
+
+    #     frontier_clustered_res_ls = self.get_clustered_frontier(topo_graph)
+    #     frontier_clustered_res_ls = self.get_frontier_vlm_score(frontier_clustered_res_ls)
+    #     # frontier_clustered_res_ls = self.get_frontier_dis_score(frontier_clustered_res_ls)
+    #     for temp_node in frontier_clustered_res_ls:
+    #         if(len(self.all_action_nodes)>=args.graph_num_action_padding):
+    #             continue
+    #         # feature_ls = [temp_node.vlm_score, 0, 0.5]
+    #         # feature_ls = [0, 0, 0.5]+temp_node.frontier_score_ls+temp_node.frontier_dis_ls
+    #         feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[temp_node.vlm_score, 0.5]
+    #         self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
+    #         temp_node.rl_node_index = len(self.all_nodes)
+    #         self.all_nodes.append(temp_node)
+
+    #         action_ls_index = len(self.all_action_nodes)
+    #         self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1 # 记录在当前result['state']['pyg_graph'].x中的index位置
+    #         self.data['state']['action_mask'][0][action_ls_index] = 1.0
+    #         self.all_action_nodes.append(temp_node)
+    #         self.all_frontier_nodes.append(temp_node)
+
+    #         temp_node.action_in_space_index = action_ls_index
+                
+
+    #     intention_clustered_res_ls = selected_intention_node_ls
+    #     for temp_node in intention_clustered_res_ls:
+    #         if(len(self.all_action_nodes)>=args.graph_num_action_padding):
+    #             continue
+    #         if(len(temp_node.near_score_ls)>0):
+    #             recheck_score = np.mean(temp_node.near_score_ls)
+    #         else:
+    #             recheck_score = 0
+
+    #         # feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]
+    #         # feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]+[0 for i in range(21)]+[100 for i in range(21)]
+            
+    #         score_feature_ls = [temp_node.score]+temp_node.near_score_ls
+    #         dis_feature_ls = [temp_node.init_dis]+temp_node.near_dis_ls
+    #         theta_feature_ls = [temp_node.res_col_index_factor]+temp_node.near_res_col_index_factor_ls
+            
+    #         if (len(score_feature_ls))>=max_len:
+    #             res_len = 0
+    #             feature_ls = score_feature_ls[(-1)*max_len:]+dis_feature_ls[(-1)*max_len:]+theta_feature_ls[(-1)*max_len:]+[0, temp_node.intention_type]
+    #         else:
+    #             res_len = max_len-len(score_feature_ls)
+    #             feature_ls = score_feature_ls+[0]*res_len+dis_feature_ls+[0]*res_len+theta_feature_ls+[0]*res_len+[0, temp_node.intention_type]
+            
+    #         self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
+    #         temp_node.rl_node_index = len(self.all_nodes)
+    #         self.all_nodes.append(temp_node)
+
+    #         action_ls_index = len(self.all_action_nodes)
+    #         self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1
+    #         self.data['state']['action_mask'][0][action_ls_index] = 1.0
+    #         self.all_action_nodes.append(temp_node)
+    #         self.all_intention_nodes.append(temp_node)
+
+    #         temp_node.action_in_space_index = action_ls_index
+        
+    #     for temp_node in self.all_nodes:
+    #         if(temp_node.node_type!="explored_node"):
+    #             self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.rela_cx**2+temp_node.rela_cy**2)**0.5, np.arctan2(temp_node.rela_cy, temp_node.rela_cx), 0]])], dim=0)
+    #             self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.rela_cx**2+temp_node.rela_cy**2)**0.5, np.arctan2((-1)*temp_node.rela_cy, (-1)*temp_node.rela_cx), 0]])], dim=0)
+    #             self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.parent_node.rl_node_index], [temp_node.rl_node_index]])], dim=1)
+    #             self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.rl_node_index], [temp_node.parent_node.rl_node_index]])], dim=1)
+    #         else:
+    #             for temp_neighbor_name in temp_node.neighbor:
+    #                 self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.all_other_nodes_loc[temp_neighbor_name][0]**2+temp_node.all_other_nodes_loc[temp_neighbor_name][1]**2)**0.5, np.arctan2(temp_node.all_other_nodes_loc[temp_neighbor_name][1], temp_node.all_other_nodes_loc[temp_neighbor_name][0]), temp_node.all_other_nodes_loc[temp_neighbor_name][2]]])], dim=0)
+    #                 self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.rl_node_index], [topo_graph.get_node(temp_neighbor_name).rl_node_index]])], dim=1)
+
+    #     # 添加当前机器人的node特征
+    #     # feature_ls = [0, 0, 3]
+    #     # feature_ls = [0, 0, 3]+[0 for i in range(21)]+[100 for i in range(21)]
+    #     feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[0, 3]
+    #     self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
+
+    #     # edge特征
+    #     self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(topo_graph.rela_cy, topo_graph.rela_cx), topo_graph.rela_turn]])], dim=0)
+    #     self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(-topo_graph.rela_cy, -topo_graph.rela_cx), -topo_graph.rela_turn]])], dim=0)
+    #     self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[topo_graph.current_node.rl_node_index], [len(self.all_nodes)]])], dim=1)
+    #     self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[len(self.all_nodes)], [topo_graph.current_node.rl_node_index]])], dim=1)
+
+    
+    #     self.now_node_index = len(self.all_nodes)
+    #     self.data['state'].update({"current_idx": torch.Tensor([[self.now_node_index]])})
+    #     self.data['state']['current_idx'] = torch.tensor(self.data['state']['current_idx'], dtype=torch.int64)
+        
+    #     self.data['state']['pyg_graph'].edge_index = torch.tensor(self.data['state']['pyg_graph'].edge_index, dtype=torch.int64)
+    #     self.data['state']['action_idxes'] = torch.tensor(self.data['state']['action_idxes'], dtype=torch.int64)
 
 
+
+
+
+    # 适用于RL
     def update(self, topo_graph):
         self.reset()
         selected_intention_node_ls = self.select_intention(topo_graph)
         # =======update node feature=======
+        
+        # 添加当前机器人的node特征
+        # feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[0, 3]
+        feature_ls = [0]*max_len+[0]*max_len+[0, 3]
+        self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
+        
+        
         for temp_node in topo_graph.all_nodes:
             if(temp_node.node_type=="explored_node"):
-                # feature_ls = [0, 0, 0]
-                # feature_ls = [0, 0, 0]+[0 for i in range(21)]+[100 for i in range(21)]
-                feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[0, 0]
+                # feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[0, 0]
+                feature_ls = [0]*max_len+[0]*max_len+[0, 0]
                 self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
-                temp_node.rl_node_index = len(self.all_nodes)
+                temp_node.rl_node_index = len(self.all_nodes)+1
                 self.all_nodes.append(temp_node)
 
         frontier_clustered_res_ls = self.get_clustered_frontier(topo_graph)
@@ -311,15 +442,14 @@ class RL_Graph(object):
         for temp_node in frontier_clustered_res_ls:
             if(len(self.all_action_nodes)>=args.graph_num_action_padding):
                 continue
-            # feature_ls = [temp_node.vlm_score, 0, 0.5]
-            # feature_ls = [0, 0, 0.5]+temp_node.frontier_score_ls+temp_node.frontier_dis_ls
-            feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[temp_node.vlm_score, 0.5]
+            # feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[temp_node.vlm_score, 0.5]
+            feature_ls = [0]*max_len+[0]*max_len+[temp_node.vlm_score, 0.5]
             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
-            temp_node.rl_node_index = len(self.all_nodes)
+            temp_node.rl_node_index = len(self.all_nodes)+1
             self.all_nodes.append(temp_node)
 
             action_ls_index = len(self.all_action_nodes)
-            self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1 # 记录在当前result['state']['pyg_graph'].x中的index位置
+            self.data['state']['action_idxes'][0][action_ls_index] = temp_node.rl_node_index # 记录在当前result['state']['pyg_graph'].x中的index位置
             self.data['state']['action_mask'][0][action_ls_index] = 1.0
             self.all_action_nodes.append(temp_node)
             self.all_frontier_nodes.append(temp_node)
@@ -336,31 +466,38 @@ class RL_Graph(object):
             else:
                 recheck_score = 0
 
-            # feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]
-            # feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]+[0 for i in range(21)]+[100 for i in range(21)]
-            
             score_feature_ls = [temp_node.score]+temp_node.near_score_ls
             dis_feature_ls = [temp_node.init_dis]+temp_node.near_dis_ls
             theta_feature_ls = [temp_node.res_col_index_factor]+temp_node.near_res_col_index_factor_ls
-            
+        
             if (len(score_feature_ls))>=max_len:
                 res_len = 0
-                feature_ls = score_feature_ls[(-1)*max_len:]+dis_feature_ls[(-1)*max_len:]+theta_feature_ls[(-1)*max_len:]+[0, temp_node.intention_type]
+                # feature_ls = score_feature_ls[(-1)*max_len:]+dis_feature_ls[(-1)*max_len:]+theta_feature_ls[(-1)*max_len:]+[0, temp_node.intention_type]
+                feature_ls = score_feature_ls[(-1)*max_len:]+dis_feature_ls[(-1)*max_len:]+[0, temp_node.intention_type]
             else:
                 res_len = max_len-len(score_feature_ls)
-                feature_ls = score_feature_ls+[0]*res_len+dis_feature_ls+[0]*res_len+theta_feature_ls+[0]*res_len+[0, temp_node.intention_type]
-            
+                # feature_ls = score_feature_ls+[0]*res_len+dis_feature_ls+[0]*res_len+theta_feature_ls+[0]*res_len+[0, temp_node.intention_type]
+                feature_ls = score_feature_ls+[0]*res_len+dis_feature_ls+[0]*res_len+[0, temp_node.intention_type]
+
             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
-            temp_node.rl_node_index = len(self.all_nodes)
+            temp_node.rl_node_index = len(self.all_nodes)+1
             self.all_nodes.append(temp_node)
 
             action_ls_index = len(self.all_action_nodes)
-            self.data['state']['action_idxes'][0][action_ls_index] = len(self.all_nodes)-1
+            self.data['state']['action_idxes'][0][action_ls_index] = temp_node.rl_node_index
             self.data['state']['action_mask'][0][action_ls_index] = 1.0
             self.all_action_nodes.append(temp_node)
             self.all_intention_nodes.append(temp_node)
 
             temp_node.action_in_space_index = action_ls_index
+        
+        
+        # edge特征
+        self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(topo_graph.rela_cy, topo_graph.rela_cx), topo_graph.rela_turn]])], dim=0)
+        self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(-topo_graph.rela_cy, -topo_graph.rela_cx), -topo_graph.rela_turn]])], dim=0)
+        self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[topo_graph.current_node.rl_node_index], [0]])], dim=1)
+        self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[0], [topo_graph.current_node.rl_node_index]])], dim=1)
+        
         
         for temp_node in self.all_nodes:
             if(temp_node.node_type!="explored_node"):
@@ -368,111 +505,21 @@ class RL_Graph(object):
                 self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.rela_cx**2+temp_node.rela_cy**2)**0.5, np.arctan2((-1)*temp_node.rela_cy, (-1)*temp_node.rela_cx), 0]])], dim=0)
                 self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.parent_node.rl_node_index], [temp_node.rl_node_index]])], dim=1)
                 self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.rl_node_index], [temp_node.parent_node.rl_node_index]])], dim=1)
+            
+                
+            
             else:
                 for temp_neighbor_name in temp_node.neighbor:
                     self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.all_other_nodes_loc[temp_neighbor_name][0]**2+temp_node.all_other_nodes_loc[temp_neighbor_name][1]**2)**0.5, np.arctan2(temp_node.all_other_nodes_loc[temp_neighbor_name][1], temp_node.all_other_nodes_loc[temp_neighbor_name][0]), temp_node.all_other_nodes_loc[temp_neighbor_name][2]]])], dim=0)
                     self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.rl_node_index], [topo_graph.get_node(temp_neighbor_name).rl_node_index]])], dim=1)
 
-        # 添加当前机器人的node特征
-        # feature_ls = [0, 0, 3]
-        # feature_ls = [0, 0, 3]+[0 for i in range(21)]+[100 for i in range(21)]
-        feature_ls = [0]*max_len+[0]*max_len+[0]*max_len+[0, 3]
-        self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
+                    
 
-        # edge特征
-        self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(topo_graph.rela_cy, topo_graph.rela_cx), topo_graph.rela_turn]])], dim=0)
-        self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(-topo_graph.rela_cy, -topo_graph.rela_cx), -topo_graph.rela_turn]])], dim=0)
-        self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[topo_graph.current_node.rl_node_index], [len(self.all_nodes)]])], dim=1)
-        self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[len(self.all_nodes)], [topo_graph.current_node.rl_node_index]])], dim=1)
 
-    
-        self.now_node_index = len(self.all_nodes)
+        
+        self.now_node_index = 0
         self.data['state'].update({"current_idx": torch.Tensor([[self.now_node_index]])})
         self.data['state']['current_idx'] = torch.tensor(self.data['state']['current_idx'], dtype=torch.int64)
         
         self.data['state']['pyg_graph'].edge_index = torch.tensor(self.data['state']['pyg_graph'].edge_index, dtype=torch.int64)
         self.data['state']['action_idxes'] = torch.tensor(self.data['state']['action_idxes'], dtype=torch.int64)
-
-
-    # def update(self, topo_graph):
-    #     self.reset()
-    #     selected_intention_node_ls = self.select_intention(topo_graph)
-    #     # =======update node feature=======
-        
-    #     # 添加当前机器人的node特征
-    #     feature_ls = [0, 0, 3]
-    #     self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
-        
-        
-    #     for temp_node in topo_graph.all_nodes:
-    #         if(temp_node.node_type=="explored_node"):
-    #             feature_ls = [0, 0, 0]
-    #             self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
-    #             temp_node.rl_node_index = len(self.all_nodes)+1
-    #             self.all_nodes.append(temp_node)
-
-    #     frontier_clustered_res_ls = self.get_clustered_frontier(topo_graph)
-    #     for temp_node in frontier_clustered_res_ls:
-    #         if(len(self.all_action_nodes)>=args.graph_num_action_padding):
-    #             continue
-    #         feature_ls = [0, 0, 0.5]
-    #         self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
-    #         temp_node.rl_node_index = len(self.all_nodes)+1
-    #         self.all_nodes.append(temp_node)
-
-    #         action_ls_index = len(self.all_action_nodes)
-    #         self.data['state']['action_idxes'][0][action_ls_index] = temp_node.rl_node_index # 记录在当前result['state']['pyg_graph'].x中的index位置
-    #         self.data['state']['action_mask'][0][action_ls_index] = 1.0
-    #         self.all_action_nodes.append(temp_node)
-    #         self.all_frontier_nodes.append(temp_node)
-
-    #         temp_node.action_in_space_index = action_ls_index
-                
-
-    #     intention_clustered_res_ls = selected_intention_node_ls
-    #     for temp_node in intention_clustered_res_ls:
-    #         if(len(self.all_action_nodes)>=args.graph_num_action_padding):
-    #             continue
-    #         if(len(temp_node.near_score_ls)>0):
-    #             recheck_score = np.mean(temp_node.near_score_ls)
-    #         else:
-    #             recheck_score = 0
-    #         feature_ls = [temp_node.score, recheck_score, temp_node.intention_type]
-    #         self.data['state']['pyg_graph'].x = torch.cat([self.data['state']['pyg_graph'].x, torch.Tensor([feature_ls])], dim=0)
-    #         temp_node.rl_node_index = len(self.all_nodes)+1
-    #         self.all_nodes.append(temp_node)
-
-    #         action_ls_index = len(self.all_action_nodes)
-    #         self.data['state']['action_idxes'][0][action_ls_index] = temp_node.rl_node_index
-    #         self.data['state']['action_mask'][0][action_ls_index] = 1.0
-    #         self.all_action_nodes.append(temp_node)
-    #         self.all_intention_nodes.append(temp_node)
-
-    #         temp_node.action_in_space_index = action_ls_index
-        
-        
-    #     # edge特征
-    #     self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(topo_graph.rela_cy, topo_graph.rela_cx), topo_graph.rela_turn]])], dim=0)
-    #     self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(topo_graph.rela_cx**2+topo_graph.rela_cy**2)**0.5, np.arctan2(-topo_graph.rela_cy, -topo_graph.rela_cx), -topo_graph.rela_turn]])], dim=0)
-    #     self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[topo_graph.current_node.rl_node_index], [0]])], dim=1)
-    #     self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[0], [topo_graph.current_node.rl_node_index]])], dim=1)
-        
-        
-    #     for temp_node in self.all_nodes:
-    #         if(temp_node.node_type!="explored_node"):
-    #             self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.rela_cx**2+temp_node.rela_cy**2)**0.5, np.arctan2(temp_node.rela_cy, temp_node.rela_cx), 0]])], dim=0)
-    #             self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.rela_cx**2+temp_node.rela_cy**2)**0.5, np.arctan2((-1)*temp_node.rela_cy, (-1)*temp_node.rela_cx), 0]])], dim=0)
-    #             self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.parent_node.rl_node_index], [temp_node.rl_node_index]])], dim=1)
-    #             self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.rl_node_index], [temp_node.parent_node.rl_node_index]])], dim=1)
-    #         else:
-    #             for temp_neighbor_name in temp_node.neighbor:
-    #                 self.data['state']['pyg_graph'].edge_attr = torch.cat([self.data['state']['pyg_graph'].edge_attr, torch.Tensor([[(temp_node.all_other_nodes_loc[temp_neighbor_name][0]**2+temp_node.all_other_nodes_loc[temp_neighbor_name][1]**2)**0.5, np.arctan2(temp_node.all_other_nodes_loc[temp_neighbor_name][1], temp_node.all_other_nodes_loc[temp_neighbor_name][0]), temp_node.all_other_nodes_loc[temp_neighbor_name][2]]])], dim=0)
-    #                 self.data['state']['pyg_graph'].edge_index = torch.cat([self.data['state']['pyg_graph'].edge_index, torch.Tensor([[temp_node.rl_node_index], [topo_graph.get_node(temp_neighbor_name).rl_node_index]])], dim=1)
-
-        
-    #     self.now_node_index = 0
-    #     self.data['state'].update({"current_idx": torch.Tensor([[self.now_node_index]])})
-    #     self.data['state']['current_idx'] = torch.tensor(self.data['state']['current_idx'], dtype=torch.int64)
-        
-    #     self.data['state']['pyg_graph'].edge_index = torch.tensor(self.data['state']['pyg_graph'].edge_index, dtype=torch.int64)
-    #     self.data['state']['action_idxes'] = torch.tensor(self.data['state']['action_idxes'], dtype=torch.int64)

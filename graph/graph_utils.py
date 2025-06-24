@@ -83,6 +83,50 @@ class GraphMap(object):
                 return temp_node
     
 
+    # def frontier_delete(self): # 检查旧frontier在新地图上是否应该存在
+    #     current_map = self.current_node.occupancy_map
+    #     for temp_node in self.explored_nodes:            
+    #         sub_frontiers_for_index = copy.deepcopy(temp_node.sub_frontiers)
+    #         for temp_frontier in sub_frontiers_for_index: # 遍历所有的frontier
+    #             # 先删除使得rl_step中实际行走的step为0的frontier
+    #             # ===================================
+    #             need_delete_flag = False
+    #             for temp_delete_frontier in temp_node.deleted_frontiers:
+    #                 if ((temp_delete_frontier.rela_cx-temp_frontier.rela_cx)**2+(temp_delete_frontier.rela_cy-temp_frontier.rela_cy)**2)**0.5<0.2:
+    #                     need_delete_flag = True
+    #                     break
+    #             if(need_delete_flag == True):
+    #                 temp_node.sub_frontiers.remove(temp_frontier)
+    #                 self.frontier_nodes.remove(temp_frontier)
+    #                 self.all_nodes.remove(temp_frontier)
+    #                 continue
+    #             # ===================================
+
+    #             if temp_node.name != self.current_node.name:
+    #                 n_in_current_node = self.current_node.all_other_nodes_loc[temp_node.name] # 将node中的ghost坐标位置转换到当前node下
+    #                 g_ref_loc = get_absolute_pos(np.array([temp_frontier.rela_cx, temp_frontier.rela_cy]), n_in_current_node[:2], n_in_current_node[2])
+    #             else:
+    #                 g_ref_loc = np.array([temp_frontier.rela_cx, temp_frontier.rela_cy])
+    #             gx = (int)(half_len-g_ref_loc[0]/args.resolution)
+    #             gy = (int)(half_len+g_ref_loc[1]/args.resolution)
+
+    #             if gx>=1 and gx<=(2*half_len-1) and gy>=1 and gy<=(2*half_len-1):
+    #                 dis = ((g_ref_loc[0]-self.rela_cx)**2 + (g_ref_loc[1]-self.rela_cy)**2)**0.5
+    #                 around = np.array([current_map[gx-1, gy-1, 0], current_map[gx-1, gy-0, 0], current_map[gx-1, gy+1, 0], current_map[gx-0, gy-1, 0], \
+    #                                 current_map[gx-0, gy+1, 0], current_map[gx+1, gy-1, 0], current_map[gx+1, gy-0, 0], current_map[gx+1, gy+1, 0], current_map[gx, gy, 0]])
+    #                 diff = np.absolute(around-args.ghost_map_g_val)
+    #                 diff = np.sort(diff)
+    #                 if diff[args.thre_for_delete] >= args.ghost_diff_thre or max(around) >= args.ghost_map_thre:
+    #                     temp_node.sub_frontiers.remove(temp_frontier)
+    #                     self.frontier_nodes.remove(temp_frontier)
+    #                     self.all_nodes.remove(temp_frontier)
+
+    #                 elif dis <= args.thre_for_blacklist_delete:
+    #                     temp_node.sub_frontiers.remove(temp_frontier)
+    #                     self.frontier_nodes.remove(temp_frontier)
+    #                     self.all_nodes.remove(temp_frontier)
+    #                     clear_fake_frontier(self.current_node, gx, gy)
+
     def frontier_delete(self): # 检查旧frontier在新地图上是否应该存在
         current_map = self.current_node.occupancy_map
         for temp_node in self.explored_nodes:            
@@ -220,7 +264,7 @@ class GraphMap(object):
             self.frontier_nodes.append(new_frontier)
             self.all_nodes.append(new_frontier)
 
-    
+        
     def add_intention(self, detect_res_pos_dict):
         rela_loc = np.array([self.rela_cx, self.rela_cy])
         r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
@@ -253,15 +297,22 @@ class GraphMap(object):
                 
                 
                 new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], res_col_index_factor=res_col_index_factor)
+                
+                # # correct_recheck
+                # if(new_intention.parent_node.name==self.current_node.name):
+                #     new_intention_loc = np.array([new_intention.rela_cx, new_intention.rela_cy])
+                # else:
+                #     new_intention_parent_in_current = self.current_node.all_other_nodes_loc[new_intention.parent_node.name]
+                #     new_intention_loc = get_absolute_pos(np.array([new_intention.rela_cx, new_intention.rela_cy]), new_intention_parent_in_current[:2], new_intention_parent_in_current[2])
+
+                # new_intention.robot_intention_dis = ((new_intention_loc[0]-self.rela_cx)**2+(new_intention_loc[1]-self.rela_cy)**2)**0.5
+                # new_intention.dis_ls[0] = new_intention.robot_intention_dis
+                # new_intention.init_dis = new_intention.robot_intention_dis
+                # # correct_recheck
+
+
                 # correct_recheck
-
-                if(new_intention.parent_node.name==self.current_node.name):
-                    new_intention_loc = np.array([new_intention.rela_cx, new_intention.rela_cy])
-                else:
-                    new_intention_parent_in_current = self.current_node.all_other_nodes_loc[new_intention.parent_node.name]
-                    new_intention_loc = get_absolute_pos(np.array([new_intention.rela_cx, new_intention.rela_cy]), new_intention_parent_in_current[:2], new_intention_parent_in_current[2])
-
-                new_intention.robot_intention_dis = ((new_intention_loc[0]-self.rela_cx)**2+(new_intention_loc[1]-self.rela_cy)**2)**0.5
+                new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
                 new_intention.dis_ls[0] = new_intention.robot_intention_dis
                 new_intention.init_dis = new_intention.robot_intention_dis
                 # correct_recheck
@@ -280,19 +331,25 @@ class GraphMap(object):
                 
             min_dis = 10000
             min_node = None
-            for temp_new_intention_node in new_intention_ls:
-                
-                # 把old转到new坐标系下
-                if(temp_new_intention_node.parent_node.name==temp_intention_node.parent_node.name):
-                    temp_intention_loc = np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy])
-                else:
-                    old_parent_in_new_parent_loc = temp_new_intention_node.parent_node.all_other_nodes_loc[temp_intention_node.parent_node.name]
-                    temp_intention_loc = get_absolute_pos(np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy]), old_parent_in_new_parent_loc[:2], old_parent_in_new_parent_loc[2])
+            # for temp_new_intention_node in new_intention_ls:
+            #     # 把old转到new坐标系下
+            #     if(temp_new_intention_node.parent_node.name==temp_intention_node.parent_node.name):
+            #         temp_intention_loc = np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy])
+            #     else:
+            #         old_parent_in_new_parent_loc = temp_new_intention_node.parent_node.all_other_nodes_loc[temp_intention_node.parent_node.name]
+            #         temp_intention_loc = get_absolute_pos(np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy]), old_parent_in_new_parent_loc[:2], old_parent_in_new_parent_loc[2])
 
-                temp_dis = ((temp_new_intention_node.rela_cx-temp_intention_loc[0])**2+(temp_new_intention_node.rela_cy-temp_intention_loc[1])**2)**0.5
+            #     temp_dis = ((temp_new_intention_node.rela_cx-temp_intention_loc[0])**2+(temp_new_intention_node.rela_cy-temp_intention_loc[1])**2)**0.5
+            #     if(temp_dis<min_dis):
+            #         min_dis = temp_dis
+            #         min_node = temp_new_intention_node
+
+            for temp_new_intention_node in new_intention_ls:
+                temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
                 if(temp_dis<min_dis):
                     min_dis = temp_dis
                     min_node = temp_new_intention_node
+
             if(min_dis<=1.0): # intention_node聚类距离修改
                 if(-1 not in temp_intention_node.score_ls):
                     temp_intention_node.score_ls.append(min_node.score)
@@ -314,101 +371,110 @@ class GraphMap(object):
         # correct_recheck
     
 
-    '''
-    def add_intention_gt(self, detect_res_pos_dict, rgb_image_ls, object_text):
-        rela_loc = np.array([self.rela_cx, self.rela_cy])
-        r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
     
-        new_intention_ls = []
-        new_intention_name_ls = []
+    # def add_intention_gt(self, detect_res_pos_dict, rgb_image_ls, object_text):
+    #     rela_loc = np.array([self.rela_cx, self.rela_cy])
+    #     r_matrix = np.array([[np.cos(self.rela_turn), np.sin(self.rela_turn)], [-np.sin(self.rela_turn), np.cos(self.rela_turn)]])
+    
+    #     new_intention_ls = []
+    #     new_intention_name_ls = []
         
-        world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+    #     world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
 
-        for temp_score in detect_res_pos_dict:
-            for temp_rela_pos in detect_res_pos_dict[temp_score]:
-                tx, ty = temp_rela_pos[0], temp_rela_pos[1]
-                is_real_intention = temp_rela_pos[2] 
-                res_col_index_factor = temp_rela_pos[3] 
-                center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
+    #     for temp_score in detect_res_pos_dict:
+    #         for temp_rela_pos in detect_res_pos_dict[temp_score]:
+    #             tx, ty = temp_rela_pos[0], temp_rela_pos[1]
+    #             is_real_intention = temp_rela_pos[2] 
+    #             res_col_index_factor = temp_rela_pos[3] 
+    #             center_loc_in_ref = np.dot(r_matrix, np.array([ty,tx])) + rela_loc
 
-                # cluster_revise
-                res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+    #             # cluster_revise
+    #             res_loc_in_real_world = get_absolute_pos_world(center_loc_in_ref[0], center_loc_in_ref[1], self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
                 
-                # 防止fake_intention生成在real_intention附近(# intention_node聚类距离修改)
-                if(is_real_intention==False):
-                    is_near_real_flag = False
-                    for temp_real_intention in self.intention_nodes:
-                        if(temp_real_intention.is_real_intention==True):
-                            if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<1.0:
-                                is_near_real_flag = True
-                                break
-                    if(is_near_real_flag==True):
-                        continue
-                # 防止fake_intention生成在real_intention附近
+    #             # 防止fake_intention生成在real_intention附近(# intention_node聚类距离修改)
+    #             if(is_real_intention==False):
+    #                 is_near_real_flag = False
+    #                 for temp_real_intention in self.intention_nodes:
+    #                     if(temp_real_intention.is_real_intention==True):
+    #                         if((res_loc_in_real_world[0]-temp_real_intention.world_cx)**2+(res_loc_in_real_world[1]-temp_real_intention.world_cy)**2)**0.5<1.0:
+    #                             is_near_real_flag = True
+    #                             break
+    #                 if(is_near_real_flag==True):
+    #                     continue
+    #             # 防止fake_intention生成在real_intention附近
                 
+    #             '''
+    #             new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention, res_col_index_factor=res_col_index_factor)                
+    #             # correct_recheck
+    #             if(new_intention.parent_node.name==self.current_node.name):
+    #                 new_intention_loc = np.array([new_intention.rela_cx, new_intention.rela_cy])
+    #             else:
+    #                 new_intention_parent_in_current = self.current_node.all_other_nodes_loc[new_intention.parent_node.name]
+    #                 new_intention_loc = get_absolute_pos(np.array([new_intention.rela_cx, new_intention.rela_cy]), new_intention_parent_in_current[:2], new_intention_parent_in_current[2])
                 
-                new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention, res_col_index_factor=res_col_index_factor)                
-                # correct_recheck
+    #             new_intention.robot_intention_dis = ((new_intention_loc[0]-self.rela_cx)**2+(new_intention_loc[1]-self.rela_cy)**2)**0.5
+    #             new_intention.dis_ls[0] = new_intention.robot_intention_dis
+    #             new_intention.init_dis = new_intention.robot_intention_dis
+    #             # correct_recheck
+    #             '''
 
-                if(new_intention.parent_node.name==self.current_node.name):
-                    new_intention_loc = np.array([new_intention.rela_cx, new_intention.rela_cy])
-                else:
-                    new_intention_parent_in_current = self.current_node.all_other_nodes_loc[new_intention.parent_node.name]
-                    new_intention_loc = get_absolute_pos(np.array([new_intention.rela_cx, new_intention.rela_cy]), new_intention_parent_in_current[:2], new_intention_parent_in_current[2])
+
+    #             new_intention = Node(node_type="intention_node", rela_cx=center_loc_in_ref[0], rela_cy=center_loc_in_ref[1], parent_node=self.current_node, score=temp_score, world_cx=res_loc_in_real_world[0], world_cy=res_loc_in_real_world[1], is_real_intention=is_real_intention, res_col_index_factor=res_col_index_factor)                
+    #             # correct_recheck
+    #             new_intention.robot_intention_dis = ((new_intention.world_cx-world_cx)**2+(new_intention.world_cy-world_cy)**2)**0.5
+    #             new_intention.dis_ls[0] = new_intention.robot_intention_dis
+    #             new_intention.init_dis = new_intention.robot_intention_dis
+    #             # correct_recheck
                 
-                new_intention.robot_intention_dis = ((new_intention_loc[0]-self.rela_cx)**2+(new_intention_loc[1]-self.rela_cy)**2)**0.5
-                new_intention.dis_ls[0] = new_intention.robot_intention_dis
-                new_intention.init_dis = new_intention.robot_intention_dis
-                # correct_recheck
+    #             self.current_node.sub_intentions.append(new_intention)
+    #             self.intention_nodes.append(new_intention)
+    #             self.all_nodes.append(new_intention)
+
+    #             new_intention_ls.append(new_intention)
+    #             new_intention_name_ls.append(new_intention.name)
+
+    #     # correct_recheck
+    #     for temp_intention_node in self.intention_nodes:
+    #         if(temp_intention_node.name in new_intention_name_ls):
+    #             continue
                 
-                self.current_node.sub_intentions.append(new_intention)
-                self.intention_nodes.append(new_intention)
-                self.all_nodes.append(new_intention)
+    #         min_dis = 10000
+    #         min_node = None
+    #         for temp_new_intention_node in new_intention_ls:
+    #             '''
+    #             # 把old转到new坐标系下
+    #             if(temp_new_intention_node.parent_node.name==temp_intention_node.parent_node.name):
+    #                 temp_intention_loc = np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy])
+    #             else:
+    #                 old_parent_in_new_parent_loc = temp_new_intention_node.parent_node.all_other_nodes_loc[temp_intention_node.parent_node.name]
+    #                 temp_intention_loc = get_absolute_pos(np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy]), old_parent_in_new_parent_loc[:2], old_parent_in_new_parent_loc[2])
 
-                new_intention_ls.append(new_intention)
-                new_intention_name_ls.append(new_intention.name)
+    #             temp_dis = ((temp_new_intention_node.rela_cx-temp_intention_loc[0])**2+(temp_new_intention_node.rela_cy-temp_intention_loc[1])**2)**0.5
+    #             '''
+    #             temp_dis = ((temp_new_intention_node.world_cx-temp_intention_node.world_cx)**2+(temp_new_intention_node.world_cy-temp_intention_node.world_cy)**2)**0.5
+    #             if(temp_dis<min_dis):
+    #                 min_dis = temp_dis
+    #                 min_node = temp_new_intention_node
+    #         if(min_dis<=1.0): # intention_node聚类距离修改
+    #             if(-1 not in temp_intention_node.score_ls):
+    #                 temp_intention_node.score_ls.append(min_node.score)
+    #                 temp_intention_node.score_ls.pop(0)
 
-        # correct_recheck
-        for temp_intention_node in self.intention_nodes:
-            if(temp_intention_node.name in new_intention_name_ls):
-                continue
-                
-            min_dis = 10000
-            min_node = None
-            for temp_new_intention_node in new_intention_ls:
-                
-                # 把old转到new坐标系下
-                if(temp_new_intention_node.parent_node.name==temp_intention_node.parent_node.name):
-                    temp_intention_loc = np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy])
-                else:
-                    old_parent_in_new_parent_loc = temp_new_intention_node.parent_node.all_other_nodes_loc[temp_intention_node.parent_node.name]
-                    temp_intention_loc = get_absolute_pos(np.array([temp_intention_node.rela_cx, temp_intention_node.rela_cy]), old_parent_in_new_parent_loc[:2], old_parent_in_new_parent_loc[2])
+    #                 temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
+    #                 temp_intention_node.dis_ls.pop(0)
+    #             else:
+    #                 score_index = temp_intention_node.score_ls.index(-1)
+    #                 temp_intention_node.score_ls[score_index] = min_node.score
 
-                temp_dis = ((temp_new_intention_node.rela_cx-temp_intention_loc[0])**2+(temp_new_intention_node.rela_cy-temp_intention_loc[1])**2)**0.5
-                
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    min_node = temp_new_intention_node
-            if(min_dis<=1.0): # intention_node聚类距离修改
-                if(-1 not in temp_intention_node.score_ls):
-                    temp_intention_node.score_ls.append(min_node.score)
-                    temp_intention_node.score_ls.pop(0)
+    #                 temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
 
-                    temp_intention_node.dis_ls.append(min_node.robot_intention_dis)
-                    temp_intention_node.dis_ls.pop(0)
-                else:
-                    score_index = temp_intention_node.score_ls.index(-1)
-                    temp_intention_node.score_ls[score_index] = min_node.score
-
-                    temp_intention_node.dis_ls[score_index] = min_node.robot_intention_dis
-
-                # 新增人工分数序列判断
-                if(min_node.robot_intention_dis<temp_intention_node.init_dis):
-                    temp_intention_node.near_score_ls.append(min_node.score)
-                    temp_intention_node.near_dis_ls.append(min_node.robot_intention_dis)
-                    temp_intention_node.near_res_col_index_factor_ls.append(min_node.res_col_index_factor)
-        # correct_recheck
-    '''
+    #             # 新增人工分数序列判断
+    #             if(min_node.robot_intention_dis<temp_intention_node.init_dis):
+    #                 temp_intention_node.near_score_ls.append(min_node.score)
+    #                 temp_intention_node.near_dis_ls.append(min_node.robot_intention_dis)
+    #                 temp_intention_node.near_res_col_index_factor_ls.append(min_node.res_col_index_factor)
+    #     # correct_recheck
+    
 
     # def add_other_intention(self, other_res_pos_dict):
     #      rela_loc = np.array([self.rela_cx, self.rela_cy])
@@ -437,21 +503,74 @@ class GraphMap(object):
     
     
 
+    # def update(self):
+    #     large_depth = get_large_depth(self.habitat_env) # meter
+    #     point_for_close_loop_detection = get_laser_point_for_ring(large_depth) # current_laser_for_loop
+
+
+    #     start_time = time.time()
+    #     flag, predict_node, final_rela_t, final_rela_turn, t_to_current, theta_to_current = \
+    #     find_current_node(self.explored_nodes, self.current_node, point_for_close_loop_detection, self.rela_turn, np.array([self.rela_cx, self.rela_cy]))
+    #     end_time = time.time()
+
+    #     print("========> delta_ring_time <========", end_time-start_time)
+    #     print("=====> len(self.explored_nodes) <=====", len(self.explored_nodes))
+
+    #     # if(len(self.explored_nodes)>5):
+    #     #     breakpoint()
+
+    #     # update explored node
+    #     if flag == True:
+    #         last_node = self.current_node
+    #         world_cx, world_cy, world_cz, world_turn = get_current_world_pos(self.habitat_env)
+            
+    #         if(last_node is None):
+    #             self.set_current_pos(0.0, 0.0, 0.0)
+    #             predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
+    #             self.current_node = predict_node
+    #             self.all_nodes.append(self.current_node)
+    #             self.explored_nodes.append(self.current_node)
+    #         else:
+    #             self.set_current_pos(0.0, 0.0, 0.0)
+    #             predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
+    #             self.current_node = predict_node
+
+    #             last_node.add_neighbor(self.current_node, t_to_current, theta_to_current)
+    #             R = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
+    #             inverse_theta = -theta_to_current
+    #             inverse_t = np.dot(R, -t_to_current)
+    #             self.current_node.add_neighbor(last_node, inverse_t, inverse_theta)
+
+    #             self.all_nodes.append(self.current_node)
+    #             self.explored_nodes.append(self.current_node)
+        
+    #     elif flag == False and predict_node.name != self.current_node.name:
+    #         self.set_current_pos(final_rela_t[0], final_rela_t[1], final_rela_turn)
+
+    #         last_node = self.current_node
+    #         self.current_node = predict_node
+
+    #         R1 = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
+    #         theta_last_in_current_p = -theta_to_current
+    #         t_last_in_current_p = np.dot(R1, -t_to_current)
+            
+    #         R2 = np.array([[np.cos(-final_rela_turn), np.sin(-final_rela_turn)], [-np.sin(-final_rela_turn), np.cos(-final_rela_turn)]])
+    #         theta_predicted_in_current_p = -final_rela_turn
+    #         t_predicted_in_current_p = np.dot(R2, -final_rela_t)
+
+    #         predicted_t_in_last = get_absolute_pos(t_predicted_in_current_p, t_to_current, theta_to_current)
+    #         predicted_theta_in_last = theta_predicted_in_current_p + theta_to_current # 机器人相对于B的相对角度-机器人相对于A的相对角度
+    #         last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last) # 新current_node相对于旧current_node的相对位置（A相对于B）
+
+    #         last_t_in_predicted = get_absolute_pos(t_last_in_current_p, final_rela_t, final_rela_turn)
+    #         last_theta_in_predicted = theta_last_in_current_p + final_rela_turn
+    #         self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)     
+    #     else:
+    #         self.set_current_pos(final_rela_t[0], final_rela_t[1], final_rela_turn)
+    #     return flag
+
     def update(self):
-        large_depth = get_large_depth(self.habitat_env) # meter
-        point_for_close_loop_detection = get_laser_point_for_ring(large_depth) # current_laser_for_loop
-
-
-        start_time = time.time()
-        flag, predict_node, final_rela_t, final_rela_turn, t_to_current, theta_to_current = \
-        find_current_node(self.explored_nodes, self.current_node, point_for_close_loop_detection, self.rela_turn, np.array([self.rela_cx, self.rela_cy]))
-        end_time = time.time()
-
-        print("========> delta_ring_time <========", end_time-start_time)
-        print("=====> len(self.explored_nodes) <=====", len(self.explored_nodes))
-
-        # if(len(self.explored_nodes)>5):
-        #     breakpoint()
+        flag, predict_node, final_t, final_theta = find_current_node_world(self.explored_nodes, self.habitat_env, self.current_node)
 
         # update explored node
         if flag == True:
@@ -460,47 +579,50 @@ class GraphMap(object):
             
             if(last_node is None):
                 self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
+                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn)
                 self.current_node = predict_node
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
             else:
                 self.set_current_pos(0.0, 0.0, 0.0)
-                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn, pc=point_for_close_loop_detection)
+                predict_node = Node(node_type="explored_node", world_cx=world_cx, world_cy=world_cy, world_cz=world_cz, world_turn=world_turn)
                 self.current_node = predict_node
+                
+                current_node_in_last_node_loc = get_relative_pos_world(self.current_node.world_cx, self.current_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
+                current_node_in_last_node_turn = self.current_node.world_turn-last_node.world_turn
+                # node_robot_dis = get_node_robot_dis(current_node_in_last_node_loc[0], current_node_in_last_node_loc[1], last_node.occupancy_map, is_explored_node=True)
 
-                last_node.add_neighbor(self.current_node, t_to_current, theta_to_current)
-                R = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
-                inverse_theta = -theta_to_current
-                inverse_t = np.dot(R, -t_to_current)
-                self.current_node.add_neighbor(last_node, inverse_t, inverse_theta)
+                last_node.add_neighbor(self.current_node, current_node_in_last_node_loc, current_node_in_last_node_turn)
+                # last_node.neighbor_dis_dict[self.current_node.name] = node_robot_dis
+
+                last_node_in_current_node_loc =  get_relative_pos_world(last_node.world_cx, last_node.world_cy, self.current_node.world_cx, self.current_node.world_cy, self.current_node.world_turn)
+                last_node_in_current_node_turn = last_node.world_turn-self.current_node.world_turn
+                self.current_node.add_neighbor(last_node, last_node_in_current_node_loc, last_node_in_current_node_turn)
+                # self.current_node.neighbor_dis_dict[last_node.name] = node_robot_dis
+
 
                 self.all_nodes.append(self.current_node)
                 self.explored_nodes.append(self.current_node)
-        
+
         elif flag == False and predict_node.name != self.current_node.name:
-            self.set_current_pos(final_rela_t[0], final_rela_t[1], final_rela_turn)
+            self.set_current_pos(final_t[0], final_t[1], final_theta)
 
             last_node = self.current_node
             self.current_node = predict_node
 
-            R1 = np.array([[np.cos(-theta_to_current), np.sin(-theta_to_current)], [-np.sin(-theta_to_current), np.cos(-theta_to_current)]])
-            theta_last_in_current_p = -theta_to_current
-            t_last_in_current_p = np.dot(R1, -t_to_current)
-            
-            R2 = np.array([[np.cos(-final_rela_turn), np.sin(-final_rela_turn)], [-np.sin(-final_rela_turn), np.cos(-final_rela_turn)]])
-            theta_predicted_in_current_p = -final_rela_turn
-            t_predicted_in_current_p = np.dot(R2, -final_rela_t)
+            predicted_t_in_last = get_relative_pos_world(predict_node.world_cx, predict_node.world_cy, last_node.world_cx, last_node.world_cy, last_node.world_turn)
+            predicted_theta_in_last = predict_node.world_turn-last_node.world_turn
+            # node_robot_dis = get_node_robot_dis(predicted_t_in_last[0], predicted_t_in_last[1], last_node.occupancy_map, is_explored_node=True)
 
-            predicted_t_in_last = get_absolute_pos(t_predicted_in_current_p, t_to_current, theta_to_current)
-            predicted_theta_in_last = theta_predicted_in_current_p + theta_to_current # 机器人相对于B的相对角度-机器人相对于A的相对角度
-            last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last) # 新current_node相对于旧current_node的相对位置（A相对于B）
+            last_node.add_neighbor(self.current_node, predicted_t_in_last, predicted_theta_in_last)
+            # last_node.neighbor_dis_dict[self.current_node.name] = node_robot_dis
 
-            last_t_in_predicted = get_absolute_pos(t_last_in_current_p, final_rela_t, final_rela_turn)
-            last_theta_in_predicted = theta_last_in_current_p + final_rela_turn
+            last_t_in_predicted = get_relative_pos_world(last_node.world_cx, last_node.world_cy, predict_node.world_cx, predict_node.world_cy, predict_node.world_turn)
+            last_theta_in_predicted = last_node.world_turn-predict_node.world_turn            
             self.current_node.add_neighbor(last_node, last_t_in_predicted, last_theta_in_predicted)     
+            # self.current_node.neighbor_dis_dict[last_node.name] = node_robot_dis
         else:
-            self.set_current_pos(final_rela_t[0], final_rela_t[1], final_rela_turn)
+            self.set_current_pos(final_t[0], final_t[1], final_theta)
         return flag
 
 

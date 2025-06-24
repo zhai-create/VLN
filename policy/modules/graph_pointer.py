@@ -41,7 +41,7 @@ class GraphPointerPolicy(nn.Module):
                  n_head=2, n_layer_with_edge_attr=1, 
                 # n_layer_encoder=4, n_layer_decoder=2,  
                 #  n_head=2, n_layer_with_edge_attr=2, 
-                 encoder_type='GCN'):
+                 encoder_type='GCN', init_temp=5.0):
         super(GraphPointerPolicy, self).__init__() 
         
         # Encoder
@@ -73,6 +73,11 @@ class GraphPointerPolicy(nn.Module):
         self.cnn_part2 = self._build_deep_cnn() 
         self.cnn_part3 = self._build_deep_cnn()
         
+        
+        # 我们学习log(T)而不是T，以确保T始终为正
+        # nn.Parameter使其成为模型的可训练参数
+        initial_log_temp = np.log(init_temp)
+        self.log_temperature = nn.Parameter(torch.tensor(initial_log_temp, dtype=torch.float32))
     
     def _build_deep_cnn(self):
         """构建深度CNN结构，包含多个小卷积核层"""
@@ -145,17 +150,15 @@ class GraphPointerPolicy(nn.Module):
             # graphs.x = new_x
             # # ==========================================
 
-            # 只有分数序列+距离序列
-            # ==========================================
-            original_x = graphs.x
-            new_x = torch.cat([
-                original_x[:, 0:100],
-                original_x[:, 150:152]
-            ], dim=1)  # [N,5]
-            graphs.x = new_x
-            # ==========================================
-
-
+            # # 只有分数序列+距离序列
+            # # ==========================================
+            # original_x = graphs.x
+            # new_x = torch.cat([
+            #     original_x[:, 0:100],
+            #     original_x[:, 150:152]
+            # ], dim=1)  # [N,5]
+            # graphs.x = new_x
+            # # ==========================================
 
             node_enhanced = self.pre(graphs) # Batch, Graph => Num_Key, Feature_Dim
             # node_enhanced_padded, node_padding_mask = padding_graph(node_enhanced, graphs.batch, n_padding=self._num_graph_padding) # Batch, Num_Key(Padded), Dim_Feature & Batch, Num_Query=1, Num_Key
@@ -187,6 +190,19 @@ class GraphPointerPolicy(nn.Module):
         enhanced_current_node = self.combine_residual(torch.cat((enhanced_current_node, current_node), dim=-1)) # double the dim of embedding_dim (Batch, 1, 2*Embedding_dim)-->(Batch, 1, Embedding_dim)
         # PointerNet
         pointer_out = self.pointer(enhanced_current_node, action_node, action_mask) # Batch, Num_Action
+        
+
+        # 3. 应用温度
+        # 使用exp()来获取始终为正的温度值
+        # 使用clamp来防止温度过低或过高，增加训练稳定性（可选但推荐）
+        temp = torch.exp(self.log_temperature).clamp(min=0.1, max=10.0)
+
+        # 将logits除以温度
+        scaled_logits = pointer_out / temp
+
+        # 应用softmax得到最终的动作概率
+        pointer_out = F.softmax(scaled_logits, dim=-1)
+        
         return pointer_out # Batch, Num_Action
 
 
@@ -241,6 +257,8 @@ class GraphQNet(nn.Module):
         self.decoder_1 = DecoderMultiHeadAttention(embedding_dim=embedding_dim, n_head=n_head, n_layer=n_layer_decoder)
         self.action_enhancing_1 = nn.Linear(embedding_dim*3, embedding_dim)
         self.q_value_embedding_1 = nn.Linear(embedding_dim, 1)
+
+        self.last_layer = nn.Linear(embedding_dim, 1)
         
         self.decoder_2 = DecoderMultiHeadAttention(embedding_dim=embedding_dim, n_head=n_head, n_layer=n_layer_decoder)
         self.action_enhancing_2 = nn.Linear(embedding_dim*3, embedding_dim)
@@ -265,28 +283,38 @@ class GraphQNet(nn.Module):
         current_idx = current_idx.unsqueeze(-1).repeat(1, 1, self._embedding_dim) # Batch, 1, Feature_Dim
         current_node = torch.gather(node_enhanced_padded, 1, current_idx) # Batch, 1, Feature_Dim
 
+        '''
         action_idx = action_idx.unsqueeze(-1).repeat(1, 1, self._embedding_dim)
         action_node = torch.gather(node_enhanced_padded, 1, action_idx) # Batch, Num_Action, Feature_Dim
-        
+        '''
+
+
         # Q1
         # enhanced_current_node_1, attention_1 = self.decoder_1(current_node, action_node, action_mask) # enhance with action nodes
         enhanced_current_node_1, attention_1 = self.decoder_1(current_node, node_enhanced_padded, node_padding_mask) # enhance with all nodes
+        v_values_masked_1 = self.last_layer(enhanced_current_node_1)
+
+
+        '''
         enhanced_action_node_1 = torch.cat((enhanced_current_node_1.repeat(1, action_node.shape[1], 1), current_node.repeat(1, action_node.shape[1], 1), action_node), dim=-1)
         enhanced_action_node_1 = self.action_enhancing_1(enhanced_action_node_1) # (Batch, 3*Num_Action, Feature_Dim) --> (Batch, Num_Action, Feature_Dim)
         q_values_1 = self.q_value_embedding_1(enhanced_action_node_1) # Batch, Num_Action, 1
         zero_1 = torch.zeros_like(q_values_1).cuda()
         q_values_masked_1 = torch.where(action_mask.unsqueeze(-1) == 0, zero_1, q_values_1) # Batch, Num_Action, 1
+        '''
 
-        # Q2
-        # enhanced_current_node_2, attention_2 = self.decoder_2(current_node, action_node, action_mask) # enhance with action nodes
-        enhanced_current_node_2, attention_2 = self.decoder_2(current_node, node_enhanced_padded, node_padding_mask) # enhance with all nodes
-        enhanced_action_node_2 = torch.cat((enhanced_current_node_2.repeat(1, action_node.shape[1], 1), current_node.repeat(1, action_node.shape[1], 1), action_node), dim=-1)
-        enhanced_action_node_2 = self.action_enhancing_2(enhanced_action_node_2)
-        q_values_2 = self.q_value_embedding_2(enhanced_action_node_2)
-        zero_2 = torch.zeros_like(q_values_2).cuda()
-        q_values_masked_2 = torch.where(action_mask.unsqueeze(-1) == 0, zero_2, q_values_2) # Batch, Num_Action, 1
 
-        return q_values_masked_1, q_values_masked_2 
+        # # Q2
+        # # enhanced_current_node_2, attention_2 = self.decoder_2(current_node, action_node, action_mask) # enhance with action nodes
+        # enhanced_current_node_2, attention_2 = self.decoder_2(current_node, node_enhanced_padded, node_padding_mask) # enhance with all nodes
+        # enhanced_action_node_2 = torch.cat((enhanced_current_node_2.repeat(1, action_node.shape[1], 1), current_node.repeat(1, action_node.shape[1], 1), action_node), dim=-1)
+        # enhanced_action_node_2 = self.action_enhancing_2(enhanced_action_node_2)
+        # q_values_2 = self.q_value_embedding_2(enhanced_action_node_2)
+        # zero_2 = torch.zeros_like(q_values_2).cuda()
+        # q_values_masked_2 = torch.where(action_mask.unsqueeze(-1) == 0, zero_2, q_values_2) # Batch, Num_Action, 1
+
+        # return q_values_masked_1, q_values_masked_2 
+        return v_values_masked_1
 
     def Q1(self, state, args):
         # Graph Encoder for Data Enhancement

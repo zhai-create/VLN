@@ -21,6 +21,8 @@ from graph.tools import get_absolute_pos
 
 from navigation.habitat_action import HabitatAction
 
+from env_tools.arguments import args as env_args
+
 
 class SAC(RL_Policy):
     def __init__(self, args):
@@ -31,32 +33,39 @@ class SAC(RL_Policy):
                                         embedding_dim= args.graph_embedding_dim, 
                                         num_graph_padding=args.graph_num_graph_padding,
                                         encoder_type=args.graph_encoder).cuda()
+
+
+        self.actor_old = GraphPointerPolicy(node_dim=args.graph_node_feature_dim, 
+                                        edge_dim=args.graph_edge_feature_dim,
+                                        embedding_dim= args.graph_embedding_dim, 
+                                        num_graph_padding=args.graph_num_graph_padding,
+                                        encoder_type=args.graph_encoder).cuda()
+
         self.critic = GraphQNet(node_dim=args.graph_node_feature_dim, 
                                 edge_dim=args.graph_edge_feature_dim,
                                 embedding_dim= args.graph_embedding_dim, 
                                 num_graph_padding=args.graph_num_graph_padding,
                                 encoder_type=args.graph_encoder).cuda()
-        self.critic_target = copy.deepcopy(self.critic)
 
-        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=args.graph_lr_actor)
-        self.critic_optimizer= torch.optim.Adam(self.critic.parameters(), lr=args.graph_lr_critic)
+        # self.critic_old = GraphQNet(node_dim=args.graph_node_feature_dim, 
+        #                         edge_dim=args.graph_edge_feature_dim,
+        #                         embedding_dim= args.graph_embedding_dim, 
+        #                         num_graph_padding=args.graph_num_graph_padding,
+        #                         encoder_type=args.graph_encoder).cuda()
+    
+        # self.critic_target = copy.deepcopy(self.critic)
+
+        self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr=args.graph_lr_actor, eps=1e-5)
+        self.critic_optimizer= torch.optim.Adam(self.critic.parameters(), lr=args.graph_lr_critic, eps=1e-5)
         
-        self.scheduler_actor = lr_scheduler.StepLR(self.actor_optimizer, 50, 0.99)
-        self.scheduler_critic = lr_scheduler.StepLR(self.critic_optimizer, 50, 0.99)
-        
-        self.critic_loss = nn.MSELoss()
+        # self.scheduler_actor = lr_scheduler.StepLR(self.actor_optimizer, 50, 0.99)
         
         self.greedy = args.graph_sac_greedy
         self.lr_scheduler_interval = args.lr_scheduler_interval
 
         # entropy tuning
         self.lr_tune = args.lr_tune
-        self.alpha_init = args.alpha_init
         self.target_entropy = 0.05 * (-np.log(1 / args.graph_num_action_padding))
-        
-        self.log_alpha = torch.full((), np.log(self.alpha_init), requires_grad=True, dtype=torch.float32, device=torch.device('cuda'))
-        self.alpha = self.log_alpha.exp().detach()
-        self.alpha_optimizer = torch.optim.Adam([self.log_alpha], lr=self.lr_tune)
 
         self.discount = args.discount
         self.tau = args.tau
@@ -65,10 +74,42 @@ class SAC(RL_Policy):
         
         self.graph_num_action_padding = args.graph_num_action_padding
         self.args = args
+
+        self.graph_iter_per_step = env_args.graph_iter_per_step
+        self.eps_clip = 0.2
+
+        self.MseLoss = nn.MSELoss()
+
+        self.train_cnt = 0
+        self.gamma = 0.99
+        self.lamda = 0.95
+
+        self.select_action_cnt = 0
+
+        self.vf_coef = 0.5
+        self.ent_coef = 0.01
+
+        self.minibatch_size = args.minibatch_size
     
-    def update_buffer(self, state, action, next_state, reward, done, p_idx):
-        self.buffer.add(state, action, next_state, reward, done, p_idx)
-    
+    def update_buffer(self, state, action, next_state, reward, done, action_logprob, reward_arrive): # 向buffer中添加一个样本
+        self.buffer.states.append(state)
+        self.buffer.actions.append(action)
+        self.buffer.rewards.append(reward)
+        self.buffer.is_terminals.append(done)
+        self.buffer.logprobs.append(action_logprob)
+        self.buffer.reward_arrives.append(reward_arrive)
+        self.buffer.next_states.append(next_state)
+
+    def delete_buffer(self):
+        while (self.buffer.reward_arrives) and (self.buffer.reward_arrives[-1] is False):
+            # 删除最后一个元素
+            self.buffer.states.pop()
+            self.buffer.actions.pop()
+            self.buffer.rewards.pop()
+            self.buffer.is_terminals.pop()
+            self.buffer.logprobs.pop()
+            self.buffer.reward_arrives.pop()
+            self.buffer.next_states.pop()
     
     def state_handler(self, state, if_batch=True):    
         if self.graph_using_pyg:
@@ -89,480 +130,381 @@ class SAC(RL_Policy):
             
             return node_info_padded, node_padding_mask, edge_matrix, current_idx, action_idxes, action_mask
 
+
+
     def action_handler(self, action):
         return action.cuda() # B num_action_node_padding
         
     @torch.no_grad()
-    def select_action(self, state, if_train=False):
-        if if_train and self.train_step < self.random_exploration_length: # random policy
-            num_action = int(np.sum(state["action_mask"].cpu().numpy()))
-            action_index = np.random.choice(num_action, 1)
-            all_action_indexes = state['action_idxes'].squeeze(-1).cpu().numpy()[0]
-            action = all_action_indexes[action_index][0]
+    def select_action(self, writer, state, if_train=False):
+        new_state = self.state_handler(state, False)
+        action_log_prob = self.actor_old(new_state, self.args).detach()  
+
+        action_std = action_log_prob.exp().std().item()
+        writer.add_scalar('Training/Policy/action_std', action_std, self.select_action_cnt)
+        self.select_action_cnt += 1
+
+        if self.greedy:
+            action_index = torch.argmax(action_log_prob, dim=1).long()
         else:
-            new_state = self.state_handler(state, False)
-            action = self.actor(new_state, self.args).detach()  
-            if self.greedy:
-                action_index = torch.argmax(action, dim=1).long()
-            else:
-                action_index = torch.multinomial(action.exp(), 1).long().squeeze(1)
-            action = state['action_idxes'][0, action_index.item()].cpu().numpy() # action在rl_topo中的index
-            action_index = action_index.cpu().numpy() # action在action_space中的index
+            action_index = torch.multinomial(action_log_prob.exp(), 1).long().squeeze(1)
+
+        action = state['action_idxes'][0, action_index.item()].cpu().numpy() # action在rl_topo中的index
+        action_index = action_index.cpu().numpy() # action在action_space中的index
+        action_log_prob_val = action_log_prob[0, action_index[0]]
+
+        return action, action_index, action_log_prob_val # idx in padding
+
+    '''
+    def update_policy(self, writer):
+        rewards = []
+        discounted_reward = 0
+        temp_index = 0
+        for reward, is_reward_arrive in zip(reversed(self.buffer.rewards), reversed(self.buffer.reward_arrives)):
+            if (is_reward_arrive==True):
+                discounted_reward = 0
+            discounted_reward = reward + (self.gamma * discounted_reward)
+            rewards.insert(0, discounted_reward)
+
+            if(temp_index==0):
+                assert (is_reward_arrive==True)
+            temp_index += 1
+
+        # Normalizing the rewards:
+        rewards = torch.tensor(rewards, dtype=torch.float32).to("cuda")
+        # rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-7) # 归一化所有reward
+        self.buffer.rewards = rewards
+
+        # # convert list to tensor
+        # old_states = self.buffer.states
+        # old_actions = self.buffer.actions
+        # old_logprobs = self.buffer.logprobs
+
+        all_old_states, all_old_actions, all_old_reward, all_old_not_done, all_old_logprobs = self.buffer.sample()
+        # all_old_states = self.state_handler(all_old_states)
+
+
+        all_old_pyg_graph = Batch.from_data_list(all_old_states['pyg_graph']).cuda()
+        all_old_current_idx = all_old_states['current_idx'].cuda()
+        all_old_action_idxes = all_old_states['action_idxes'].cuda()
+        all_old_action_mask = all_old_states['action_mask'].cuda()
+
+        all_old_actions = self.action_handler(all_old_actions) # B,1 (选择到的action在action_space中的index)
+        all_old_logprobs = all_old_logprobs.unsqueeze(1).float().cuda() # B,1,1
+
         
-        return action, action_index # idx in padding
+        with torch.no_grad():
+            # q_values_from_old_critic: (batch_size, Num_Action, 1)
+            v_values_from_old_critic = self.critic_old((all_old_pyg_graph, all_old_current_idx, all_old_action_idxes, all_old_action_mask), self.args) # 使用旧critic
+            # baseline_v_values: (batch_size, 1) - 已采取动作对应的旧Q值
+            baseline_v_values = v_values_from_old_critic.squeeze(2)
 
-    @torch.no_grad()
-    def random_select_action(self, state, if_train=False):
-        num_action = int(np.sum(state["action_mask"].cpu().numpy()))
-        action_index = np.random.choice(num_action, 1)
-        all_action_indexes = state['action_idxes'].squeeze(-1).cpu().numpy()[0]
-        action = all_action_indexes[action_index][0]
-        return action, action_index # idx in padding
+        advantages = rewards - baseline_v_values.detach() # （B,1,1）
+        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8) 
 
-    '''
-    @torch.no_grad()
-    def greedy_select_action(self, rl_graph, topo_graph):
-        max_score = 0
-        max_score_node = None
-        candidate_intention_ls = []
-        for temp_node in rl_graph.all_intention_nodes:
-            if(temp_node.score>max_score):
-                max_score = temp_node.score
-                max_score_node = temp_node
+        # 步骤 3: PPO Epoch 循环和 Minibatch 迭代
+        # --------------------------------------------------------------------
+        num_samples_in_rollout = len(self.buffer.states) # 应该是 rl_args.update_timestep (1024)
+        accumulated_loss = 0.0
+        num_minibatch_updates = 0
 
-            if(len(temp_node.near_score_ls)>0):
-                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-                    candidate_intention_ls.append(temp_node)
-                
-        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-            min_dis = 10000
-            res_node = None
-            for temp_node in candidate_intention_ls:
-                if(temp_node.parent_node.name==topo_graph.current_node.name):
-                    temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                else:
-                    temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                    temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
+        for _ in range(self.graph_iter_per_step): # PPO Epochs
+            permutation_indices = np.random.permutation(num_samples_in_rollout)
 
-                temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        else: # 没有“两次有效观察”的intention
-            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-            if(max_score>0.8):
-                if(max_score_node.intention_type==1):
-                    return max_score_node
-            if(len(rl_graph.all_frontier_nodes)==0):
-                return max_score_node
-            min_dis = 10000
-            res_node = None
-            for temp_node in rl_graph.all_frontier_nodes:
-                if(temp_node.parent_node.name==topo_graph.current_node.name):
-                    temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                else:
-                    temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                    temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
-                
-                temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        return res_node
-    '''
+            for start_idx in range(0, num_samples_in_rollout, self.minibatch_size):
+                end_idx = start_idx + self.minibatch_size
+                mb_indices = permutation_indices[start_idx:end_idx]
 
-    '''
-    @torch.no_grad()
-    def greedy_select_action_ring_vlm_score(self, rl_graph, topo_graph):
-        max_score = 0
-        max_score_node = None
-        candidate_intention_ls = []
-        for temp_node in rl_graph.all_intention_nodes:
-            if(temp_node.score>max_score):
-                max_score = temp_node.score
-                max_score_node = temp_node
+                # 提取当前minibatch的数据
+                # mb_states = all_old_states[mb_indices]
 
-            if(len(temp_node.near_score_ls)>0):
-                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-                    candidate_intention_ls.append(temp_node)
-                
-        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-            min_dis = 10000
-            res_node = None
-            for temp_node in candidate_intention_ls:
-                if(temp_node.parent_node.name==topo_graph.current_node.name):
-                    temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                else:
-                    temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                    temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
+                # # 使用列表推导式对元组中的每个张量应用高级索引
+                # minibatch_states_list = [state_part[mb_indices] for state_part in all_old_states]
+                # # 将列表转换回元组
+                # mb_states = tuple(minibatch_states_list)
 
-                temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        else: # 没有“两次有效观察”的intention
-            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-            if(max_score>0.8):
-                if(max_score_node.intention_type==1):
-                    return max_score_node
-            if(len(rl_graph.all_frontier_nodes)==0):
-                return max_score_node
+                part_old_pyg_graph = Batch.from_data_list([all_old_states['pyg_graph'][temp_index] for temp_index in mb_indices]).cuda()
+                part_old_current_idx = all_old_current_idx[mb_indices]
+                part_old_action_idxes = all_old_action_idxes[mb_indices]
+                part_old_action_mask = all_old_action_mask[mb_indices]
+                mb_states = (part_old_pyg_graph, part_old_current_idx, part_old_action_idxes, part_old_action_mask)
 
-            # 选择一个frontier
-            all_frontier_score = [temp_frontier.vlm_score for temp_frontier in rl_graph.all_frontier_nodes]
-            all_zero_flag = np.all(np.array(all_frontier_score) == 0)
-            if(all_zero_flag==True): # 选择距离机器人最近的frontier
-                min_dis = 10000
-                res_node = None
-                for temp_node in rl_graph.all_frontier_nodes:
-                    if(temp_node.parent_node.name==topo_graph.current_node.name):
-                        temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                    else:
-                        temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                        temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
-                    
-                    temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                    if(temp_dis<min_dis):
-                        min_dis = temp_dis
-                        res_node = temp_node
-            else: # 选择分数最高的frontier
-                res_node = None
-                max_score = 0
-
-                now_frontier_distance_ls = []
-                for temp_node in rl_graph.all_frontier_nodes:
-                    if(temp_node.parent_node.name==topo_graph.current_node.name):
-                        temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                    else:
-                        temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                        temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
-                    temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                    now_frontier_distance_ls.append(temp_dis)
-                
-                sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes), key=lambda x: x[0])]
-                for temp_node in sorted_nodes:
-                    if(temp_node.vlm_score>max_score) or (res_node is None):
-                        max_score = temp_node.vlm_score
-                        res_node = temp_node
-
-        return res_node
-    '''
-
-
-    @torch.no_grad()
-    def greedy_select_action_ring_dis_score(self, rl_graph, topo_graph):
-        max_score = 0
-        max_score_node = None
-        candidate_intention_ls = []
-        for temp_node in rl_graph.all_intention_nodes:
-            if(temp_node.score>max_score):
-                max_score = temp_node.score
-                max_score_node = temp_node
-
-            if(len(temp_node.near_score_ls)>0):
-                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-                    candidate_intention_ls.append(temp_node)
-                
-        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-            min_dis = 10000
-            res_node = None
-            for temp_node in candidate_intention_ls:
-                if(temp_node.parent_node.name==topo_graph.current_node.name):
-                    temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                else:
-                    temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                    temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
-
-                temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        else: # 没有“两次有效观察”的intention
-            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-            if(max_score>0.8):
-                if(max_score_node.intention_type==1):
-                    return max_score_node
-            if(len(rl_graph.all_frontier_nodes)==0):
-                return max_score_node
-
-            # 选择一个frontier
-            all_frontier_score = [temp_frontier.vlm_score for temp_frontier in rl_graph.all_frontier_nodes]
-            all_zero_flag = np.all(np.array(all_frontier_score) == 0)
-            if(all_zero_flag==True): # 选择距离机器人最近的frontier
-                min_dis = 10000
-                res_node = None
-                for temp_node in rl_graph.all_frontier_nodes:
-                    if(temp_node.parent_node.name==topo_graph.current_node.name):
-                        temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                    else:
-                        temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                        temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
-                    
-                    temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                    if(temp_dis<min_dis):
-                        min_dis = temp_dis
-                        res_node = temp_node
-            else: # 选择分数最高的frontier
-                res_node = None
-                max_score = 0
-
-                now_frontier_distance_ls = []
-                for temp_node in rl_graph.all_frontier_nodes:
-                    if(temp_node.parent_node.name==topo_graph.current_node.name):
-                        temp_loc = np.array([temp_node.rela_cx, temp_node.rela_cy])
-                    else:
-                        temp_parent_in_current_loc = topo_graph.current_node.all_other_nodes_loc[temp_node.parent_node.name]
-                        temp_loc = get_absolute_pos(np.array([temp_node.rela_cx, temp_node.rela_cy]), temp_parent_in_current_loc[:2], temp_parent_in_current_loc[2])
-                    temp_dis = ((temp_loc[0]-topo_graph.rela_cx)**2+(temp_loc[1]-topo_graph.rela_cy)**2)**0.5
-                    now_frontier_distance_ls.append(temp_dis)
-                
-                sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes), key=lambda x: x[0])]
-                for temp_node in sorted_nodes:
-                    if(temp_node.vlm_score>max_score) or (res_node is None):
-                        max_score = temp_node.vlm_score
-                        res_node = temp_node
-
-        return res_node
-
-
-    # 用于“our+rcnn+greedy+llm_frontier”
-    '''
-    @torch.no_grad()
-    def greedy_select_action_frontier_score(self, rl_graph, world_cx, world_cy):
-        max_score = 0
-        max_score_node = None
-        candidate_intention_ls = []
-        for temp_node in rl_graph.all_intention_nodes:
-            if(temp_node.score>max_score):
-                max_score = temp_node.score
-                max_score_node = temp_node
-
-            if(len(temp_node.near_score_ls)>0):
-                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-                    candidate_intention_ls.append(temp_node)
-                
-        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-            min_dis = 10000
-            res_node = None
-            for temp_node in candidate_intention_ls:
-                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        else: # 没有“两次有效观察”的intention
-            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-            if(max_score>0.8):
-                if(max_score_node.intention_type==1):
-                    return max_score_node
-            if(len(rl_graph.all_frontier_nodes)==0):
-                return max_score_node
-            # 选择一个frontier
-            all_frontier_score = [temp_frontier.vlm_score for temp_frontier in rl_graph.all_frontier_nodes]
-            all_zero_flag = np.all(np.array(all_frontier_score) == 0)
-            if(all_zero_flag==True): # 选择距离机器人最近的frontier
-                min_dis = 10000
-                res_node = None
-                for temp_node in rl_graph.all_frontier_nodes:
-                    temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-                    if(temp_dis<min_dis):
-                        min_dis = temp_dis
-                        res_node = temp_node
-            else: # 选择分数最高的frontier
-                res_node = None
-                max_score = 0
-                now_frontier_distance_ls = [((temp_frontier.world_cx-world_cx)**2+(temp_frontier.world_cy-world_cy)**2)**0.5 for temp_frontier in rl_graph.all_frontier_nodes]
-                # sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes))] # 按照距离递增排序后的list
-                sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes), key=lambda x: x[0])]
-                for temp_node in sorted_nodes:
-                    if(temp_node.vlm_score>max_score) or (res_node is None):
-                        max_score = temp_node.vlm_score
-                        res_node = temp_node
-        return res_node
-    '''
-
-    '''
-    @torch.no_grad()
-    def greedy_select_action_dis_score(self, rl_graph, world_cx, world_cy):
-        max_score = 0
-        max_score_node = None
-        candidate_intention_ls = []
-        for temp_node in rl_graph.all_intention_nodes:
-            if(temp_node.score>max_score):
-                max_score = temp_node.score
-                max_score_node = temp_node
-
-            if(len(temp_node.near_score_ls)>0):
-                if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-                    candidate_intention_ls.append(temp_node)
-                
-        if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-            min_dis = 10000
-            res_node = None
-            for temp_node in candidate_intention_ls:
-                temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-                if(temp_dis<min_dis):
-                    min_dis = temp_dis
-                    res_node = temp_node
-        else: # 没有“两次有效观察”的intention
-            # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-            if(max_score>0.8):
-                if(max_score_node.intention_type==1):
-                    return max_score_node
-            if(len(rl_graph.all_frontier_nodes)==0):
-                return max_score_node
-            # 选择一个frontier
-            now_frontier_distance_ls = [((temp_frontier.world_cx-world_cx)**2+(temp_frontier.world_cy-world_cy)**2)**0.5 for temp_frontier in rl_graph.all_frontier_nodes]
-            sorted_nodes = [node for _, node in sorted(zip(now_frontier_distance_ls, rl_graph.all_frontier_nodes), key=lambda x: x[0])]
-            res_node = None
-            max_score = 0
-            for temp_node in sorted_nodes:
-                if(temp_node.vlm_score>max_score) or (res_node is None):
-                    max_score = temp_node.vlm_score
-                    res_node = temp_node
-        return res_node
-    '''
-
-
-
-    # @torch.no_grad()
-    # def greedy_select_action_near_goal(self, rl_graph, world_cx, world_cy, current_episode):
-    #     # 找到距离当前机器人最近的object所在的位置
-    #     min_goal_dis = 1000000
-    #     min_goal_loc = None
-    #     for temp_index in range(len(current_episode.goals)):
-    #         temp_dis = ((current_episode.goals[temp_index].position[2]-world_cx)**2+(current_episode.goals[temp_index].position[0]-world_cy)**2)**0.5
-    #         if temp_dis<min_goal_dis:
-    #             min_goal_dis = temp_dis
-    #             min_goal_loc = current_episode.goals[temp_index].position
+                mb_actions = all_old_actions[mb_indices]
+                mb_old_logprobs = all_old_logprobs[mb_indices]
+                mb_returns_G_t = rewards[mb_indices] # 当前minibatch的G_t
+                mb_advantages = advantages[mb_indices]
         
-    #     max_score = 0
-    #     max_score_node = None
-    #     candidate_intention_ls = []
-    #     for temp_node in rl_graph.all_intention_nodes:
-    #         if(temp_node.score>max_score):
-    #             max_score = temp_node.score
-    #             max_score_node = temp_node
+                # 3b. 调用 train 函数处理这个minibatch
+                loss_this_minibatch = self.train(
+                    writer,
+                    mb_states,
+                    mb_actions,
+                    mb_old_logprobs,
+                    mb_returns_G_t, # 将G_t作为"reward"参数传递给train函数
+                    mb_advantages
+                )
+                accumulated_loss += loss_this_minibatch.mean().item()
+                num_minibatch_updates += 1
+        
+        avg_loss_for_update = accumulated_loss / num_minibatch_updates if num_minibatch_updates > 0 else 0
+        
 
-    #         if(len(temp_node.near_score_ls)>0):
-    #             if(temp_node.score<=np.mean(temp_node.near_score_ls)):
-    #                 candidate_intention_ls.append(temp_node)
-                
-    #     if(len(candidate_intention_ls)>0): # 具有“两次有效观察”的intention
-    #         min_dis = 10000
-    #         res_node = None
-    #         for temp_node in candidate_intention_ls:
-    #             temp_dis = ((temp_node.world_cx-world_cx)**2+(temp_node.world_cy-world_cy)**2)**0.5
-    #             if(temp_dis<min_dis):
-    #                 min_dis = temp_dis
-    #                 res_node = temp_node
-    #     else: # 没有“两次有效观察”的intention
-    #         # if(max_score>0.8) or (len(rl_graph.all_frontier_nodes)==0):
-    #         if(max_score>0.8):
-    #             if(max_score_node.intention_type==1):
-    #                 return max_score_node
-    #         if(len(rl_graph.all_frontier_nodes)==0):
-    #             return max_score_node
-    #         min_dis = 10000
-    #         res_node = None
-    #         for temp_node in rl_graph.all_frontier_nodes:
-    #             temp_dis = ((temp_node.world_cx-min_goal_loc[0])**2+(temp_node.world_cy-min_goal_loc[1])**2)**0.5
-    #             if(temp_dis<min_dis):
-    #                 min_dis = temp_dis
-    #                 res_node = temp_node
-    #     return res_node
-                
+        # for _ in range(self.graph_iter_per_step): # 将网络参数更新K次
+        #     loss = self.train(writer)
+        
+        self.actor_old.load_state_dict(self.actor.state_dict())
+        self.critic_old.load_state_dict(self.critic.state_dict())
+        self.train_cnt += 1
+        writer.add_scalar('Training/Policy/lr_actor', self.actor_optimizer.state_dict()['param_groups'][0]['lr'], self.train_cnt)
+        writer.add_scalar('Training/Policy/lr_critic', self.critic_optimizer.state_dict()['param_groups'][0]['lr'], self.train_cnt)
+        writer.add_scalar('Training/Policy/avg_loss_per_update', avg_loss_for_update, self.train_cnt)
+    '''
+
+    def update_policy(self, writer):
+        temp_index = 0
+        for reward, is_reward_arrive in zip(reversed(self.buffer.rewards), reversed(self.buffer.reward_arrives)):
+            if(temp_index==0):
+                assert (is_reward_arrive==True)
+                break
+            temp_index += 1
+        
+        all_old_states, all_old_actions, all_old_next_state, all_old_reward, all_old_not_done, all_old_logprobs = self.buffer.sample()
+
+        # =====> state <=====
+        all_old_pyg_graph = Batch.from_data_list(all_old_states['pyg_graph']).cuda()
+        all_old_current_idx = all_old_states['current_idx'].cuda()
+        all_old_action_idxes = all_old_states['action_idxes'].cuda()
+        all_old_action_mask = all_old_states['action_mask'].cuda()
+
+        # =====> next_state <=====
+        all_old_next_pyg_graph = Batch.from_data_list(all_old_next_state['pyg_graph']).cuda()
+        all_old_next_current_idx = all_old_next_state['current_idx'].cuda()
+        all_old_next_action_idxes = all_old_next_state['action_idxes'].cuda()
+        all_old_next_action_mask = all_old_next_state['action_mask'].cuda()
+
+        adv = []
+        gae = 0
+        with torch.no_grad():  # adv and v_target have no gradient
+            vs = self.critic((all_old_next_pyg_graph, all_old_next_current_idx, all_old_next_action_idxes, all_old_next_action_mask), self.args) # 使用旧critic
+            vs = vs.squeeze(2).cuda()
+
+            vs_ = self.critic((all_old_next_pyg_graph, all_old_next_current_idx, all_old_next_action_idxes, all_old_next_action_mask), self.args)
+            vs_ = vs_.squeeze(2).cuda()
+
+            # deltas = all_old_reward + self.gamma * all_old_not_done * vs_ - vs
+            deltas = all_old_reward.cuda() + self.gamma * all_old_not_done.cuda() * vs_ - vs
+            for delta, not_d in zip(reversed(deltas.flatten().cpu().numpy()), reversed(all_old_not_done.flatten().cpu().numpy())):
+                gae = delta + self.gamma * self.lamda * gae * not_d
+                adv.insert(0, gae)
+            adv = torch.tensor(adv, dtype=torch.float).view(-1, 1).cuda()
+            v_target = adv + vs
+            adv = ((adv - adv.mean()) / (adv.std() + 1e-5))
+
+        # 步骤 3: PPO Epoch 循环和 Minibatch 迭代
+        # --------------------------------------------------------------------
+        num_samples_in_rollout = len(self.buffer.states) # 应该是 rl_args.update_timestep (1024)
+        accumulated_actor_loss = 0.0
+        accumulated_critic_loss = 0.0
+        num_minibatch_updates = 0
+
+        for _ in range(self.graph_iter_per_step): # PPO Epochs
+            permutation_indices = np.random.permutation(num_samples_in_rollout)
+
+            for start_idx in range(0, num_samples_in_rollout, self.minibatch_size):
+                end_idx = start_idx + self.minibatch_size
+                mb_indices = permutation_indices[start_idx:end_idx]
+
+                # 提取当前minibatch的数据
+                # mb_states = all_old_states[mb_indices]
+
+                # # 使用列表推导式对元组中的每个张量应用高级索引
+                # minibatch_states_list = [state_part[mb_indices] for state_part in all_old_states]
+                # # 将列表转换回元组
+                # mb_states = tuple(minibatch_states_list)
+
+                part_old_pyg_graph = Batch.from_data_list([all_old_states['pyg_graph'][temp_index] for temp_index in mb_indices]).cuda()
+                part_old_current_idx = all_old_current_idx[mb_indices]
+                part_old_action_idxes = all_old_action_idxes[mb_indices]
+                part_old_action_mask = all_old_action_mask[mb_indices]
+                mb_states = (part_old_pyg_graph, part_old_current_idx, part_old_action_idxes, part_old_action_mask)
+
+                mb_actions = all_old_actions[mb_indices]
+                mb_old_logprobs = all_old_logprobs[mb_indices]
+                # mb_returns_G_t = rewards[mb_indices] # 当前minibatch的G_t
+                mb_advantages = adv[mb_indices]
+                mb_v_target = v_target[mb_indices]
+        
+                # 3b. 调用 train 函数处理这个minibatch
+                actor_loss_this_minibatch, critic_loss_this_minibatch = self.train(
+                    writer,
+                    mb_states,
+                    mb_actions,
+                    mb_old_logprobs,
+                    # mb_returns_G_t, # 将G_t作为"reward"参数传递给train函数
+                    mb_advantages,
+                    mb_v_target
+                )
+                accumulated_actor_loss += actor_loss_this_minibatch.mean().item()
+                accumulated_critic_loss += critic_loss_this_minibatch.mean().item()
+                num_minibatch_updates += 1
+        
+        actor_avg_loss_for_update = accumulated_actor_loss / num_minibatch_updates if num_minibatch_updates > 0 else 0
+        critic_avg_loss_for_update = accumulated_critic_loss / num_minibatch_updates if num_minibatch_updates > 0 else 0
+        
+        
+        self.actor_old.load_state_dict(self.actor.state_dict())
+        # self.critic_old.load_state_dict(self.critic.state_dict())
+        self.train_cnt += 1
+
+        current_temp = torch.exp(self.actor.log_temperature).item()
+        writer.add_scalar('Training/Policy/current_temp', current_temp, self.train_cnt)
+
+        writer.add_scalar('Training/Policy/lr_actor', self.actor_optimizer.state_dict()['param_groups'][0]['lr'], self.train_cnt)
+        writer.add_scalar('Training/Policy/lr_critic', self.critic_optimizer.state_dict()['param_groups'][0]['lr'], self.train_cnt)
+        writer.add_scalar('Training/Policy/actor_avg_loss_per_update', actor_avg_loss_for_update, self.train_cnt)
+        writer.add_scalar('Training/Policy/critic_avg_loss_per_update', critic_avg_loss_for_update, self.train_cnt)
 
 
-    def train(self, writer, train_index, batch_size=16):
-        if(train_index==0):
-            self.train_step += 1
-            HabitatAction.episode_train_step += 1
-        if self.train_step < self.random_exploration_length:
-            return self.train_step
-
+    def train(self, writer,
+            # 以下是minibatch数据：
+            state_mb,         # (minibatch_size, state_dim...)
+            action_mb,        # (minibatch_size, 1) - 动作索引
+            old_logprob_mb,   # (minibatch_size, 1) - 旧策略的log_prob(a|s)
+            # returns_G_t_mb,    # (minibatch_size,) - 这个minibatch的回报 G_t
+            advantages_mb,
+            v_target_mb
+    ):
         self.actor.train()
         self.critic.train()
 
-        '''load data batch'''
-        state, action, next_state, reward, not_done, _ = self.buffer.sample(batch_size)
-        state = self.state_handler(state)
-        next_state = self.state_handler(next_state)
+        # '''load data batch'''
+        # state, action, reward, not_done, action_logprob = self.buffer.sample()
+        # state = self.state_handler(state)
+        # action = self.action_handler(action) # B,1 (选择到的action在action_space中的index)
+        # reward = reward.unsqueeze(1).float().cuda() # B,1,1
+        # not_done = not_done.unsqueeze(1).float().cuda() # B,1,1
+        # action_logprob = action_logprob.unsqueeze(1).float().cuda() # B,1,1
         
-        action = self.action_handler(action) # B,1 (选择到的action在action_space中的index)
-        reward = reward.unsqueeze(1).float().cuda() # B,1,1
-        not_done = not_done.unsqueeze(1).float().cuda() # B,1,1
-        
-        '''critic'''
-        with torch.no_grad():
-            next_logprob = self.actor(next_state, self.args) # Batch, Num_Action
-            target_q1, target_q2 = self.critic_target(next_state, self.args) # Batch, Num_Action, 1
-            next_q_values = torch.min(target_q1, target_q2) # Batch, Num_Action, 1
-            target_q = torch.sum(next_logprob.unsqueeze(2).exp() * (next_q_values - self.alpha * next_logprob.unsqueeze(2)), dim=1).unsqueeze(1)
-            target_q = reward + self.discount * not_done * target_q # B, 1, 1
-            
-        all_q1, all_q2 = self.critic(state, self.args) # Batch, Num_Action, 1
-        current_q1 = torch.gather(all_q1, 1, action.unsqueeze(-1)) # B,1,1(选择action对应的q值)
-        current_q2 = torch.gather(all_q2, 1, action.unsqueeze(-1)) # B,1,1
-        critic_loss = self.critic_loss(current_q1, target_q) + self.critic_loss(current_q2, target_q)
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()   
-        
+
         '''actor'''
-        logprob = self.actor(state, self.args) # Batch, Num_Action
-        actor_loss = torch.sum((logprob.exp().unsqueeze(2) * (self.alpha * logprob.unsqueeze(2) - self.critic.Q1(state, self.args).detach())), dim=1).mean()
+        origin_logprobs = self.actor(state_mb, self.args) # Batch, Num_Action # 用old_state得到对应的对数概率分布
+        origin_logprobs = origin_logprobs.unsqueeze(-1).float().cuda() # B,N,1
+        entropy = (origin_logprobs * origin_logprobs.exp()).sum(dim=1) # (B,1)
+        logprobs = torch.gather(origin_logprobs, 1, action_mb.unsqueeze(-1).cuda()) # B,1,1
+        ratios = torch.exp(logprobs - old_logprob_mb.detach().cuda()) # （B,1,1）
+
+        surr1 = ratios * advantages_mb # （B,1,1）
+        surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages_mb # （B,1,1）
+        actor_loss = -torch.min(surr1.squeeze(-1), surr2.squeeze(-1)) - self.ent_coef * entropy # Actor相关的损失
+
+        # take gradient step
+        # 优化 Actor
         self.actor_optimizer.zero_grad()
-        actor_loss.backward()
-        self.actor_optimizer.step()        
+        actor_loss.mean().backward() # 只计算影响actor的梯度
+        torch.nn.utils.clip_grad_norm_(self.actor.parameters(), 0.5)
+        self.actor_optimizer.step()
 
-        '''automatic entropy tuning'''
-        entropy = (logprob * logprob.exp()).sum(dim=-1)
-        alpha_loss = -(self.log_alpha * (entropy.detach() + self.target_entropy)).mean()
-        
-        self.alpha_optimizer.zero_grad()
-        alpha_loss.backward()
-        self.alpha_optimizer.step()
-        self.alpha = self.log_alpha.exp().detach()
-        soft_update(self.critic_target, self.critic, self.tau)
 
-        writer.add_scalar('Training/Policy/lr_actor', self.actor_optimizer.state_dict()['param_groups'][0]['lr'], self.train_step)
-        writer.add_scalar('Training/Policy/lr_critic', self.critic_optimizer.state_dict()['param_groups'][0]['lr'], self.train_step)
-        writer.add_scalar('Training/Policy/actor_loss', actor_loss.item(), self.train_step)
-        writer.add_scalar('Training/Policy/critic_loss', critic_loss.item(), self.train_step)
-        writer.add_scalar('Training/Policy/alpha', self.alpha.detach().item(), self.train_step)
+        origin_state_values = self.critic(state_mb, self.args) # Batch, Num_Action, 1
+        state_values = origin_state_values.squeeze(2).cuda()
+        critic_loss = self.MseLoss(state_values.squeeze(-1), v_target_mb.squeeze(-1))
         
-        if self.train_step % self.lr_scheduler_interval == 0:
-            self.scheduler_actor.step()
-            self.scheduler_critic.step()
-        return self.train_step
+        # 优化 Critic
+        self.critic_optimizer.zero_grad()
+        critic_loss.mean().backward() # 只计算影响critic的梯度
+        torch.nn.utils.clip_grad_norm_(self.critic.parameters(), 0.5)
+        self.critic_optimizer.step()
+        
+        return actor_loss, critic_loss
+
+
+    # def train(self, writer,
+    #         # 以下是minibatch数据：
+    #         state_mb,         # (minibatch_size, state_dim...)
+    #         action_mb,        # (minibatch_size, 1) - 动作索引
+    #         old_logprob_mb,   # (minibatch_size, 1) - 旧策略的log_prob(a|s)
+    #         returns_G_t_mb,    # (minibatch_size,) - 这个minibatch的回报 G_t
+    #         advantages_mb
+    # ):
+    #     self.actor.train()
+    #     self.critic.train()
+
+    #     # '''load data batch'''
+    #     # state, action, reward, not_done, action_logprob = self.buffer.sample()
+    #     # state = self.state_handler(state)
+    #     # action = self.action_handler(action) # B,1 (选择到的action在action_space中的index)
+    #     # reward = reward.unsqueeze(1).float().cuda() # B,1,1
+    #     # not_done = not_done.unsqueeze(1).float().cuda() # B,1,1
+    #     # action_logprob = action_logprob.unsqueeze(1).float().cuda() # B,1,1
+        
+
+    #     '''actor'''
+    #     origin_logprobs = self.actor(state_mb, self.args) # Batch, Num_Action # 用old_state得到对应的对数概率分布
+    #     origin_logprobs = origin_logprobs.unsqueeze(-1).float().cuda() # B,N,1
+    #     entropy = (origin_logprobs * origin_logprobs.exp()).sum(dim=1) # (B,1)
+    #     logprobs = torch.gather(origin_logprobs, 1, action_mb.unsqueeze(-1)) # B,1,1
+    #     ratios = torch.exp(logprobs - old_logprob_mb.detach()) # （B,1,1）
+
+    #     surr1 = ratios * advantages_mb # （B,1,1）
+    #     surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages_mb # （B,1,1）
+
+    #     origin_state_values = self.critic(state_mb, self.args) # Batch, Num_Action, 1
+    #     # state_values = torch.gather(origin_state_values, 1, action_mb.unsqueeze(-1)) # B,1,1(选择action对应的q值)
+    #     state_values = origin_state_values.squeeze(2)
+
+    #     policy_loss = -torch.min(surr1.squeeze(-1), surr2.squeeze(-1))
+    #     critic_loss = self.MseLoss(state_values.squeeze(-1), returns_G_t_mb.squeeze(-1))
+    #     loss = policy_loss + self.vf_coef*critic_loss - self.ent_coef*entropy
+
+    #     # take gradient step
+    #     # 优化 Actor
+    #     self.actor_optimizer.zero_grad()
+    #     actor_loss_for_backward = policy_loss - self.ent_coef * entropy # Actor相关的损失
+    #     actor_loss_for_backward.mean().backward() # 只计算影响actor的梯度
+    #     self.actor_optimizer.step()
+
+    #     # 优化 Critic
+    #     self.critic_optimizer.zero_grad()
+    #     critic_loss_for_backward = self.vf_coef * critic_loss # Critic相关的损失
+    #     critic_loss_for_backward.mean().backward() # 只计算影响critic的梯度
+    #     self.critic_optimizer.step()
+
+    #     # loss.mean().backward()
+    #     # self.actor_optimizer.step()
+    #     return loss
+        
+        # writer.add_scalar('Training/Policy/lr_actor', self.actor_optimizer.state_dict()['param_groups'][0]['lr'], self.train_cnt)
+        # writer.add_scalar('Training/Policy/loss', loss.item(), self.train_cnt)
+
+        # if self.train_step % self.lr_scheduler_interval == 0:
+        #     self.scheduler_actor.step()
                     
     def save(self, dir_path):
         save_models(self.critic, self.critic_optimizer, "critic", dir_path)
         save_models(self.actor, self.actor_optimizer, "actor", dir_path)
 
     def load(self, dir_path):
-        self.critic.load_state_dict(torch.load(dir_path + "_critic"))
-        self.critic_optimizer.load_state_dict(torch.load(dir_path + "_critic_optimizer"))
-        self.critic_target = copy.deepcopy(self.critic)
+        # self.critic.load_state_dict(torch.load(dir_path + "_critic"))
+        # self.critic_optimizer.load_state_dict(torch.load(dir_path + "_critic_optimizer"))
+        # self.critic_target = copy.deepcopy(self.critic)
 
         self.actor.load_state_dict(torch.load(dir_path + "_actor"))
         self.actor_optimizer.load_state_dict(torch.load(dir_path + "_actor_optimizer"))
-        self.actor_target = copy.deepcopy(self.actor)
+        # self.actor_target = copy.deepcopy(self.actor)
 
     def load_il(self, dir_path):
         checkpoint = torch.load(dir_path, map_location="cuda")['model_state']
-        self.actor.load_state_dict(checkpoint)
+        self.actor.load_state_dict(checkpoint, strict=False)
+        self.actor_old.load_state_dict(checkpoint, strict=False)
+
+        # 筛选出Encoder的参数
+        # 筛选逻辑: 保留所有键名以 "encoder." 开头的项
+        encoder_weights = {key: value for key, value in checkpoint.items() if key.startswith("pre.")}
+
+        # 使用 strict=False 将筛选后的权重加载到Critic模型中
+        # 这会只更新encoder部分的权重，而critic_head部分保持不变
+        self.critic.load_state_dict(encoder_weights, strict=False)
 
 
-    def load_buffer_data(self, writer, load_buffer_data_cnt, load_buffer_data_path):
-        while self.train_step<=load_buffer_data_cnt:
-            load_dict = np.load("{}/{}.npy".format(load_buffer_data_path, self.train_step), allow_pickle=True).item()
-            load_state = load_dict['current_state']
-            load_action_indexes = load_dict['policy_acton_idx']
-            load_next_state = load_dict['next_state']
-            load_reward = load_dict['reward']
-            load_done = load_dict['done']
 
-            self.update_buffer(load_state, load_action_indexes, load_next_state, load_reward, load_done, 0) # 一个样本
-            self.train_step += 1
-            writer.add_scalar('Result/reward_per_rl_step', load_reward, self.train_step) # 记录每一个train_step的reward
+

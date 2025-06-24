@@ -40,6 +40,11 @@ def get_args():
         help="the interval of the learning rate scheduler step in training")
     parser.add_argument('--graph_action_space', type=str, default='adjacent',
         help="the action space of the graph task  :  ['adjacent', 'frontier']  ")
+    parser.add_argument('--update_timestep', type=int, default=2000)
+
+    parser.add_argument('--minibatch_size', type=int, default=-1)
+
+
 
     # graph task setting
     parser.add_argument('--graph_task', type=str, default='object_goal_navigation',

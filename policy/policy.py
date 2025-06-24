@@ -5,7 +5,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from policy.tools.buffer import ReplayBuffer_List, RolloutBuffer_vanilla, ReplayBuffer_Graph, RolloutBuffer
+from policy.tools.buffer import ReplayBuffer_List, RolloutBuffer_vanilla, ReplayBuffer_Graph, RolloutBuffer, Memory_Graph
 
 class RL_Policy(object):
     def __init__(self, args):
@@ -40,7 +40,9 @@ class RL_Policy(object):
         else:
             self.graph_using_pyg = args.graph_using_pyg
             self.random_exploration_length = args.random_exploration_length
-            self.buffer = ReplayBuffer_Graph(args.buffer_size, args.graph_num_action_padding, args.graph_num_graph_padding, args.graph_node_feature_dim, args.graph_using_pyg)
+            # self.buffer = ReplayBuffer_Graph(args.buffer_size, args.graph_num_action_padding, args.graph_num_graph_padding, args.graph_node_feature_dim, args.graph_using_pyg)
+            self.buffer = Memory_Graph(args.buffer_size, args.graph_num_action_padding, args.graph_num_graph_padding, args.graph_node_feature_dim, args.graph_using_pyg)
+
 
     def update_buffer(self):
         return NotImplementedError

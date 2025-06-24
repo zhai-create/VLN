@@ -802,39 +802,27 @@ def map2points(args, obs_map):
     
     return points
 
+
 def init_RL(args, rl_args, experiment, writer=None):
     from policy.rl_algorithms.sac_graph import SAC as RL_Policy
     policy = RL_Policy(rl_args)
     if not args.graph_train:  # test阶段
-        pre_policy = '{0}/{1}/policy/{2}/{3}'.format(args.root, args.model_file_name, experiment, args.graph_pre_model)
-        policy.load(pre_policy)
-    else: # train阶段
+        # # 导入RL权重
+        # pre_policy = '{0}/{1}/policy/{2}/{3}'.format(args.root, args.model_file_name, experiment, args.graph_pre_model)
+        # policy.load(pre_policy)
+        
+        # 导入IL权重
+        # pre_policy = 'checkpoints_llm_score_revise_intention_for_new_ring/epoch_{}.pt'.format(args.graph_pre_model)
+        pre_policy = 'checkpoints_frontier_score_revise_intention_for_train_old_label_only_score_dis/epoch_{}.pt'.format(args.graph_pre_model)
+        policy.load_il(pre_policy)
+    else: # train阶段 (scratch训练)
         if args.graph_pre_model > 0: # 之前训练过一段时间
-            pre_policy = '{0}/{1}/policy/{2}/{3}'.format(args.root, args.model_file_name, experiment, args.graph_pre_model)
-            policy.load(pre_policy)
-        else: # scratch训练
+            pre_policy = 'checkpoints_frontier_score_revise_intention_for_train_old_label_only_score_dis/epoch_{}.pt'.format(args.graph_pre_model)
+            # pre_policy = 'checkpoints_llm_score_revise_intention_for_new_ring/epoch_{}.pt'.format(args.graph_pre_model)
+            policy.load_il(pre_policy)
+        else:
             pre_path = '{0}/{1}/policy/{2}'.format(args.root, args.model_file_name, experiment)
             if not os.path.exists(pre_path):
                 os.makedirs(pre_path)
                 print(f"The new path:'{pre_path}' has beed craeted!")
-        
-        # 保存buffer数据
-        if(rl_args.is_save_buffer_data==True):
-            # 创建buffer的文件夹
-            save_buffer_path = rl_args.save_buffer_data_path
-            if(not os.path.exists(save_buffer_path)):
-                os.makedirs(save_buffer_path)
-                print(f"The new path:'{save_buffer_path}' has beed craeted!")
-        
-        # 导入buffer中的数据
-        policy.load_buffer_data(writer, load_buffer_data_cnt=rl_args.load_buffer_data_cnt, load_buffer_data_path=rl_args.load_buffer_data_path)
-    return policy
-
-
-def init_IL(args, rl_args):
-    from policy.rl_algorithms.sac_graph import SAC as RL_Policy
-    policy = RL_Policy(rl_args)
-    # pre_policy = 'checkpoints_llm_score_revise_intention_for_new_ring/epoch_{}.pt'.format(args.graph_pre_model)    
-    pre_policy = 'checkpoints_frontier_score_revise_intention_for_train_old_label_only_score_dis/epoch_{}.pt'.format(args.graph_pre_model)
-    policy.load_il(pre_policy)
     return policy
